@@ -60,7 +60,7 @@ impl component::Component for Model {
                 bound.left(),
                 bound.right(),
             );
-            let y = *s * 100.0 * (self.amp + self.amp_tmp);
+            let y = *s * 100.0 * (self.amp + self.amp_tmp).abs();
             nannou::geom::pt2(x, y)
         }));
 

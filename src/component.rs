@@ -35,6 +35,11 @@ pub trait Component {
 
     fn draw(&self, ctx: &Draw);
 
+    fn mouse_moved(&mut self, _pos: Point2) {}
+    fn mouse_pressed(&mut self, _mouse: MouseButton) {}
+    fn mouse_dragged(&mut self, _origin: Point2, _current: Point2) {}
+    fn mouse_released(&mut self, _mouse: MouseButton) {}
+
     fn get_bounding_box(&self) -> nannou::geom::Rect {
         return self.get_base_component().bound;
     }
@@ -45,7 +50,7 @@ pub trait Component {
         let base = self.get_base_component();
         base.mousepos - base.bound.xy()
     }
-    //called by actual drawer.
+    //called by actual app.
     fn draw_raw(&self, app: &App, frame: Frame) {
         let mut draw = app.draw();
         let base = self.get_base_component();
@@ -78,7 +83,7 @@ pub trait Component {
     fn set_draw_boundary(&mut self, b: bool) {
         self.get_base_component_mut().draw_bound = b;
     }
-    fn mouse_moved(&mut self, _pos: Point2) {}
+
     fn mouse_moved_raw(&mut self, pos: Point2) {
         let is_mouseon = self.is_mouse_on();
         let base = self.get_base_component_mut();
@@ -95,12 +100,12 @@ pub trait Component {
         self.mouse_moved(pos);
     }
 
-    fn mouse_pressed(&mut self, mouse: MouseButton) {
+    fn mouse_pressed_raw(&mut self, mouse: MouseButton) {
         if let MouseButton::Left = mouse {
             self.get_base_component_mut().mousestate = MouseState::Clicked(self.get_mouse_pos());
         }
+        self.mouse_pressed(mouse)
     }
-    fn mouse_dragged(&mut self, _origin: Point2, _current: Point2) {}
 
     fn mouse_released_raw(&mut self, mouse: MouseButton) {
         let is_mouseon = self.is_mouse_on();
@@ -115,5 +120,4 @@ pub trait Component {
         }
         self.mouse_released(mouse);
     }
-    fn mouse_released(&mut self, _mouse: MouseButton) {}
 }

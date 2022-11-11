@@ -104,7 +104,7 @@ fn mouse_moved(_app: &App, model: &mut Model, pos: Point2) {
 }
 
 fn mouse_pressed(_app: &App, model: &mut Model, button: MouseButton) {
-    model.wave.mouse_pressed(button);
+    model.wave.mouse_pressed_raw(button);
 }
 
 fn mouse_released(_app: &App, model: &mut Model, button: MouseButton) {
