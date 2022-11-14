@@ -1,13 +1,15 @@
 // use core::slice::SlicePattern;
-use super::component;
-
+use super::audio_processor;
+use super::gui;
 use nannou::prelude::*;
 
 pub struct Model {
     samples: Vec<f32>,
+    phase: f32,
+    freq: f32,
     amp: f32,
     amp_tmp: f32,
-    base: component::ComponentBase,
+    base: gui::ComponentBase,
 }
 
 impl Model {
@@ -21,23 +23,31 @@ impl Model {
             let increment = twopi / size as f32;
             phase = (phase + increment) % twopi;
         }
+        let freq = 440.;
         let amp = 1.0;
         let amp_tmp = 0.;
-        let base = component::ComponentBase::new(bound);
+        let base = gui::ComponentBase::new(bound);
         Self {
             samples,
+            phase,
+            freq,
             amp,
             amp_tmp,
             base,
         }
     }
+    pub fn get_current_amp(&self) -> f32 {
+        (self.amp + self.amp_tmp).abs()
+    }
 }
 
-impl component::Component for Model {
-    fn get_base_component_mut(&mut self) -> &mut component::ComponentBase {
+
+
+impl gui::Component for Model {
+    fn get_base_component_mut(&mut self) -> &mut gui::ComponentBase {
         &mut self.base
     }
-    fn get_base_component(&self) -> &component::ComponentBase {
+    fn get_base_component(&self) -> &gui::ComponentBase {
         &self.base
     }
     fn mouse_moved(&mut self, _pos: Point2) {}
@@ -60,7 +70,7 @@ impl component::Component for Model {
                 bound.left(),
                 bound.right(),
             );
-            let y = *s * 100.0 * (self.amp + self.amp_tmp).abs();
+            let y = *s * 100.0 * self.get_current_amp();
             nannou::geom::pt2(x, y)
         }));
 
@@ -72,6 +82,7 @@ impl component::Component for Model {
             self.get_local_mouse_pos().x,
             self.get_local_mouse_pos().y
         );
-        ctx.text(str.as_str()).xy(self.get_local_mouse_pos()+Vec2::new(0.,20.));
+        ctx.text(str.as_str())
+            .xy(self.get_local_mouse_pos() + Vec2::new(0., 20.));
     }
 }

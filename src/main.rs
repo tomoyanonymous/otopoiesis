@@ -1,7 +1,12 @@
-use component::Component;
+use audio_processor::oscillator;
+use gui::Component;
 use nannou::prelude::*;
-mod component;
+use nannou_audio;
+mod audio_processor;
+mod gui;
 mod waveform;
+
+use audio_processor::Renderer;
 
 fn main() {
     nannou::app(model)
@@ -11,7 +16,10 @@ fn main() {
         .run();
 }
 struct Model {
-    wave: waveform::Model,
+    wave_ui: waveform::Model,
+    // wave_audio: audio_processor::OscillatorModel,
+    audio_in: nannou_audio::Stream<audio_processor::InputModel>,
+    audio_out: nannou_audio::Stream<audio_processor::OutputModel<oscillator::OscillatorModel>>,
 }
 
 fn model(app: &App) -> Model {
@@ -39,8 +47,15 @@ fn model(app: &App) -> Model {
         .closed(window_closed)
         .build()
         .unwrap();
-    let mut res = Model {
-        wave: waveform::Model::new(nannou::geom::Rect::from_x_y_w_h(0., 0., 400., 600.)),
+    let wave_audio = oscillator::OscillatorModel::new(1.0, 440.0, 44100.0);
+    let mut renderer = audio_processor::SimpleRenderer {
+        host: nannou_audio::Host::new(),
+    };
+    let (audio_in, audio_out) = renderer.init(wave_audio);
+    let res = Model {
+        wave_ui: waveform::Model::new(nannou::geom::Rect::from_x_y_w_h(0., 0., 400., 600.)),
+        audio_in,
+        audio_out,
     };
     res
 }
@@ -60,13 +75,13 @@ fn event(_app: &App, _model: &mut Model, event: Event) {
 }
 
 fn update(_app: &App, model: &mut Model, _update: Update) {
-    model.wave.set_draw_boundary(true);
+    model.wave_ui.set_draw_boundary(true);
 }
 
 fn view(app: &App, model: &Model, frame: Frame) {
     frame.clear(SKYBLUE);
 
-    model.wave.draw_raw(app, frame);
+    model.wave_ui.draw_raw(app, frame);
 }
 
 fn window_event(_app: &App, _model: &mut Model, event: WindowEvent) {
@@ -100,15 +115,15 @@ fn key_pressed(_app: &App, _model: &mut Model, _key: Key) {}
 fn key_released(_app: &App, _model: &mut Model, _key: Key) {}
 
 fn mouse_moved(_app: &App, model: &mut Model, pos: Point2) {
-    model.wave.mouse_moved_raw(pos);
+    model.wave_ui.mouse_moved_raw(pos);
 }
 
 fn mouse_pressed(_app: &App, model: &mut Model, button: MouseButton) {
-    model.wave.mouse_pressed_raw(button);
+    model.wave_ui.mouse_pressed_raw(button);
 }
 
 fn mouse_released(_app: &App, model: &mut Model, button: MouseButton) {
-    model.wave.mouse_released_raw(button);
+    model.wave_ui.mouse_released_raw(button);
 }
 
 fn mouse_wheel(_app: &App, _model: &mut Model, _dt: MouseScrollDelta, _phase: TouchPhase) {}

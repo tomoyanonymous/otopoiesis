@@ -7,3 +7,5 @@ edition = "2021"
 
 [dependencies]
 nannou = "*"
+nannou_audio = "*"
+ringbuf = "*"
