@@ -6,7 +6,10 @@ mod audio;
 mod gui;
 mod parameter;
 
-use audio::{oscillator, renderer::{RendererBase,Renderer}};
+use audio::{
+    oscillator,
+    renderer::{Renderer, RendererBase},
+};
 
 use gui::waveform;
 use gui::Component as UiComponent;
@@ -20,8 +23,7 @@ fn main() {
 }
 struct Model {
     wave_ui: waveform::Model,
-    // audio_in: nannou_audio::Stream<audio::InputModel>,
-    // audio_out: nannou_audio::Stream<audio::OutputModel<oscillator::SineWave>>,
+    audio: Renderer<oscillator::SineWave>,
 }
 
 impl Model {
@@ -30,15 +32,11 @@ impl Model {
         let waveui = waveform::Model::new(area);
         let wave_audio =
             oscillator::SineWave::new(Arc::clone(&waveui.amp), Arc::clone(&waveui.freq));
-        let mut renderer = Renderer {
-            host: nannou_audio::Host::new(),
-        };
-        let (_audio_in, _audio_out) = renderer.init(wave_audio, 44100.0);
+        let renderer = audio::renderer::create_renderer(wave_audio, 44100.0);
 
         Self {
             wave_ui: waveui,
-            // audio_in,
-            // audio_out,
+            audio: renderer,
         }
     }
 }

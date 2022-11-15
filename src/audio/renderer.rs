@@ -8,15 +8,12 @@ where
     E: Component + Send + 'static,
 {
     fn get_host(&self) -> &nannou_audio::Host;
-
-    fn init(
+    fn set_streams(
         &mut self,
-        effect: E,
-        sample_rate: f32,
-    ) -> (
-        nannou_audio::Stream<InputModel>,
-        nannou_audio::Stream<OutputModel<E>>,
-    ) {
+        i: Option<nannou_audio::Stream<InputModel>>,
+        o: Option<nannou_audio::Stream<OutputModel<E>>>,
+    );
+    fn init(&mut self, effect: E, sample_rate: f32) {
         let (in_model, out_model) = init_models(effect, sample_rate);
 
         let in_stream = self
@@ -40,10 +37,8 @@ where
             .build()
             .unwrap();
         in_stream.play().unwrap();
-
         out_stream.play().unwrap();
-        println!("input");
-        (in_stream, out_stream)
+        self.set_streams(Some(in_stream), Some(out_stream));
     }
 }
 
@@ -67,13 +62,17 @@ pub fn init_models<E: Component>(effect: E, sample_rate: f32) -> (InputModel, Ou
         consumer: cons,
         internal_buf: vec![0.0f32; latency_samples * 4],
         effector: effect,
-        playback_info: PlaybackInfo { sample_rate },
+        playback_info: PlaybackInfo {
+            sample_rate,
+            current_time: 0,
+        },
     };
     (inmodel, outmodel)
 }
 
 fn pass_in(model: &mut InputModel, buffer: &nannou_audio::Buffer) {
     let _num = model.producer.push_slice(buffer.as_ref());
+    // println!("{:.2?}",buffer.as_ref());
 }
 
 fn pass_out<E: Component>(model: &mut OutputModel<E>, buffer: &mut nannou_audio::Buffer) {
@@ -87,15 +86,50 @@ fn pass_out<E: Component>(model: &mut OutputModel<E>, buffer: &mut nannou_audio:
         .render(buf, buffer.deref_mut(), &model.playback_info);
 }
 
-pub struct Renderer {
+pub struct Renderer<E>
+where
+    E: Component + Send + 'static,
+{
     pub host: nannou_audio::Host,
+    istream: Option<nannou_audio::Stream<InputModel>>,
+    ostream: Option<nannou_audio::Stream<OutputModel<E>>>,
 }
 
-impl<E> RendererBase<E> for Renderer
+impl<E> RendererBase<E> for Renderer<E>
 where
     E: Component + Send + 'static,
 {
     fn get_host(&self) -> &nannou_audio::Host {
         &self.host
     }
+    fn set_streams(
+        &mut self,
+        i: Option<nannou_audio::Stream<InputModel>>,
+        o: Option<nannou_audio::Stream<OutputModel<E>>>,
+    ) {
+        self.istream = i;
+        self.ostream = o;
+    }
+}
+
+impl<E> Renderer<E>
+where
+    E: Component + Send + 'static,
+{
+    pub fn new(effect: E, sample_rate: f32) -> Self {
+        let mut res = Self {
+            host: nannou_audio::Host::default(),
+            istream: None,
+            ostream: None,
+        };
+        res.init(effect,sample_rate);
+        res
+    }
+}
+
+pub fn create_renderer<E>(effect: E, sample_rate: f32) -> Renderer<E>
+where
+    E: Component + Send + 'static,
+{
+    Renderer::<E>::new(effect, sample_rate)
 }

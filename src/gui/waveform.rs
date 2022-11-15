@@ -1,5 +1,6 @@
 use crate::gui::{Component, ComponentBase};
 use crate::*;
+use crate::parameter::Parameter;
 use std::sync::Arc;
 
 pub struct Model {

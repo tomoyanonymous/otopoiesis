@@ -1,7 +1,6 @@
 use super::*;
-use crate::parameter;
+use crate::parameter::{Parameter,FloatParameter};
 use std::sync::Arc;
-
 
 pub trait GeneratorComponent {
     fn render_sample(&mut self, out: &mut f32, info: &PlaybackInfo);
@@ -35,22 +34,28 @@ where
 //共有が不要な内部パラメーターは普通のfloatなどでOK
 pub struct SineWave {
     phase: f32,
-    pub amp: Arc<parameter::FloatParameter>,
-    pub freq: Arc<parameter::FloatParameter>,
+    pub amp: Arc<FloatParameter>,
+    pub freq: Arc<FloatParameter>,
 }
 
 impl SineWave {
-    pub fn new(amp: Arc<parameter::FloatParameter>, freq: Arc<parameter::FloatParameter>) -> Self {
+    pub fn new(amp: Arc<FloatParameter>, freq: Arc<FloatParameter>) -> Self {
         Self {
             phase: 0.0,
             amp,
             freq,
         }
     }
+    pub fn render_sample_internal(&mut self, out: &mut f32, info: &PlaybackInfo) {
+        let twopi = std::f32::consts::PI * 2.;
+        self.phase = (self.phase + twopi * self.freq.get() / info.sample_rate) % twopi;
+        *out = self.phase.sin() * self.amp.get();
+    }
 }
 
 impl GeneratorComponent for SineWave {
     fn render_sample(&mut self, out: &mut f32, info: &PlaybackInfo) {
+        // self.render_sample_internal(out, info)
         let twopi = std::f32::consts::PI * 2.;
         self.phase = (self.phase + twopi * self.freq.get() / info.sample_rate) % twopi;
         *out = self.phase.sin() * self.amp.get();
