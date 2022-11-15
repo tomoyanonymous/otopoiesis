@@ -30,15 +30,16 @@ where
 }
 
 //各モデルは初期化時にArc<atomicを含む型>を受け取り状態を共有する
+//共有が不要な内部パラメーターは普通のfloatなどでOK
 pub struct OscillatorModel {
     phase: f32,
     pub amp: Arc<parameter::FloatParameter>,
-    pub freq: f32,
+    pub freq: Arc<parameter::FloatParameter>,
     pub sr: f32,
 }
 
 impl OscillatorModel {
-    pub fn new(amp: Arc<parameter::FloatParameter>, freq: f32, sr: f32) -> Self {
+    pub fn new(amp: Arc<parameter::FloatParameter>, freq: Arc<parameter::FloatParameter>, sr: f32) -> Self {
         Self {
             phase: 0.0,
             amp,
@@ -51,7 +52,7 @@ impl OscillatorModel {
 impl GeneratorComponent for OscillatorModel {
     fn render_sample(&mut self, out: &mut f32) {
         let twopi = std::f32::consts::PI * 2.;
-        self.phase = (self.phase + twopi * self.freq / self.sr) % twopi;
+        self.phase = (self.phase + twopi * self.freq.get() / self.sr) % twopi;
         *out = self.phase.sin() * self.amp.get();
     }
 }

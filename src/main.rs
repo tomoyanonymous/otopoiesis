@@ -27,7 +27,7 @@ struct Model {
 impl Model {
     pub fn new() -> Self {
         let waveui = waveform::Model::new(nannou::geom::Rect::from_x_y_w_h(0., 0., 400., 600.));
-        let wave_audio = oscillator::OscillatorModel::new(Arc::clone(&waveui.amp), 440.0, 44100.0);
+        let wave_audio = oscillator::OscillatorModel::new(Arc::clone(&waveui.amp), Arc::clone(&waveui.freq), 44100.0);
         let mut renderer = audio_processor::SimpleRenderer {
             host: nannou_audio::Host::new(),
         };

@@ -1,34 +1,55 @@
 use crate::gui::{Component, ComponentBase};
 use crate::*;
-use std::sync::{atomic::Ordering, Arc};
+use std::sync::Arc;
 
 pub struct Model {
     samples: Vec<f32>,
     pub amp: Arc<parameter::FloatParameter>,
+    pub freq: Arc<parameter::FloatParameter>,
     amp_tmp: f32,
+    freq_tmp: f32,
     base: ComponentBase,
 }
 
 impl Model {
-    pub fn new(bound: nannou::geom::Rect) -> Self {
-        let size = 512;
-        let mut samples = vec![0f32; size];
+    pub fn update_samples(&mut self) {
         let mut phase = 0.0f32;
-        for s in samples.iter_mut() {
+        let len = self.samples.len();
+        for s in self.samples.iter_mut() {
             *s = phase.sin();
             let twopi = std::f32::consts::PI * 2.0;
-            let increment = twopi / size as f32;
+            //とりあえず、440Hzで1周期分ということで
+            let ratio = self.freq.get() / 440.0;
+            let increment = ratio * twopi / len as f32;
             phase = (phase + increment) % twopi;
         }
+    }
+
+    pub fn new(bound: nannou::geom::Rect) -> Self {
+        let size = 512;
+        let samples = vec![0f32; size];
+
         let amp = Arc::new(parameter::FloatParameter::new(1., 0.0..1.0, "amplitude"));
+        let freq = Arc::new(parameter::FloatParameter::new(
+            440.,
+            20.0..20000.0,
+            "frequency",
+        ));
+
         let amp_tmp = amp.get();
+        let freq_tmp = freq.get();
+
         let base = ComponentBase::new(bound);
-        Self {
+        let mut res = Self {
             samples,
             amp,
+            freq,
             amp_tmp,
+            freq_tmp,
             base,
-        }
+        };
+        res.update_samples();
+        res
     }
     pub fn get_current_amp(&self) -> f32 {
         self.amp.get().abs()
@@ -45,9 +66,12 @@ impl Component for Model {
     fn mouse_moved(&mut self, _pos: Point2) {}
     fn mouse_dragged(&mut self, origin: Point2, current: Point2) {
         self.amp.set(self.amp_tmp + (current.y - origin.y) * 0.01);
+        self.freq.set(self.freq_tmp + (current.x - origin.x) * 10.);
+        self.update_samples();
     }
     fn mouse_released(&mut self, _mouse: MouseButton) {
         self.amp_tmp = self.amp.get();
+        self.freq_tmp = self.freq.get();
     }
     fn draw(&self, ctx: &Draw) {
         let bound = self.get_bounding_box();
@@ -75,6 +99,9 @@ impl Component for Model {
         );
         ctx.text(str.as_str())
             .xy(self.get_local_mouse_pos() + Vec2::new(0., 20.));
+        let str2 = format!("amp:{:.2},freq:{:.2}", self.amp.get(), self.freq.get());
+        ctx.text(str2.as_str())
+            .xy(self.get_local_mouse_pos() + Vec2::new(0., -20.));
     }
 
     fn mouse_pressed(&mut self, _mouse: MouseButton) {}
@@ -146,7 +173,8 @@ impl Component for Model {
 
     fn mouse_pressed_raw(&mut self, mouse: MouseButton) {
         if let MouseButton::Left = mouse {
-            self.get_base_component_mut().mousestate = gui::MouseState::Clicked(self.get_mouse_pos());
+            self.get_base_component_mut().mousestate =
+                gui::MouseState::Clicked(self.get_mouse_pos());
         }
         self.mouse_pressed(mouse)
     }
