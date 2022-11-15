@@ -126,6 +126,13 @@ where
         res.init(effect, sample_rate);
         res
     }
+    pub fn rewind(&mut self) {
+        if let Some(stream) = &self.ostream {
+            stream.send(|model| {
+                model.playback_info.rewind();
+            }).unwrap();
+        }
+    }
 }
 
 pub fn create_renderer<E>(effect: E, sample_rate: f32) -> Renderer<E>

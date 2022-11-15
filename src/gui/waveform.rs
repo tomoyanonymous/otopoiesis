@@ -1,12 +1,14 @@
 use crate::gui::{Component, ComponentBase};
-use crate::*;
 use crate::parameter::Parameter;
+use crate::utils::AtomicRange;
+use crate::*;
 use std::sync::Arc;
 
 pub struct Model {
     samples: Vec<f32>,
     pub amp: Arc<parameter::FloatParameter>,
     pub freq: Arc<parameter::FloatParameter>,
+    pub region: Arc<AtomicRange>,
     amp_tmp: f32,
     freq_tmp: f32,
     base: ComponentBase,
@@ -36,7 +38,7 @@ impl Model {
             20.0..=20000.0,
             "frequency",
         ));
-
+        let region = Arc::new(AtomicRange::new(1000, 44100));
         let amp_tmp = amp.get();
         let freq_tmp = freq.get();
 
@@ -45,6 +47,7 @@ impl Model {
             samples,
             amp,
             freq,
+            region,
             amp_tmp,
             freq_tmp,
             base,

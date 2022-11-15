@@ -1,12 +1,30 @@
 use super::oscillator::GeneratorComponent;
 use crate::audio::{Component, PlaybackInfo};
+use std::ops::RangeBounds;
 use std::ops::RangeInclusive;
+use std::thread;
+// use crate::parameter::UIntParameter
+use crate::utils::AtomicRange;
+use std::sync::Arc;
+
 // modifierが後で追加されたりする。生成用にComponentを持っている？
 // Buffer by Bufferで再生するという時にどうタイミングを合わせるか？
 // Region{range:0..=2000,2,vec![0.0]}
 
+// impl PartialOrd<AtomicU64> for AtomicU64{
+//     fn partial_cmp(&self, other: &AtomicU64) -> Option<std::cmp::Ordering> {
+//         use std::cmp::Ordering;
+//         let self_v = self.load(std::sync::atomic::Ordering::Relaxed);
+//         let other_v = other.load(std::sync::atomic::Ordering::Relaxed);
+//         self_v.partial_cmp(&other_v)
+//     }
+
+// }
+
+
+
 pub struct Region {
-    range: RangeInclusive<u64>,
+    range: Arc<AtomicRange>,
     channels: usize,
     interleaved_samples_cache: Vec<f32>,
     cache_completed: bool,
@@ -17,8 +35,8 @@ pub struct Region {
 // }
 
 impl Region {
-    fn new(range: RangeInclusive<u64>, channels: usize) -> Self {
-        let buf_size = channels as u64 * (range.end() - range.start());
+    pub fn new(range: Arc<AtomicRange>, channels: usize) -> Self {
+        let buf_size = channels as u64 * (range.getrange());
         Self {
             range,
             channels,
@@ -26,7 +44,11 @@ impl Region {
             cache_completed: false,
         }
     }
-    fn render_offline<E: GeneratorComponent>(&mut self, generator: &mut E, info: &PlaybackInfo) {
+    pub fn render_offline<E: GeneratorComponent>(
+        &mut self,
+        generator: &mut E,
+        info: &PlaybackInfo,
+    ) {
         for (_count, out) in self
             .interleaved_samples_cache
             .chunks_mut(self.channels)
@@ -36,7 +58,13 @@ impl Region {
                 generator.render_sample(o, info)
             }
         }
-        self.cache_completed=true;
+        self.cache_completed = true;
+    }
+    pub fn render_offline_async<E: GeneratorComponent + Send + Sync>(
+        &mut self,
+        generator: E,
+        info: PlaybackInfo,
+    ) {
     }
 }
 

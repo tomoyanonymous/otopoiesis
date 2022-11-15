@@ -1,3 +1,4 @@
+#[derive(Clone)]
 pub struct PlaybackInfo {
     pub sample_rate: f32,
     pub current_time: usize,
@@ -6,6 +7,9 @@ pub struct PlaybackInfo {
 impl PlaybackInfo {
     pub fn get_current_realtime(&self) -> f32 {
         self.current_time as f32 / self.sample_rate
+    }
+    pub fn rewind(&mut self){
+        self.current_time = 0;
     }
 }
 

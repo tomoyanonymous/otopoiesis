@@ -3,6 +3,7 @@
 
 use nannou::prelude::*;
 pub mod waveform;
+pub mod timeline;
 
 #[derive(PartialEq)]
 pub enum MouseState {
@@ -64,7 +65,7 @@ pub trait Component {
             _ => false,
         }
     }
-    
+
     //called by actual app.
     fn draw_raw(&self, app: &App, frame: Frame) {
         let mut draw = app.draw();

@@ -4,11 +4,9 @@ use std::sync::Arc;
 mod audio;
 mod gui;
 mod parameter;
+mod utils;
 
-use audio::{
-    oscillator,
-    renderer::Renderer,
-};
+use audio::{oscillator, region, renderer::Renderer};
 
 use gui::waveform;
 use gui::Component as UiComponent;
@@ -22,20 +20,26 @@ fn main() {
 }
 struct Model {
     wave_ui: waveform::Model,
-    _audio: Renderer<oscillator::SineWave>,
+    audio: Renderer<region::Region>,
 }
 
 impl Model {
     pub fn new() -> Self {
         let area = nannou::geom::Rect::from_x_y_w_h(0., 0., 400., 600.);
         let waveui = waveform::Model::new(area);
-        let wave_audio =
+        let mut wave_audio =
             oscillator::SineWave::new(Arc::clone(&waveui.amp), Arc::clone(&waveui.freq));
-        let renderer = audio::renderer::create_renderer(wave_audio, 44100.0);
+        let mut region = region::Region::new(Arc::clone(&waveui.region), 2);
+        let info = audio::PlaybackInfo {
+            sample_rate: 44100.0,
+            current_time: 0,
+        };
+        region.render_offline(&mut wave_audio, &info);
+        let renderer = audio::renderer::create_renderer(region, 44100.0);
 
         Self {
             wave_ui: waveui,
-            _audio: renderer,
+            audio: renderer,
         }
     }
 }
@@ -119,7 +123,14 @@ fn window_event(_app: &App, _model: &mut Model, event: WindowEvent) {
 
 fn raw_window_event(_app: &App, _model: &mut Model, _event: &nannou::winit::event::WindowEvent) {}
 
-fn key_pressed(_app: &App, _model: &mut Model, _key: Key) {}
+fn key_pressed(_app: &App, model: &mut Model, key: Key) {
+    match key {
+        Key::Space => {
+            model.audio.rewind();
+        }
+        _ => {}
+    }
+}
 
 fn key_released(_app: &App, _model: &mut Model, _key: Key) {}
 
