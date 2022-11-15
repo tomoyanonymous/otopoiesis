@@ -1,5 +1,4 @@
 use nannou::prelude::*;
-use nannou_audio;
 use std::sync::Arc;
 
 mod audio;
@@ -8,7 +7,7 @@ mod parameter;
 
 use audio::{
     oscillator,
-    renderer::{Renderer, RendererBase},
+    renderer::Renderer,
 };
 
 use gui::waveform;
@@ -23,7 +22,7 @@ fn main() {
 }
 struct Model {
     wave_ui: waveform::Model,
-    audio: Renderer<oscillator::SineWave>,
+    _audio: Renderer<oscillator::SineWave>,
 }
 
 impl Model {
@@ -36,7 +35,7 @@ impl Model {
 
         Self {
             wave_ui: waveui,
-            audio: renderer,
+            _audio: renderer,
         }
     }
 }

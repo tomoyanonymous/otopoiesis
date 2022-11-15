@@ -4,10 +4,6 @@ use std::ops::RangeInclusive;
 use std::sync::atomic::AtomicU64;
 use std::sync::atomic::Ordering;
 
-pub trait Listener {
-    fn on_value_change(&mut self, new_v: f32);
-}
-
 pub trait Parameter<T> {
     fn new(init: T, range: RangeInclusive<T>, label: impl Into<String>) -> Self;
     fn get(&self) -> T;

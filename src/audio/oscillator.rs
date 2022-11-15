@@ -55,9 +55,6 @@ impl SineWave {
 
 impl GeneratorComponent for SineWave {
     fn render_sample(&mut self, out: &mut f32, info: &PlaybackInfo) {
-        // self.render_sample_internal(out, info)
-        let twopi = std::f32::consts::PI * 2.;
-        self.phase = (self.phase + twopi * self.freq.get() / info.sample_rate) % twopi;
-        *out = self.phase.sin() * self.amp.get();
+        self.render_sample_internal(out, info)
     }
 }

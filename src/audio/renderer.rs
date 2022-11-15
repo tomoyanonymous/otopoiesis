@@ -84,6 +84,7 @@ fn pass_out<E: Component>(model: &mut OutputModel<E>, buffer: &mut nannou_audio:
     model
         .effector
         .render(buf, buffer.deref_mut(), &model.playback_info);
+    model.playback_info.current_time += buffer.len_frames();
 }
 
 pub struct Renderer<E>
@@ -122,7 +123,7 @@ where
             istream: None,
             ostream: None,
         };
-        res.init(effect,sample_rate);
+        res.init(effect, sample_rate);
         res
     }
 }
