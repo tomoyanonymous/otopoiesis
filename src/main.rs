@@ -1,5 +1,8 @@
-use nannou::prelude::*;
 use std::sync::Arc;
+use nannou::prelude::*;
+use audio::oscillator::SineWave;
+use parameter::{FloatParameter, Parameter};
+use utils::AtomicRange;
 
 mod audio;
 mod gui;
@@ -20,21 +23,28 @@ fn main() {
 }
 struct Model {
     wave_ui: waveform::Model,
-    audio: Renderer<region::Region>,
+    audio: Renderer<region::Region<SineWave>>,
 }
 
 impl Model {
     pub fn new() -> Self {
         let area = nannou::geom::Rect::from_x_y_w_h(0., 0., 400., 600.);
-        let waveui = waveform::Model::new(area);
-        let mut wave_audio =
-            oscillator::SineWave::new(Arc::clone(&waveui.amp), Arc::clone(&waveui.freq));
-        let mut region = region::Region::new(Arc::clone(&waveui.region), 2);
+
+        let sinewave_params = Arc::new(oscillator::SharedParams {
+            amp: FloatParameter::new(1.0, 0.0..=1.0, "amp"),
+            freq: FloatParameter::new(440.0, 20.0..=20000.0, "freq"),
+        });
+        let sinewave = oscillator::SineWave::new(Arc::clone(&sinewave_params));
+
+        let range_params = Arc::new(AtomicRange::new(1000, 50000));
+        let mut region = region::Region::new(Arc::clone(&range_params), 2, sinewave);
         let info = audio::PlaybackInfo {
             sample_rate: 44100.0,
             current_time: 0,
         };
-        region.render_offline(&mut wave_audio, &info);
+        region.render_offline(&info);
+
+        let waveui = waveform::Model::new(area, sinewave_params, range_params);
         let renderer = audio::renderer::create_renderer(region, 44100.0);
 
         Self {

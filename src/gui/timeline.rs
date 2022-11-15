@@ -6,8 +6,6 @@ use std::sync::Arc;
 
 
 pub struct Model {
-    samples: Vec<f32>,
-    pub amp: Arc<parameter::FloatParameter>,
-    pub freq: Arc<parameter::FloatParameter>,
+    time:u64
 
 }

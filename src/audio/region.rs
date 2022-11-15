@@ -1,7 +1,5 @@
 use super::oscillator::GeneratorComponent;
 use crate::audio::{Component, PlaybackInfo};
-use std::ops::RangeBounds;
-use std::ops::RangeInclusive;
 use std::thread;
 // use crate::parameter::UIntParameter
 use crate::utils::AtomicRange;
@@ -21,12 +19,11 @@ use std::sync::Arc;
 
 // }
 
-
-
-pub struct Region {
+pub struct Region<E: GeneratorComponent> {
     range: Arc<AtomicRange>,
     channels: usize,
     interleaved_samples_cache: Vec<f32>,
+    pub generator: E,
     cache_completed: bool,
 }
 
@@ -34,41 +31,33 @@ pub struct Region {
 //     fn set_start(newv: u64) {}
 // }
 
-impl Region {
-    pub fn new(range: Arc<AtomicRange>, channels: usize) -> Self {
+impl<E: GeneratorComponent> Region<E> {
+    pub fn new(range: Arc<AtomicRange>, channels: usize, generator: E) -> Self {
         let buf_size = channels as u64 * (range.getrange());
         Self {
             range,
             channels,
             interleaved_samples_cache: vec![0.0; buf_size as usize],
+            generator,
             cache_completed: false,
         }
     }
-    pub fn render_offline<E: GeneratorComponent>(
-        &mut self,
-        generator: &mut E,
-        info: &PlaybackInfo,
-    ) {
+    pub fn render_offline(&mut self, info: &PlaybackInfo) {
         for (_count, out) in self
             .interleaved_samples_cache
             .chunks_mut(self.channels)
             .enumerate()
         {
             for (_ch, o) in out.iter_mut().enumerate() {
-                generator.render_sample(o, info)
+                self.generator.render_sample(o, info)
             }
         }
         self.cache_completed = true;
     }
-    pub fn render_offline_async<E: GeneratorComponent + Send + Sync>(
-        &mut self,
-        generator: E,
-        info: PlaybackInfo,
-    ) {
-    }
+    pub fn render_offline_async(&mut self, info: PlaybackInfo) {}
 }
 
-impl Component for Region {
+impl<E: GeneratorComponent> Component for Region<E> {
     fn get_input_channels(&self) -> usize {
         0
     }
