@@ -2,11 +2,11 @@ use nannou::prelude::*;
 use nannou_audio;
 use std::sync::Arc;
 
-mod audio_processor;
+mod audio;
 mod gui;
 mod parameter;
 
-use audio_processor::{oscillator, Component, Renderer};
+use audio::{oscillator, Renderer};
 use gui::waveform;
 use gui::Component as UiComponent;
 
@@ -19,24 +19,25 @@ fn main() {
 }
 struct Model {
     wave_ui: waveform::Model,
-    // wave_audio: audio_processor::OscillatorModel,
-    audio_in: nannou_audio::Stream<audio_processor::InputModel>,
-    audio_out: nannou_audio::Stream<audio_processor::OutputModel<oscillator::OscillatorModel>>,
+    // audio_in: nannou_audio::Stream<audio::InputModel>,
+    // audio_out: nannou_audio::Stream<audio::OutputModel<oscillator::SineWave>>,
 }
 
 impl Model {
     pub fn new() -> Self {
-        let waveui = waveform::Model::new(nannou::geom::Rect::from_x_y_w_h(0., 0., 400., 600.));
-        let wave_audio = oscillator::OscillatorModel::new(Arc::clone(&waveui.amp), Arc::clone(&waveui.freq), 44100.0);
-        let mut renderer = audio_processor::SimpleRenderer {
+        let area = nannou::geom::Rect::from_x_y_w_h(0., 0., 400., 600.);
+        let waveui = waveform::Model::new(area);
+        let wave_audio =
+            oscillator::SineWave::new(Arc::clone(&waveui.amp), Arc::clone(&waveui.freq));
+        let mut renderer = audio::SimpleRenderer {
             host: nannou_audio::Host::new(),
         };
-        let (audio_in, audio_out) = renderer.init(wave_audio);
+        let (_audio_in, _audio_out) = renderer.init(wave_audio, 44100.0);
 
         Self {
             wave_ui: waveui,
-            audio_in,
-            audio_out,
+            // audio_in,
+            // audio_out,
         }
     }
 }

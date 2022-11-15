@@ -30,17 +30,20 @@ impl ComponentBase {
     }
 }
 pub trait Component {
-    //2 functions user must implements.
+    //3 functions user must implement.
     fn get_base_component_mut(&mut self) -> &mut ComponentBase;
     fn get_base_component(&self) -> &ComponentBase;
 
     fn draw(&self, ctx: &Draw);
+
+    //optional function user can override behaviour.
 
     fn mouse_moved(&mut self, _pos: Point2) {}
     fn mouse_pressed(&mut self, _mouse: MouseButton) {}
     fn mouse_dragged(&mut self, _origin: Point2, _current: Point2) {}
     fn mouse_released(&mut self, _mouse: MouseButton) {}
 
+    //getters
     fn get_bounding_box(&self) -> nannou::geom::Rect {
         return self.get_base_component().bound;
     }
@@ -51,6 +54,17 @@ pub trait Component {
         let base = self.get_base_component();
         base.mousepos - base.bound.xy()
     }
+    fn is_mouse_on(&self) -> bool {
+        let base = self.get_base_component();
+        base.bound.contains_point(base.mousepos.to_array())
+    }
+    fn is_mouse_pressed(&self) -> bool {
+        match self.get_base_component().mousestate {
+            MouseState::Clicked(_) => true,
+            _ => false,
+        }
+    }
+    
     //called by actual app.
     fn draw_raw(&self, app: &App, frame: Frame) {
         let mut draw = app.draw();
@@ -70,16 +84,6 @@ pub trait Component {
         draw = draw.scissor(bound);
         self.draw(&draw);
         draw.to_frame(app, &frame).ok();
-    }
-    fn is_mouse_on(&self) -> bool {
-        let base = self.get_base_component();
-        base.bound.contains_point(base.mousepos.to_array())
-    }
-    fn is_mouse_pressed(&self) -> bool {
-        match self.get_base_component().mousestate {
-            MouseState::Clicked(_) => true,
-            _ => false,
-        }
     }
     fn set_draw_boundary(&mut self, b: bool) {
         self.get_base_component_mut().draw_bound = b;
