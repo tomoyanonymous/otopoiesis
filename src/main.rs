@@ -1,12 +1,14 @@
-use audio_processor::oscillator;
-use gui::Component;
 use nannou::prelude::*;
 use nannou_audio;
+use std::sync::Arc;
+
 mod audio_processor;
 mod gui;
-mod waveform;
+mod parameter;
 
-use audio_processor::Renderer;
+use audio_processor::{oscillator, Component, Renderer};
+use gui::waveform;
+use gui::Component as UiComponent;
 
 fn main() {
     nannou::app(model)
@@ -20,6 +22,23 @@ struct Model {
     // wave_audio: audio_processor::OscillatorModel,
     audio_in: nannou_audio::Stream<audio_processor::InputModel>,
     audio_out: nannou_audio::Stream<audio_processor::OutputModel<oscillator::OscillatorModel>>,
+}
+
+impl Model {
+    pub fn new() -> Self {
+        let waveui = waveform::Model::new(nannou::geom::Rect::from_x_y_w_h(0., 0., 400., 600.));
+        let wave_audio = oscillator::OscillatorModel::new(Arc::clone(&waveui.amp), 440.0, 44100.0);
+        let mut renderer = audio_processor::SimpleRenderer {
+            host: nannou_audio::Host::new(),
+        };
+        let (audio_in, audio_out) = renderer.init(wave_audio);
+
+        Self {
+            wave_ui: waveui,
+            audio_in,
+            audio_out,
+        }
+    }
 }
 
 fn model(app: &App) -> Model {
@@ -47,17 +66,8 @@ fn model(app: &App) -> Model {
         .closed(window_closed)
         .build()
         .unwrap();
-    let wave_audio = oscillator::OscillatorModel::new(1.0, 440.0, 44100.0);
-    let mut renderer = audio_processor::SimpleRenderer {
-        host: nannou_audio::Host::new(),
-    };
-    let (audio_in, audio_out) = renderer.init(wave_audio);
-    let res = Model {
-        wave_ui: waveform::Model::new(nannou::geom::Rect::from_x_y_w_h(0., 0., 400., 600.)),
-        audio_in,
-        audio_out,
-    };
-    res
+
+    Model::new()
 }
 
 fn event(_app: &App, _model: &mut Model, event: Event) {

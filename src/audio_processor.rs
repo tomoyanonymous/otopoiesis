@@ -1,16 +1,13 @@
 use nannou_audio;
 use ringbuf::{HeapConsumer, HeapProducer, HeapRb};
 
-use std::ops::DerefMut;
-use std::sync::{mpsc, Arc};
+use std::{sync::Arc, ops::DerefMut};
 pub mod oscillator;
 pub trait Component {
     fn get_input_channels(&self) -> usize;
     fn get_output_channels(&self) -> usize;
     fn render(&mut self, input: &[f32], output: &mut [f32]);
 }
-
-
 
 pub trait Renderer<E>
 where
@@ -46,6 +43,7 @@ where
             .build()
             .unwrap();
         in_stream.play().unwrap();
+
         out_stream.play().unwrap();
         println!("input");
         (in_stream, out_stream)
