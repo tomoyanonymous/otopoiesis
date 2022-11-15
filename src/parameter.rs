@@ -1,5 +1,5 @@
 use atomic_float::*;
-use std::ops::{Range, RangeInclusive};
+use std::ops::{RangeInclusive};
 use std::sync::atomic::Ordering;
 
 pub trait Listener {
@@ -15,10 +15,10 @@ unsafe impl Send for FloatParameter {}
 unsafe impl Sync for FloatParameter {}
 
 impl FloatParameter {
-    pub fn new(init: f32, range: Range<f32>, label: impl Into<String>) -> Self {
+    pub fn new(init: f32, range: RangeInclusive<f32>, label: impl Into<String>) -> Self {
         Self {
             value: AtomicF32::new(init),
-            range: RangeInclusive::new(range.start, range.end),
+            range,
             label: label.into(),
         }
     }

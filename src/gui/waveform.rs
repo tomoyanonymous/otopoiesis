@@ -29,10 +29,10 @@ impl Model {
         let size = 512;
         let samples = vec![0f32; size];
 
-        let amp = Arc::new(parameter::FloatParameter::new(1., 0.0..1.0, "amplitude"));
+        let amp = Arc::new(parameter::FloatParameter::new(1., 0.0..=1.0, "amplitude"));
         let freq = Arc::new(parameter::FloatParameter::new(
             440.,
-            20.0..20000.0,
+            20.0..=20000.0,
             "frequency",
         ));
 

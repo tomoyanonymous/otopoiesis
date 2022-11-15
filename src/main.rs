@@ -6,7 +6,8 @@ mod audio;
 mod gui;
 mod parameter;
 
-use audio::{oscillator, Renderer};
+use audio::{oscillator, renderer::{RendererBase,Renderer}};
+
 use gui::waveform;
 use gui::Component as UiComponent;
 
@@ -29,7 +30,7 @@ impl Model {
         let waveui = waveform::Model::new(area);
         let wave_audio =
             oscillator::SineWave::new(Arc::clone(&waveui.amp), Arc::clone(&waveui.freq));
-        let mut renderer = audio::SimpleRenderer {
+        let mut renderer = Renderer {
             host: nannou_audio::Host::new(),
         };
         let (_audio_in, _audio_out) = renderer.init(wave_audio, 44100.0);

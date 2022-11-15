@@ -1,5 +1,7 @@
 use super::*;
 use crate::parameter;
+use std::sync::Arc;
+
 
 pub trait GeneratorComponent {
     fn render_sample(&mut self, out: &mut f32, info: &PlaybackInfo);
