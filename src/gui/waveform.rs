@@ -7,11 +7,19 @@ pub struct Model {
     samples: Vec<f32>,
     pub osc_params: Arc<oscillator::SharedParams>,
     pub region_params: Arc<AtomicRange>,
+    horizontal_scale: f32,
     amp_tmp: f32,
     freq_tmp: f32,
     base: ComponentBase,
 }
-
+pub fn range_to_bound(horizontal_scale: f32, range: (u64, u64)) -> Rect {
+    Rect::from_x_y_w_h(
+        range.0 as f32 * horizontal_scale,
+        50.,
+        range.1 as f32 * horizontal_scale,
+        400.,
+    )
+}
 impl Model {
     pub fn update_samples(&mut self) {
         let mut phase = 0.0f32;
@@ -26,19 +34,23 @@ impl Model {
         }
     }
 
-    pub fn new(bound: nannou::geom::Rect,osc_params:Arc<oscillator::SharedParams>,region_params:Arc<AtomicRange>) -> Self {
+    pub fn new(
+        bound: Rect,
+        osc_params: Arc<oscillator::SharedParams>,
+        region_params: Arc<AtomicRange>,
+    ) -> Self {
         let size = 512;
         let samples = vec![0f32; size];
-
-
+        let horizontal_scale = 0.01;
         let amp_tmp = osc_params.amp.get();
         let freq_tmp = osc_params.freq.get();
-
-        let base = ComponentBase::new(bound);
+        let rect = range_to_bound(horizontal_scale, region_params.get_pair());
+        let base = ComponentBase::new(rect);
         let mut res = Self {
             samples,
             osc_params,
             region_params,
+            horizontal_scale,
             amp_tmp,
             freq_tmp,
             base,
@@ -49,6 +61,15 @@ impl Model {
     pub fn get_current_amp(&self) -> f32 {
         self.osc_params.amp.get().abs()
     }
+    fn is_on_start_handle(&self, cursor: Point2) -> bool {
+        let left = self.get_bounding_box().left();
+        ((left - 10.)..(left + 10.)).contains(&cursor.x)
+    }
+    fn is_on_end_handle(&self, cursor: Point2) -> bool {
+        let right = self.get_bounding_box().right();
+        ((right - 10.)..(right + 10.)).contains(&cursor.x)
+    }
+    fn dragg_start(&mut self, origin: Point2, current: Point2) {}
 }
 
 impl Component for Model {
@@ -60,13 +81,24 @@ impl Component for Model {
     }
     fn mouse_moved(&mut self, _pos: Point2) {}
     fn mouse_dragged(&mut self, origin: Point2, current: Point2) {
-        let params = &self.osc_params;
+        let bound = self.get_base_component_mut().bound;
 
-        params.amp.set(self.amp_tmp + (current.y - origin.y) * 0.01);
-        params
-            .freq
-            .set(self.freq_tmp + (current.x - origin.x) * 10.);
-        self.update_samples();
+        if self.is_on_start_handle(self.get_mouse_pos()) {
+            let shift = (bound.left() + current.x) / self.horizontal_scale;
+            self.region_params.set_start(shift as u64);
+            self.get_base_component_mut().bound.x.start = current.x;
+        } else if self.is_on_end_handle(self.get_mouse_pos()) {
+            let shift = (bound.left() + bound.w() + current.x) / self.horizontal_scale;
+            self.region_params.set_end(shift as u64);
+            self.get_base_component_mut().bound.x.end = current.x;
+        } else {
+            let params = &self.osc_params;
+            params.amp.set(self.amp_tmp + (current.y - origin.y) * 0.01);
+            params
+                .freq
+                .set(self.freq_tmp + (current.x - origin.x) * 10.);
+            self.update_samples();
+        }
     }
     fn mouse_released(&mut self, _mouse: MouseButton) {
         let params = &self.osc_params;
@@ -76,7 +108,6 @@ impl Component for Model {
     }
     fn draw(&self, ctx: &Draw) {
         let bound = self.get_bounding_box();
-
         let line = ctx.polyline();
         line.points(self.samples.iter().enumerate().map(|(i, s)| {
             let x = nannou::math::map_range(
@@ -89,7 +120,18 @@ impl Component for Model {
             let y = *s * 100.0 * self.get_current_amp();
             nannou::geom::pt2(x, y)
         }));
-
+        if self.is_on_start_handle(self.get_mouse_pos()) {
+            ctx.line()
+                .weight(2.0)
+                .start(bound.top_left())
+                .end(bound.bottom_left());
+        }
+        if self.is_on_end_handle(self.get_mouse_pos()) {
+            ctx.line()
+                .weight(2.0)
+                .start(bound.top_right())
+                .end(bound.bottom_right());
+        }
         if self.is_mouse_pressed() {
             ctx.ellipse().radius(10.).xy(self.get_local_mouse_pos());
         }
@@ -100,99 +142,16 @@ impl Component for Model {
         );
         ctx.text(str.as_str())
             .xy(self.get_local_mouse_pos() + Vec2::new(0., 20.));
-            let params = &self.osc_params;
+        let params = &self.osc_params;
 
         let str2 = format!("amp:{:.2},freq:{:.2}", params.amp.get(), params.freq.get());
         ctx.text(str2.as_str())
             .xy(self.get_local_mouse_pos() + Vec2::new(0., -20.));
+        let range = self.region_params.get_pair();
+        let str3 = format!("range:{:?}", range);
+        ctx.text(str3.as_str())
+            .xy(self.get_local_mouse_pos() + Vec2::new(0., -40.));
     }
 
     fn mouse_pressed(&mut self, _mouse: MouseButton) {}
-
-    fn get_bounding_box(&self) -> nannou::geom::Rect {
-        return self.get_base_component().bound;
-    }
-
-    fn get_mouse_pos(&self) -> Point2 {
-        self.get_base_component().mousepos
-    }
-
-    fn get_local_mouse_pos(&self) -> Point2 {
-        let base = self.get_base_component();
-        base.mousepos - base.bound.xy()
-    }
-
-    fn draw_raw(&self, app: &App, frame: Frame) {
-        let mut draw = app.draw();
-        let base = self.get_base_component();
-        let bound = self.get_bounding_box();
-
-        // draw = draw.x_y(-frame.rect().w() * 0.5, frame.rect().h() * 0.5);
-
-        if base.draw_bound {
-            draw.rect()
-                .x_y(0., 0.)
-                .w_h(bound.w(), bound.h())
-                .no_fill()
-                .stroke_color(rgb(255., 0., 0.))
-                .stroke_weight(1.0);
-        }
-        draw = draw.scissor(bound);
-        self.draw(&draw);
-        draw.to_frame(app, &frame).ok();
-    }
-
-    fn is_mouse_on(&self) -> bool {
-        let base = self.get_base_component();
-        base.bound.contains_point(base.mousepos.to_array())
-    }
-
-    fn is_mouse_pressed(&self) -> bool {
-        match self.get_base_component().mousestate {
-            gui::MouseState::Clicked(_) => true,
-            _ => false,
-        }
-    }
-
-    fn set_draw_boundary(&mut self, b: bool) {
-        self.get_base_component_mut().draw_bound = b;
-    }
-
-    fn mouse_moved_raw(&mut self, pos: Point2) {
-        let is_mouseon = self.is_mouse_on();
-        let base = self.get_base_component_mut();
-        base.mousepos = pos;
-        match base.mousestate {
-            gui::MouseState::None => {
-                if is_mouseon {
-                    base.mousestate = gui::MouseState::Hover;
-                }
-            }
-            gui::MouseState::Clicked(origin) => self.mouse_dragged(origin, pos),
-            _ => {}
-        }
-        self.mouse_moved(pos);
-    }
-
-    fn mouse_pressed_raw(&mut self, mouse: MouseButton) {
-        if let MouseButton::Left = mouse {
-            self.get_base_component_mut().mousestate =
-                gui::MouseState::Clicked(self.get_mouse_pos());
-        }
-        self.mouse_pressed(mouse)
-    }
-
-    fn mouse_released_raw(&mut self, mouse: MouseButton) {
-        let is_mouseon = self.is_mouse_on();
-        let base = self.get_base_component_mut();
-
-        if let MouseButton::Left = mouse {
-            if is_mouseon {
-                base.mousestate = gui::MouseState::Hover;
-            } else {
-                base.mousestate = gui::MouseState::None;
-            }
-        }
-        self.mouse_released(mouse);
-    }
 }

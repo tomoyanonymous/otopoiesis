@@ -15,18 +15,19 @@ where
         0
     }
     fn get_output_channels(&self) -> usize {
-        1
+        2
     }
+    fn prepare_play(&mut self, _info: &PlaybackInfo) {}
     fn render(&mut self, _input: &[f32], output: &mut [f32], info: &PlaybackInfo) {
-        for oframe in output.chunks_mut(2) {
-            let mut ch = 0;
-            for s in oframe {
+        for (_count, out_per_channel) in output.chunks_mut(self.get_output_channels()).enumerate() {
+            let mut res = 0.0;
+            self.render_sample(&mut res, info);
+            for (ch, s) in out_per_channel.iter_mut().enumerate() {
                 if ch == 0 {
-                    self.render_sample(s, info)
+                    *s = res
                 } else {
-                    *s = 0.0;
+                    *s = 0.0
                 }
-                ch += 1;
             }
         }
     }
@@ -38,23 +39,24 @@ pub struct SharedParams {
     pub amp: FloatParameter,
     pub freq: FloatParameter,
 }
-pub struct SineWave {
+pub struct SineModel {
     phase: f32,
     params: Arc<SharedParams>,
 }
 
-impl SineWave {
+impl SineModel {
     pub fn new(params: Arc<SharedParams>) -> Self {
         Self { phase: 0.0, params }
     }
     pub fn render_sample_internal(&mut self, out: &mut f32, info: &PlaybackInfo) {
         let twopi = std::f32::consts::PI * 2.;
-        self.phase = (self.phase + twopi * self.params.freq.get() / info.sample_rate) % twopi;
+        self.phase =
+            (self.phase + twopi * self.params.freq.get() / info.sample_rate as f32) % twopi;
         *out = self.phase.sin() * self.params.amp.get();
     }
 }
 
-impl GeneratorComponent for SineWave {
+impl GeneratorComponent for SineModel {
     type Params = SharedParams;
     fn get_params(&self) -> &Self::Params {
         self.params.as_ref()

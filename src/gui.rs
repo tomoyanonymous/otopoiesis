@@ -2,8 +2,8 @@
 // it has handler for relative mouse event position relative to bounding box.
 
 use nannou::prelude::*;
-pub mod waveform;
 pub mod timeline;
+pub mod waveform;
 
 #[derive(PartialEq)]
 pub enum MouseState {
@@ -11,17 +11,17 @@ pub enum MouseState {
     Hover,
     Clicked(Point2), //saves position when clicked. useful for make drag function
 }
-
+pub use nannou::geom::Rect;
 //mousepos stores global position in window.
 //user can get local position through get_local_mouse_pos in Component trait.
 pub struct ComponentBase {
-    bound: nannou::geom::Rect,
+    bound: Rect,
     draw_bound: bool,
     mousestate: MouseState,
     pub mousepos: Point2,
 }
 impl ComponentBase {
-    pub fn new(bound: nannou::geom::Rect) -> Self {
+    pub fn new(bound: Rect) -> Self {
         Self {
             bound,
             draw_bound: false,
@@ -76,7 +76,7 @@ pub trait Component {
 
         if base.draw_bound {
             draw.rect()
-                .x_y(0., 0.)
+                .x_y(bound.x(), bound.y())
                 .w_h(bound.w(), bound.h())
                 .no_fill()
                 .stroke_color(rgb(255., 0., 0.))

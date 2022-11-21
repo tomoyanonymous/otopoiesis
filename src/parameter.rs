@@ -1,5 +1,4 @@
 use atomic_float::*;
-use nannou::geom::Range;
 use std::ops::RangeInclusive;
 use std::sync::atomic::AtomicU64;
 use std::sync::atomic::Ordering;

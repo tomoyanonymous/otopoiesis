@@ -1,6 +1,5 @@
-use super::oscillator::GeneratorComponent;
 use crate::audio::{Component, PlaybackInfo};
-use std::thread;
+
 // use crate::parameter::UIntParameter
 use crate::utils::AtomicRange;
 use std::sync::Arc;
@@ -9,21 +8,11 @@ use std::sync::Arc;
 // Buffer by Bufferで再生するという時にどうタイミングを合わせるか？
 // Region{range:0..=2000,2,vec![0.0]}
 
-// impl PartialOrd<AtomicU64> for AtomicU64{
-//     fn partial_cmp(&self, other: &AtomicU64) -> Option<std::cmp::Ordering> {
-//         use std::cmp::Ordering;
-//         let self_v = self.load(std::sync::atomic::Ordering::Relaxed);
-//         let other_v = other.load(std::sync::atomic::Ordering::Relaxed);
-//         self_v.partial_cmp(&other_v)
-//     }
-
-// }
-
-pub struct Region<E: GeneratorComponent> {
+pub struct Model {
     range: Arc<AtomicRange>,
     channels: usize,
     interleaved_samples_cache: Vec<f32>,
-    pub generator: E,
+    pub generator: Box<dyn Component + Send>,
     cache_completed: bool,
 }
 
@@ -31,8 +20,12 @@ pub struct Region<E: GeneratorComponent> {
 //     fn set_start(newv: u64) {}
 // }
 
-impl<E: GeneratorComponent> Region<E> {
-    pub fn new(range: Arc<AtomicRange>, channels: usize, generator: E) -> Self {
+impl Model {
+    pub fn new(
+        range: Arc<AtomicRange>,
+        channels: usize,
+        generator: Box<dyn Component + Send>,
+    ) -> Self {
         let buf_size = channels as u64 * (range.getrange());
         Self {
             range,
@@ -43,21 +36,21 @@ impl<E: GeneratorComponent> Region<E> {
         }
     }
     pub fn render_offline(&mut self, info: &PlaybackInfo) {
-        for (_count, out) in self
-            .interleaved_samples_cache
-            .chunks_mut(self.channels)
-            .enumerate()
-        {
-            for (_ch, o) in out.iter_mut().enumerate() {
-                self.generator.render_sample(o, info)
-            }
-        }
+        let dummy_input = [0.0];
+        self.generator.render(
+            &dummy_input,
+            self.interleaved_samples_cache.as_mut_slice(),
+            info,
+        );
+
         self.cache_completed = true;
     }
-    pub fn render_offline_async(&mut self, info: PlaybackInfo) {}
+    pub fn render_offline_async(&mut self, info: PlaybackInfo) {
+        todo!()
+    }
 }
 
-impl<E: GeneratorComponent> Component for Region<E> {
+impl Component for Model {
     fn get_input_channels(&self) -> usize {
         0
     }
@@ -65,23 +58,20 @@ impl<E: GeneratorComponent> Component for Region<E> {
         self.channels
     }
     //info.current_time contains exact sample from the beggining at a head of the buffer.
-
+    fn prepare_play(&mut self, info: &PlaybackInfo) {
+        self.render_offline(info);
+    }
     fn render(&mut self, input: &[f32], output: &mut [f32], info: &PlaybackInfo) {
-        for (count, o) in output.chunks_mut(self.channels).enumerate() {
+        for (count, out_per_channel) in output.chunks_mut(self.channels).enumerate() {
             let now = (info.current_time + count) as u64;
-            for (ch, s) in o.iter_mut().enumerate() {
-                *s = if self.range.contains(&now) {
-                    if self.cache_completed {
-                        let read_point = (now - self.range.start()) as i64;
-                        assert_eq!(read_point >= 0, true);
-                        self.interleaved_samples_cache[read_point as usize + ch]
-                    } else {
-                        // self.generate()
-                        0.0
-                    }
-                } else {
-                    0.0
-                }
+            let in_range = self.range.contains(now);
+            let has_cache = self.cache_completed;
+            if in_range && has_cache {
+                let read_point = ((now - self.range.start()) * 2) as usize;
+                out_per_channel
+                    .iter_mut()
+                    .enumerate()
+                    .for_each(|(ch, s)| *s = self.interleaved_samples_cache[read_point + ch]);
             }
         }
     }
