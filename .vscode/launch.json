@@ -4,14 +4,21 @@
     // 詳細情報は次を確認してください: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [
+        
         {
             "type": "lldb",
             "request": "launch",
-            "name": "Debug executable 'hello'",
+            "name": "Debug main executable",
             "cargo": {
                 "args": [
                     "build",
+                    "--bin=otopoiesis",
+                    "--package=otopoiesis"
                 ],
+                "filter": {
+                    "name": "otopoiesis",
+                    "kind": "bin"
+                }
             },
             "args": [],
             "cwd": "${workspaceFolder}"

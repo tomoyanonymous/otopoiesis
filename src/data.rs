@@ -2,30 +2,40 @@
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
-use crate::utils::AtomicRange;
+use crate::{
+    parameter::FloatParameter,
+    utils::AtomicRange,
+};
 #[derive(Serialize, Deserialize)]
 pub struct GlobalSetting;
 
 #[derive(Serialize, Deserialize)]
 pub struct Project {
     pub global_setting: GlobalSetting,
-    pub tracks: Vec<Track>,
+    pub tracks: Arc<Vec<Arc<Track>>>,
 }
 
 #[derive(Serialize, Deserialize)]
-pub struct Track(Vec<Region>);
+pub struct Track(pub Vec<Arc<Region>>);
 
 //range stores a real time.
 #[derive(Serialize, Deserialize)]
 pub struct Region {
-    pub range: std::ops::Range<f32>,
-    pub generator: Generator,
-    pub filters: Vec<RegionFilter>,
+    pub range: AtomicRange,
+    pub generator: Arc<Generator>,
+    pub filters: Vec<Arc<RegionFilter>>,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct OscillatorParam {
+    pub amp: FloatParameter,
+    pub freq: FloatParameter,
+    pub phase: FloatParameter,
 }
 
 #[derive(Serialize, Deserialize)]
 pub enum Generator {
-    Sinewave,
+    Oscillator(Arc<OscillatorParam>),
 }
 
 #[derive(Serialize, Deserialize)]

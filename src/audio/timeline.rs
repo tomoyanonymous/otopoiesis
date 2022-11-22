@@ -1,13 +1,9 @@
-use atomic_float::AtomicF32;
-
 use crate::audio::{self, Component, PlaybackInfo};
 use std::sync::Arc;
+use crate::data;
 
-pub struct Params {
-    time: AtomicF32,
-}
 pub struct Model {
-    param: Arc<Params>,
+    param: Arc<data::Project>,
     // regions: Vec<audio::region::Region<>>
 }
 

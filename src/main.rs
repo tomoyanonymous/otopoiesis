@@ -5,6 +5,7 @@ use nannou_egui::{
 };
 use otopoiesis::*;
 use std::sync::Arc;
+use std::sync::atomic::AtomicBool;
 
 use parameter::{FloatParameter, Parameter};
 use utils::AtomicRange;
@@ -13,7 +14,7 @@ use crate::audio::{
     renderer::{Renderer, RendererBase},
     Component,
 };
-
+use crate::data;
 use crate::gui;
 
 fn main() {
@@ -24,7 +25,7 @@ fn main() {
         .run();
 }
 struct Model {
-    wave_ui: gui::region::Model,
+    project: Arc<data::Project>,
     audio: Renderer<audio::region::Model>,
     egui: Egui,
     is_played: bool,
@@ -32,31 +33,37 @@ struct Model {
 
 impl Model {
     pub fn new(egui: Egui) -> Self {
-        let sinewave_params = Arc::new(audio::oscillator::SharedParams {
+        let region_len = 60000;
+        let osc_param = Arc::new(data::OscillatorParam {
             amp: FloatParameter::new(1.0, 0.0..=1.0, "amp"),
             freq: FloatParameter::new(440.0, 20.0..=20000.0, "freq"),
+            phase: FloatParameter::new(0.0, 0.0..=6.3, "phase"),
         });
-        let sinewave = audio::oscillator::SineModel::new(Arc::clone(&sinewave_params));
-
-        let region_len = 60000;
-        let region_params = Arc::new(audio::region::Params {
+        let region_param = Arc::new(data::Region {
             range: AtomicRange::new(1000, 50000),
-            max_size: region_len,
+            generator: Arc::new(data::Generator::Oscillator(Arc::clone(&osc_param))),
+            filters: vec![],
         });
+        let project = Arc::new(data::Project {
+            global_setting: data::GlobalSetting {},
+            tracks: Arc::new(vec![Arc::new(data::Track(vec![Arc::clone(&region_param)]))]),
+        });
+
+        let sinewave = audio::oscillator::SineModel::new(Arc::clone(&osc_param));
+
         let mut region =
-            audio::region::Model::new(Arc::clone(&region_params), 2, Box::new(sinewave));
+            audio::region::Model::new(Arc::clone(&region_param), 2, Box::new(sinewave));
         let info = audio::PlaybackInfo {
             sample_rate: 44100,
             current_time: 0,
         };
         region.prepare_play(&info);
 
-        let waveui = gui::region::Model::new(sinewave_params, region_params);
         let renderer = audio::renderer::create_renderer(region, Some(44100), Some(512));
 
         Self {
-            wave_ui: waveui,
             audio: renderer,
+            project,
             egui,
             is_played: false,
         }
@@ -118,24 +125,10 @@ fn update(_app: &App, model: &mut Model, update: Update) {
     let ctx = egui.begin_frame();
     model.is_played = model.audio.is_playing();
     egui::CentralPanel::default().show(&ctx, |ui| {
-        egui::ScrollArea::horizontal().show(ui, |ui| {
-            // ctx.set_debug_on_hover(true);
-            let mut style: egui::Style = (*ctx.style()).clone();
-            // style.visuals.widgets.active.bg_fill=Color32::TRANSPARENT;
-            // style.visuals.widgets.inactive.bg_fill=Color32::TRANSPARENT;
-            // style.visuals.widgets.open.bg_fill=Color32::TRANSPARENT;
-            // style.visuals.widgets.hovered.bg_fill=Color32::TRANSPARENT;
-            style.visuals.widgets.noninteractive.bg_fill = Color32::TRANSPARENT;
-
-            ctx.set_style(style);
-            ui.label(format!(
-                "{}",
-                if model.is_played { "playing" } else { "paused" }
-            ));
-            ui.horizontal(|ui| {
-                ui.add_space(100.0);
-                ui.add(&mut model.wave_ui);
-            });
+        ui.add(gui::timeline::Model {
+            played: AtomicBool::from(model.is_played),
+            time: update.since_start.as_secs(),
+            params: Arc::clone(&model.project),
         })
     });
 }

@@ -20,7 +20,7 @@ pub trait Parameter<T> {
 pub struct FloatParameter {
     #[serde_as(as = "AtomicF32Json")]
     value: AtomicF32,
-    range: RangeInclusive<f32>,
+    pub range: RangeInclusive<f32>,
     label: String,
 }
 //do we need?

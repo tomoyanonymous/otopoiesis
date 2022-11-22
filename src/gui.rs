@@ -6,6 +6,8 @@
 use nannou::prelude::*;
 pub mod timeline;
 pub mod region;
+pub mod track;
+pub mod generator;
 
 #[derive(PartialEq)]
 pub enum MouseState {

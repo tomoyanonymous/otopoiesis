@@ -1,9 +1,9 @@
 use crate::audio::{Component, PlaybackInfo};
 
 // use crate::parameter::UIntParameter
+use crate::data;
 use crate::utils::AtomicRange;
 use std::sync::Arc;
-
 // modifierが後で追加されたりする。生成用にComponentを持っている？
 // Buffer by Bufferで再生するという時にどうタイミングを合わせるか？
 // Region{range:0..=2000,2,vec![0.0]}
@@ -14,7 +14,7 @@ pub struct Params {
 }
 
 pub struct Model {
-    params: Arc<Params>,
+    params: Arc<data::Region>,
     channels: usize,
     interleaved_samples_cache: Vec<f32>,
     pub generator: Box<dyn Component + Send>,
@@ -26,9 +26,13 @@ pub struct Model {
 // }
 
 impl Model {
-    pub fn new(params: Arc<Params>, channels: usize, generator: Box<dyn Component + Send>) -> Self {
-        assert!(params.range.getrange() < params.max_size);
-        let buf_size = channels as u64 * (params.max_size);
+    pub fn new(
+        params: Arc<data::Region>,
+        channels: usize,
+        generator: Box<dyn Component + Send>,
+    ) -> Self {
+        // assert!(params.range.getrange() < params.max_size);
+        let buf_size = channels as u64 * 60000; //todo!
         Self {
             params,
             channels,

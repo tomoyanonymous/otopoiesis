@@ -1,7 +1,7 @@
 use super::*;
-use crate::parameter::{FloatParameter, Parameter};
+use crate::data;
+use crate::parameter::Parameter;
 use std::sync::Arc;
-
 pub trait GeneratorComponent {
     type Params;
     fn get_params(&self) -> &Self::Params;
@@ -32,32 +32,28 @@ where
         }
     }
 }
-
-//各モデルは初期化時にArc<atomicを含む型>を受け取り状態を共有する
-//共有が不要な内部パラメーターは普通のfloatなどでOK
-pub struct SharedParams {
-    pub amp: FloatParameter,
-    pub freq: FloatParameter,
-}
 pub struct SineModel {
-    phase: f32,
-    params: Arc<SharedParams>,
+    pub params: Arc<data::OscillatorParam>,
 }
 
 impl SineModel {
-    pub fn new(params: Arc<SharedParams>) -> Self {
-        Self { phase: 0.0, params }
+    pub fn new(params: Arc<data::OscillatorParam>) -> Self {
+        Self {
+            params: Arc::clone(&params),
+        }
     }
     pub fn render_sample_internal(&mut self, out: &mut f32, info: &PlaybackInfo) {
         let twopi = std::f32::consts::PI * 2.;
-        self.phase =
-            (self.phase + twopi * self.params.freq.get() / info.sample_rate as f32) % twopi;
-        *out = self.phase.sin() * self.params.amp.get();
+        let params = &self.params;
+        params.phase.set(
+            (params.phase.get() + twopi * params.freq.get() / info.sample_rate as f32) % twopi,
+        );
+        *out = params.phase.get().sin() * self.params.amp.get();
     }
 }
 
 impl GeneratorComponent for SineModel {
-    type Params = SharedParams;
+    type Params = data::OscillatorParam;
     fn get_params(&self) -> &Self::Params {
         self.params.as_ref()
     }
