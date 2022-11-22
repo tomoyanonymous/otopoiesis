@@ -10,12 +10,11 @@ use parameter::{FloatParameter, Parameter};
 use utils::AtomicRange;
 
 use crate::audio::{
-    oscillator, region,
     renderer::{Renderer, RendererBase},
     Component,
 };
 
-use crate::gui::waveform;
+use crate::gui;
 
 fn main() {
     nannou::app(model)
@@ -25,33 +24,34 @@ fn main() {
         .run();
 }
 struct Model {
-    wave_ui: waveform::Model,
-    audio: Renderer<region::Model>,
+    wave_ui: gui::region::Model,
+    audio: Renderer<audio::region::Model>,
     egui: Egui,
     is_played: bool,
 }
 
 impl Model {
     pub fn new(egui: Egui) -> Self {
-        let sinewave_params = Arc::new(oscillator::SharedParams {
+        let sinewave_params = Arc::new(audio::oscillator::SharedParams {
             amp: FloatParameter::new(1.0, 0.0..=1.0, "amp"),
             freq: FloatParameter::new(440.0, 20.0..=20000.0, "freq"),
         });
-        let sinewave = oscillator::SineModel::new(Arc::clone(&sinewave_params));
+        let sinewave = audio::oscillator::SineModel::new(Arc::clone(&sinewave_params));
 
         let region_len = 60000;
-        let region_params = Arc::new(region::Params {
+        let region_params = Arc::new(audio::region::Params {
             range: AtomicRange::new(1000, 50000),
             max_size: region_len,
         });
-        let mut region = region::Model::new(Arc::clone(&region_params), 2, Box::new(sinewave));
+        let mut region =
+            audio::region::Model::new(Arc::clone(&region_params), 2, Box::new(sinewave));
         let info = audio::PlaybackInfo {
             sample_rate: 44100,
             current_time: 0,
         };
         region.prepare_play(&info);
 
-        let waveui = waveform::Model::new(sinewave_params, region_params);
+        let waveui = gui::region::Model::new(sinewave_params, region_params);
         let renderer = audio::renderer::create_renderer(region, Some(44100), Some(512));
 
         Self {

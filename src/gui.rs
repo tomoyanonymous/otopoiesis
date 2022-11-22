@@ -5,7 +5,7 @@
 
 use nannou::prelude::*;
 pub mod timeline;
-pub mod waveform;
+pub mod region;
 
 #[derive(PartialEq)]
 pub enum MouseState {

@@ -1,19 +1,18 @@
+use crate::data;
 use crate::gui;
 use crate::parameter::Parameter;
 use crate::utils::AtomicRange;
 use crate::*;
+use nannou_egui::egui;
 use std::sync::Arc;
 
 pub struct Model {
     time: u64,
-    base: gui::ComponentBase,
+    params: Arc<data::Project>
 }
 
-impl Model {
-    pub fn new(bound: gui::Rect) -> Self {
-        Self {
-            time: 0,
-            base: gui::ComponentBase::new(bound),
-        }
+impl egui::Widget for Model {
+    fn ui(self, ui: &mut egui::Ui) -> egui::Response {
+        ui.button("text")
     }
 }
