@@ -67,7 +67,7 @@ pub trait Component {
     }
 
     //called by actual app.
-    fn draw_raw(&self, app: &App, frame: Frame) {
+    fn draw_raw(&self, app: &App, frame: & Frame) {
         let mut draw = app.draw();
         let base = self.get_base_component();
         let bound = self.get_bounding_box();

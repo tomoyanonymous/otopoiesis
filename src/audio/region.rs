@@ -8,8 +8,13 @@ use std::sync::Arc;
 // Buffer by Bufferで再生するという時にどうタイミングを合わせるか？
 // Region{range:0..=2000,2,vec![0.0]}
 
+pub struct Params {
+    pub range: AtomicRange,
+    pub max_size: u64,
+}
+
 pub struct Model {
-    range: Arc<AtomicRange>,
+    params: Arc<Params>,
     channels: usize,
     interleaved_samples_cache: Vec<f32>,
     pub generator: Box<dyn Component + Send>,
@@ -21,14 +26,11 @@ pub struct Model {
 // }
 
 impl Model {
-    pub fn new(
-        range: Arc<AtomicRange>,
-        channels: usize,
-        generator: Box<dyn Component + Send>,
-    ) -> Self {
-        let buf_size = channels as u64 * (range.getrange());
+    pub fn new(params: Arc<Params>, channels: usize, generator: Box<dyn Component + Send>) -> Self {
+        assert!(params.range.getrange() < params.max_size);
+        let buf_size = channels as u64 * (params.max_size);
         Self {
-            range,
+            params,
             channels,
             interleaved_samples_cache: vec![0.0; buf_size as usize],
             generator,
@@ -64,10 +66,10 @@ impl Component for Model {
     fn render(&mut self, input: &[f32], output: &mut [f32], info: &PlaybackInfo) {
         for (count, out_per_channel) in output.chunks_mut(self.channels).enumerate() {
             let now = (info.current_time + count) as u64;
-            let in_range = self.range.contains(now);
+            let in_range = self.params.range.contains(now);
             let has_cache = self.cache_completed;
             if in_range && has_cache {
-                let read_point = ((now - self.range.start()) * 2) as usize;
+                let read_point = ((now - self.params.range.start()) * 2) as usize;
                 out_per_channel
                     .iter_mut()
                     .enumerate()

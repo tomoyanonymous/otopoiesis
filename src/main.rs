@@ -1,4 +1,8 @@
 use nannou::prelude::*;
+use nannou_egui::{
+    egui::{self, Color32},
+    Egui,
+};
 use std::sync::Arc;
 
 use parameter::{FloatParameter, Parameter};
@@ -28,38 +32,44 @@ fn main() {
 struct Model {
     wave_ui: waveform::Model,
     audio: Renderer<region::Model>,
+    egui: Egui,
 }
 
 impl Model {
-    pub fn new() -> Self {
-        let area = nannou::geom::Rect::from_x_y_w_h(-400., 0., 400., 600.);
-
+    pub fn new(egui: Egui) -> Self {
         let sinewave_params = Arc::new(oscillator::SharedParams {
             amp: FloatParameter::new(1.0, 0.0..=1.0, "amp"),
             freq: FloatParameter::new(440.0, 20.0..=20000.0, "freq"),
         });
         let sinewave = oscillator::SineModel::new(Arc::clone(&sinewave_params));
 
-        let range_params = Arc::new(AtomicRange::new(1000, 50000));
-        let mut region = region::Model::new(Arc::clone(&range_params), 2, Box::new(sinewave));
+        let region_len = 60000;
+        let region_params = Arc::new(region::Params {
+            range: AtomicRange::new(1000, 50000),
+            max_size: region_len,
+        });
+        let mut region = region::Model::new(Arc::clone(&region_params), 2, Box::new(sinewave));
         let info = audio::PlaybackInfo {
             sample_rate: 44100,
             current_time: 0,
         };
         region.prepare_play(&info);
 
-        let waveui = waveform::Model::new(area, sinewave_params, range_params);
+        let area = nannou::geom::Rect::from_x_y_w_h(-400., 0., 400., 600.);
+        let waveui = waveform::Model::new(area, sinewave_params, region_params);
         let renderer = audio::renderer::create_renderer(region, Some(44100), Some(512));
 
         Self {
             wave_ui: waveui,
             audio: renderer,
+            egui,
         }
     }
 }
 
 fn model(app: &App) -> Model {
-    app.new_window()
+    let window_id = app
+        .new_window()
         .size(800, 800)
         .event(window_event)
         .raw_event(raw_window_event)
@@ -83,8 +93,9 @@ fn model(app: &App) -> Model {
         .closed(window_closed)
         .build()
         .unwrap();
+    let egui = Egui::from_window(&app.window(window_id).unwrap());
 
-    let mut res = Model::new();
+    let mut res = Model::new(egui);
     res.audio.prepare_play();
     res.audio.play();
     res
@@ -104,14 +115,36 @@ fn event(_app: &App, _model: &mut Model, event: Event) {
     }
 }
 
-fn update(_app: &App, model: &mut Model, _update: Update) {
+fn update(_app: &App, model: &mut Model, update: Update) {
     model.wave_ui.set_draw_boundary(true);
+    let egui = &mut model.egui;
+
+    egui.set_elapsed_time(update.since_start);
+    let ctx = egui.begin_frame();
+
+    egui::CentralPanel::default().show(&ctx, |ui| {
+        // ctx.set_debug_on_hover(true);
+        let mut style: egui::Style = (*ctx.style()).clone();
+        // style.visuals.widgets.active.bg_fill=Color32::TRANSPARENT;
+        // style.visuals.widgets.inactive.bg_fill=Color32::TRANSPARENT;
+        // style.visuals.widgets.open.bg_fill=Color32::TRANSPARENT;
+        // style.visuals.widgets.hovered.bg_fill=Color32::TRANSPARENT;
+        style.visuals.widgets.noninteractive.bg_fill = Color32::TRANSPARENT;
+
+        ctx.set_style(style);
+        ui.label("test");
+        ui.horizontal(|ui| {
+            ui.add_space(100.0);
+            ui.add(&mut model.wave_ui);
+        });
+    });
 }
 
 fn view(app: &App, model: &Model, frame: Frame) {
     frame.clear(SKYBLUE);
 
-    model.wave_ui.draw_raw(app, frame);
+    model.wave_ui.draw_raw(app, &frame);
+    model.egui.draw_to_frame(&frame).unwrap();
 }
 
 fn window_event(_app: &App, _model: &mut Model, event: WindowEvent) {
@@ -138,7 +171,10 @@ fn window_event(_app: &App, _model: &mut Model, event: WindowEvent) {
     }
 }
 
-fn raw_window_event(_app: &App, _model: &mut Model, _event: &nannou::winit::event::WindowEvent) {}
+fn raw_window_event(_app: &App, model: &mut Model, event: &nannou::winit::event::WindowEvent) {
+    // Let egui handle things like keyboard and mouse input.
+    model.egui.handle_raw_event(event);
+}
 
 fn key_pressed(_app: &App, model: &mut Model, key: Key) {
     match key {

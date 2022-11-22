@@ -1,17 +1,125 @@
 use crate::gui::{Component, ComponentBase};
 use crate::parameter::Parameter;
+use crate::region;
 use crate::*;
 use std::sync::Arc;
+
+// use nannou_egui::*;
+use nannou_egui::egui;
 
 pub struct Model {
     samples: Vec<f32>,
     pub osc_params: Arc<oscillator::SharedParams>,
-    pub region_params: Arc<AtomicRange>,
+    pub region_params: Arc<region::Params>,
+    on_start_hover: bool,
+    on_end_hover: bool,
     horizontal_scale: f32,
     amp_tmp: f32,
     freq_tmp: f32,
     base: ComponentBase,
 }
+
+fn region_bar(ui: &mut egui::Ui, size: egui::Vec2) -> egui::Response {
+    let (response, mut painter) = ui.allocate_painter(size, egui::Sense::click_and_drag());
+    let rect = response.rect;
+
+    let pos = [
+        egui::pos2(response.rect.center().x, response.rect.top()),
+        egui::pos2(response.rect.center().x, response.rect.bottom()),
+    ];
+    if response.hovered() {
+        painter.rect_filled(response.rect, 0., ui.style().visuals.window_shadow.color);
+    }
+    if response.dragged() {
+        let mut bold = egui::Stroke::default();
+        bold.width = 1.0;
+        bold.color = ui.style().visuals.strong_text_color();
+        painter.line_segment(pos, bold);
+    }
+    if let Some(cursor_pos) = response.interact_pointer_pos() {
+        let test_text = if response.rect.contains(cursor_pos) {
+            format!("{:?}", cursor_pos)
+        } else {
+            "not_hovered".to_string()
+        };
+        painter.debug_text(
+            rect.center(),
+            egui::Align2::CENTER_CENTER,
+            Color32::BLACK,
+            test_text,
+        );
+    }
+    painter.debug_rect(response.rect, Color32::RED, "bar");
+    response
+}
+
+impl egui::Widget for &mut Model {
+    fn ui(self, ui: &mut egui::Ui) -> egui::Response {
+        let scaling_factor = 100;
+        let bar_size = egui::vec2(10.0, 100.0);
+        let x_size = (self.region_params.range.getrange() / scaling_factor) as f32;
+        let region_size = egui::vec2(x_size, 100.0);
+        let max_rect = egui::Rect::from_x_y_ranges(
+            0.0..=(self.region_params.range.start() / scaling_factor) as f32,
+            0.0..=100.0,
+        );
+        let response = ui
+            .allocate_ui_at_rect(max_rect, |ui| {
+                ui.horizontal(|ui| {
+                    ui.spacing_mut().item_spacing = egui::vec2(0., 0.);
+                    //draw left handle
+                    ui.add_space((self.region_params.range.start() / scaling_factor) as f32);
+                    let left = region_bar(ui, bar_size);
+
+                    if let Some(cursor_pos) = left.interact_pointer_pos() {
+                        let new_start = (cursor_pos.x as u64 * scaling_factor)
+                            .min(self.region_params.range.end());
+                        self.region_params.range.set_start(new_start);
+                    }
+                    //draw main plot
+                    let line = egui::plot::Line::new(egui::plot::Values::from_values_iter(
+                        self.samples.iter().enumerate().map(|(i, s)| {
+                            let x = nannou::math::map_range(
+                                i as f32,
+                                0.,
+                                self.samples.len() as f32,
+                                0.,
+                                x_size,
+                            );
+                            let y = *s * 100.0 * self.get_current_amp();
+                            egui::plot::Value::new(x, y)
+                        }),
+                    ));
+                    let center =
+                        ui.add_sized(region_size, egui::plot::Plot::new("region").line(line));
+                    //draw right handle
+                    let right = region_bar(ui, bar_size);
+                    if let Some(cursor_pos) = right.interact_pointer_pos() {
+                        let new_size = ((cursor_pos.x - center.rect.left() - right.rect.width())
+                            as u64
+                            * scaling_factor)
+                            .min(self.region_params.max_size);
+                        self.region_params
+                            .range
+                            .set_end(self.region_params.range.start() + new_size);
+                    }
+                    //debug
+                    ui.label(format!("{:?}", x_size));
+                })
+                .response
+            })
+            .response;
+        response.ctx.debug_painter().rect(
+            response.rect,
+            0.,
+            Color32::TRANSPARENT,
+            egui::Stroke::new(1., Color32::RED),
+        );
+
+        response
+    }
+}
+
 pub fn range_to_bound(horizontal_scale: f32, range: (u64, u64)) -> Rect {
     Rect::from_x_y_w_h(
         range.0 as f32 * horizontal_scale,
@@ -20,6 +128,7 @@ pub fn range_to_bound(horizontal_scale: f32, range: (u64, u64)) -> Rect {
         400.,
     )
 }
+
 impl Model {
     pub fn update_samples(&mut self) {
         let mut phase = 0.0f32;
@@ -37,20 +146,22 @@ impl Model {
     pub fn new(
         bound: Rect,
         osc_params: Arc<oscillator::SharedParams>,
-        region_params: Arc<AtomicRange>,
+        region_params: Arc<region::Params>,
     ) -> Self {
         let size = 512;
         let samples = vec![0f32; size];
         let horizontal_scale = 0.01;
         let amp_tmp = osc_params.amp.get();
         let freq_tmp = osc_params.freq.get();
-        let rect = range_to_bound(horizontal_scale, region_params.get_pair());
+        let rect = range_to_bound(horizontal_scale, region_params.range.get_pair());
         let base = ComponentBase::new(rect);
         let mut res = Self {
             samples,
             osc_params,
             region_params,
             horizontal_scale,
+            on_end_hover: false,
+            on_start_hover: false,
             amp_tmp,
             freq_tmp,
             base,
@@ -69,7 +180,6 @@ impl Model {
         let right = self.get_bounding_box().right();
         ((right - 10.)..(right + 10.)).contains(&cursor.x)
     }
-    fn dragg_start(&mut self, origin: Point2, current: Point2) {}
 }
 
 impl Component for Model {
@@ -81,31 +191,32 @@ impl Component for Model {
     }
     fn mouse_moved(&mut self, _pos: Point2) {}
     fn mouse_dragged(&mut self, origin: Point2, current: Point2) {
-        let bound = self.get_base_component_mut().bound;
+        // let bound = self.get_base_component_mut().bound;
 
-        if self.is_on_start_handle(self.get_mouse_pos()) {
-            let shift = (bound.left() + current.x) / self.horizontal_scale;
-            self.region_params.set_start(shift as u64);
-            self.get_base_component_mut().bound.x.start = current.x;
-        } else if self.is_on_end_handle(self.get_mouse_pos()) {
-            let shift = (bound.left() + bound.w() + current.x) / self.horizontal_scale;
-            self.region_params.set_end(shift as u64);
-            self.get_base_component_mut().bound.x.end = current.x;
-        } else {
-            let params = &self.osc_params;
-            params.amp.set(self.amp_tmp + (current.y - origin.y) * 0.01);
-            params
-                .freq
-                .set(self.freq_tmp + (current.x - origin.x) * 10.);
-            self.update_samples();
-        }
+        // if self.is_on_start_handle(self.get_mouse_pos()) {
+        //     let shift = (bound.left() + current.x) / self.horizontal_scale;
+        //     self.region_params.set_start(shift as u64);
+        //     self.get_base_component_mut().bound.x.start = current.x;
+        // } else if self.is_on_end_handle(self.get_mouse_pos()) {
+        //     let shift = (bound.left() + bound.w() + current.x) / self.horizontal_scale;
+        //     self.region_params.set_end(shift as u64);
+        //     self.get_base_component_mut().bound.x.end = current.x;
+        // } else {
+        //     let params = &self.osc_params;
+        //     params.amp.set(self.amp_tmp + (current.y - origin.y) * 0.01);
+        //     params
+        //         .freq
+        //         .set(self.freq_tmp + (current.x - origin.x) * 10.);
+        //     self.update_samples();
+        // }
     }
     fn mouse_released(&mut self, _mouse: MouseButton) {
-        let params = &self.osc_params;
+        // let params = &self.osc_params;
 
-        self.amp_tmp = params.amp.get();
-        self.freq_tmp = params.freq.get();
+        // self.amp_tmp = params.amp.get();
+        // self.freq_tmp = params.freq.get();
     }
+
     fn draw(&self, ctx: &Draw) {
         let bound = self.get_bounding_box();
         let line = ctx.polyline();
@@ -120,13 +231,13 @@ impl Component for Model {
             let y = *s * 100.0 * self.get_current_amp();
             nannou::geom::pt2(x, y)
         }));
-        if self.is_on_start_handle(self.get_mouse_pos()) {
+        if self.on_start_hover {
             ctx.line()
                 .weight(2.0)
                 .start(bound.top_left())
                 .end(bound.bottom_left());
         }
-        if self.is_on_end_handle(self.get_mouse_pos()) {
+        if self.on_end_hover {
             ctx.line()
                 .weight(2.0)
                 .start(bound.top_right())
@@ -147,7 +258,7 @@ impl Component for Model {
         let str2 = format!("amp:{:.2},freq:{:.2}", params.amp.get(), params.freq.get());
         ctx.text(str2.as_str())
             .xy(self.get_local_mouse_pos() + Vec2::new(0., -20.));
-        let range = self.region_params.get_pair();
+        let range = self.region_params.range.get_pair();
         let str3 = format!("range:{:?}", range);
         ctx.text(str3.as_str())
             .xy(self.get_local_mouse_pos() + Vec2::new(0., -40.));
