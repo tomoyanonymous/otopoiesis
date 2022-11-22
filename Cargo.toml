@@ -14,4 +14,5 @@ nannou_audio = "*"
 nannou_egui = "*"
 ringbuf = "*"
 atomic_float = "*"
-serde = "*"
+serde = {version = "*",features = ["rc"]}
+serde_with = "2.1.0"
