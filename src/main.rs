@@ -3,24 +3,19 @@ use nannou_egui::{
     egui::{self, Color32},
     Egui,
 };
+use otopoiesis::*;
 use std::sync::Arc;
 
 use parameter::{FloatParameter, Parameter};
 use utils::AtomicRange;
 
-mod audio;
-mod gui;
-mod parameter;
-mod utils;
-
-use audio::{
+use crate::audio::{
     oscillator, region,
     renderer::{Renderer, RendererBase},
     Component,
 };
 
-use gui::waveform;
-use gui::Component as UiComponent;
+use crate::gui::waveform;
 
 fn main() {
     nannou::app(model)
@@ -56,8 +51,7 @@ impl Model {
         };
         region.prepare_play(&info);
 
-        let area = nannou::geom::Rect::from_x_y_w_h(-400., 0., 400., 600.);
-        let waveui = waveform::Model::new(area, sinewave_params, region_params);
+        let waveui = waveform::Model::new(sinewave_params, region_params);
         let renderer = audio::renderer::create_renderer(region, Some(44100), Some(512));
 
         Self {

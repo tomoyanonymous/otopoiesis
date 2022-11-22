@@ -1828,6 +1828,7 @@ dependencies = [
  "nannou_audio",
  "nannou_egui",
  "ringbuf",
+ "serde",
 ]
 
 [[package]]

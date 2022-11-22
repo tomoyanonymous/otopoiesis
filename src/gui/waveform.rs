@@ -1,7 +1,6 @@
-use crate::gui::{Component, ComponentBase};
+use crate::audio::{oscillator, region};
 use crate::parameter::Parameter;
-use crate::region;
-use crate::*;
+use egui::Color32;
 use std::sync::Arc;
 
 // use nannou_egui::*;
@@ -11,12 +10,6 @@ pub struct Model {
     samples: Vec<f32>,
     pub osc_params: Arc<oscillator::SharedParams>,
     pub region_params: Arc<region::Params>,
-    on_start_hover: bool,
-    on_end_hover: bool,
-    horizontal_scale: f32,
-    amp_tmp: f32,
-    freq_tmp: f32,
-    base: ComponentBase,
 }
 
 fn region_bar(ui: &mut egui::Ui, size: egui::Vec2) -> egui::Response {
@@ -139,8 +132,8 @@ impl egui::Widget for &mut Model {
     }
 }
 
-pub fn range_to_bound(horizontal_scale: f32, range: (u64, u64)) -> Rect {
-    Rect::from_x_y_w_h(
+pub fn range_to_bound(horizontal_scale: f32, range: (u64, u64)) -> nannou::geom::Rect {
+    nannou::geom::Rect::from_x_y_w_h(
         range.0 as f32 * horizontal_scale,
         50.,
         range.1 as f32 * horizontal_scale,
@@ -163,27 +156,16 @@ impl Model {
     }
 
     pub fn new(
-        bound: Rect,
         osc_params: Arc<oscillator::SharedParams>,
         region_params: Arc<region::Params>,
     ) -> Self {
         let size = 512;
         let samples = vec![0f32; size];
-        let horizontal_scale = 0.01;
-        let amp_tmp = osc_params.amp.get();
-        let freq_tmp = osc_params.freq.get();
-        let rect = range_to_bound(horizontal_scale, region_params.range.get_pair());
-        let base = ComponentBase::new(rect);
+
         let mut res = Self {
             samples,
             osc_params,
             region_params,
-            horizontal_scale,
-            on_end_hover: false,
-            on_start_hover: false,
-            amp_tmp,
-            freq_tmp,
-            base,
         };
         res.update_samples();
         res
