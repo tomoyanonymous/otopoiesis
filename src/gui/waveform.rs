@@ -53,17 +53,29 @@ fn region_bar(ui: &mut egui::Ui, size: egui::Vec2) -> egui::Response {
     response
 }
 
+fn default_graph(
+    label: impl std::hash::Hash,
+    iter: impl Iterator<Item = egui::plot::Value>,
+) -> egui::plot::Plot {
+    let line = egui::plot::Line::new(egui::plot::Values::from_values_iter(iter));
+    egui::plot::Plot::new(label)
+        .line(line)
+        .allow_drag(false)
+        .allow_zoom(false)
+}
+
 impl egui::Widget for &mut Model {
     fn ui(self, ui: &mut egui::Ui) -> egui::Response {
         let scaling_factor = 50;
-        
+
         let bar_size = egui::vec2(10.0, 100.0);
         let x_size = (self.region_params.range.getrange() / scaling_factor) as f32;
         let region_size = egui::vec2(x_size, 100.0);
         let max_rect = egui::Rect::from_x_y_ranges(
             0.0..=(self.region_params.range.start() / scaling_factor) as f32,
             0.0..=100.0,
-        ).translate(egui::vec2(ui.min_rect().left(),0.));
+        )
+        .translate(egui::vec2(ui.min_rect().left(), 0.));
         let response = ui
             .allocate_ui_at_rect(max_rect, |ui| {
                 ui.horizontal(|ui| {
@@ -78,21 +90,24 @@ impl egui::Widget for &mut Model {
                         self.region_params.range.set_start(new_start);
                     }
                     //draw main plot
-                    let line = egui::plot::Line::new(egui::plot::Values::from_values_iter(
-                        self.samples.iter().enumerate().map(|(i, s)| {
-                            let x = nannou::math::map_range(
-                                i as f32,
-                                0.,
-                                self.samples.len() as f32,
-                                0.,
-                                x_size,
-                            );
-                            let y = *s * 100.0 * self.get_current_amp();
-                            egui::plot::Value::new(x, y)
-                        }),
-                    ));
-                    let center =
-                        ui.add_sized(region_size, egui::plot::Plot::new("region").line(line));
+
+                    let center = ui.add_sized(
+                        region_size,
+                        default_graph(
+                            "region",
+                            self.samples.iter().enumerate().map(|(i, s)| {
+                                let x = nannou::math::map_range(
+                                    i as f32,
+                                    0.,
+                                    self.samples.len() as f32,
+                                    0.,
+                                    x_size,
+                                );
+                                let y = *s * 100.0 * self.get_current_amp();
+                                egui::plot::Value::new(x, y)
+                            }),
+                        ),
+                    );
                     //draw right handle
                     let right = region_bar(ui, bar_size);
                     if let Some(cursor_pos) = right.interact_pointer_pos() {
