@@ -116,7 +116,7 @@ fn event(_app: &App, _model: &mut Model, event: Event) {
 }
 
 fn update(_app: &App, model: &mut Model, update: Update) {
-    model.wave_ui.set_draw_boundary(true);
+
     let egui = &mut model.egui;
 
     egui.set_elapsed_time(update.since_start);
@@ -143,7 +143,6 @@ fn update(_app: &App, model: &mut Model, update: Update) {
 fn view(app: &App, model: &Model, frame: Frame) {
     frame.clear(SKYBLUE);
 
-    model.wave_ui.draw_raw(app, &frame);
     model.egui.draw_to_frame(&frame).unwrap();
 }
 
@@ -191,15 +190,15 @@ fn key_pressed(_app: &App, model: &mut Model, key: Key) {
 fn key_released(_app: &App, _model: &mut Model, _key: Key) {}
 
 fn mouse_moved(_app: &App, model: &mut Model, pos: Point2) {
-    model.wave_ui.mouse_moved_raw(pos);
+
 }
 
 fn mouse_pressed(_app: &App, model: &mut Model, button: MouseButton) {
-    model.wave_ui.mouse_pressed_raw(button);
+
 }
 
 fn mouse_released(_app: &App, model: &mut Model, button: MouseButton) {
-    model.wave_ui.mouse_released_raw(button);
+
 }
 
 fn mouse_wheel(_app: &App, _model: &mut Model, _dt: MouseScrollDelta, _phase: TouchPhase) {}
