@@ -55,14 +55,15 @@ fn region_bar(ui: &mut egui::Ui, size: egui::Vec2) -> egui::Response {
 
 impl egui::Widget for &mut Model {
     fn ui(self, ui: &mut egui::Ui) -> egui::Response {
-        let scaling_factor = 100;
+        let scaling_factor = 50;
+        
         let bar_size = egui::vec2(10.0, 100.0);
         let x_size = (self.region_params.range.getrange() / scaling_factor) as f32;
         let region_size = egui::vec2(x_size, 100.0);
         let max_rect = egui::Rect::from_x_y_ranges(
             0.0..=(self.region_params.range.start() / scaling_factor) as f32,
             0.0..=100.0,
-        );
+        ).translate(egui::vec2(ui.min_rect().left(),0.));
         let response = ui
             .allocate_ui_at_rect(max_rect, |ui| {
                 ui.horizontal(|ui| {
@@ -104,7 +105,10 @@ impl egui::Widget for &mut Model {
                             .set_end(self.region_params.range.start() + new_size);
                     }
                     //debug
-                    ui.label(format!("{:?}", x_size));
+                    ui.add_sized(
+                        egui::vec2(20.0, 100.),
+                        egui::Label::new(format!("{:?}", x_size)),
+                    );
                 })
                 .response
             })
@@ -172,5 +176,4 @@ impl Model {
     pub fn get_current_amp(&self) -> f32 {
         self.osc_params.amp.get().abs()
     }
-
 }

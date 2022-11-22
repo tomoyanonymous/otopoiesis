@@ -33,6 +33,7 @@ struct Model {
     wave_ui: waveform::Model,
     audio: Renderer<region::Model>,
     egui: Egui,
+    is_played: bool,
 }
 
 impl Model {
@@ -63,6 +64,7 @@ impl Model {
             wave_ui: waveui,
             audio: renderer,
             egui,
+            is_played: false,
         }
     }
 }
@@ -97,7 +99,7 @@ fn model(app: &App) -> Model {
 
     let mut res = Model::new(egui);
     res.audio.prepare_play();
-    res.audio.play();
+    // res.audio.play();
     res
 }
 
@@ -116,27 +118,31 @@ fn event(_app: &App, _model: &mut Model, event: Event) {
 }
 
 fn update(_app: &App, model: &mut Model, update: Update) {
-
     let egui = &mut model.egui;
 
     egui.set_elapsed_time(update.since_start);
     let ctx = egui.begin_frame();
-
+    model.is_played = model.audio.is_playing();
     egui::CentralPanel::default().show(&ctx, |ui| {
-        // ctx.set_debug_on_hover(true);
-        let mut style: egui::Style = (*ctx.style()).clone();
-        // style.visuals.widgets.active.bg_fill=Color32::TRANSPARENT;
-        // style.visuals.widgets.inactive.bg_fill=Color32::TRANSPARENT;
-        // style.visuals.widgets.open.bg_fill=Color32::TRANSPARENT;
-        // style.visuals.widgets.hovered.bg_fill=Color32::TRANSPARENT;
-        style.visuals.widgets.noninteractive.bg_fill = Color32::TRANSPARENT;
+        egui::ScrollArea::horizontal().show(ui, |ui| {
+            // ctx.set_debug_on_hover(true);
+            let mut style: egui::Style = (*ctx.style()).clone();
+            // style.visuals.widgets.active.bg_fill=Color32::TRANSPARENT;
+            // style.visuals.widgets.inactive.bg_fill=Color32::TRANSPARENT;
+            // style.visuals.widgets.open.bg_fill=Color32::TRANSPARENT;
+            // style.visuals.widgets.hovered.bg_fill=Color32::TRANSPARENT;
+            style.visuals.widgets.noninteractive.bg_fill = Color32::TRANSPARENT;
 
-        ctx.set_style(style);
-        ui.label("test");
-        ui.horizontal(|ui| {
-            ui.add_space(100.0);
-            ui.add(&mut model.wave_ui);
-        });
+            ctx.set_style(style);
+            ui.label(format!(
+                "{}",
+                if model.is_played { "playing" } else { "paused" }
+            ));
+            ui.horizontal(|ui| {
+                ui.add_space(100.0);
+                ui.add(&mut model.wave_ui);
+            });
+        })
     });
 }
 
@@ -178,10 +184,13 @@ fn raw_window_event(_app: &App, model: &mut Model, event: &nannou::winit::event:
 fn key_pressed(_app: &App, model: &mut Model, key: Key) {
     match key {
         Key::Space => {
-            model.audio.pause();
-            model.audio.rewind();
-            model.audio.prepare_play();
-            model.audio.play();
+            if model.audio.is_playing() {
+                model.audio.pause();
+            } else {
+                model.audio.rewind();
+                model.audio.prepare_play();
+                model.audio.play();
+            }
         }
         _ => {}
     }
@@ -189,17 +198,11 @@ fn key_pressed(_app: &App, model: &mut Model, key: Key) {
 
 fn key_released(_app: &App, _model: &mut Model, _key: Key) {}
 
-fn mouse_moved(_app: &App, model: &mut Model, pos: Point2) {
+fn mouse_moved(_app: &App, model: &mut Model, pos: Point2) {}
 
-}
+fn mouse_pressed(_app: &App, model: &mut Model, button: MouseButton) {}
 
-fn mouse_pressed(_app: &App, model: &mut Model, button: MouseButton) {
-
-}
-
-fn mouse_released(_app: &App, model: &mut Model, button: MouseButton) {
-
-}
+fn mouse_released(_app: &App, model: &mut Model, button: MouseButton) {}
 
 fn mouse_wheel(_app: &App, _model: &mut Model, _dt: MouseScrollDelta, _phase: TouchPhase) {}
 
