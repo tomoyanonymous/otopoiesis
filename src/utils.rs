@@ -1,6 +1,9 @@
 use std::ops::Range;
 use std::sync::atomic::AtomicU64;
 use std::sync::atomic::Ordering;
+use serde::{Serialize,Deserialize};
+
+#[derive(Serialize,Deserialize)]
 pub struct AtomicRange(pub AtomicU64, pub AtomicU64);
 
 type EguiGetSet<'a> = Box<dyn FnMut(Option<f64>) -> f64 + 'a>;
