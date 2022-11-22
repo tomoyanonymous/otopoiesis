@@ -1,7 +1,10 @@
 [package]
-name = "nannou-app-test"
+name = "otopoiesis"
 version = "0.1.0"
+authors = ["Tomoya Matsuura <me@matsuuratomoya.com>"]
 edition = "2021"
+resolver="2"
+description = "a constructive audio programming environment with timeline-based view"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
