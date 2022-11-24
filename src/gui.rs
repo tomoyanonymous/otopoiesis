@@ -9,6 +9,8 @@ pub mod region;
 pub mod track;
 pub mod generator;
 
+pub const SAMPLES_PER_PIXEL_DEFAULT:f32= 100.0;
+
 #[derive(PartialEq)]
 pub enum MouseState {
     None,

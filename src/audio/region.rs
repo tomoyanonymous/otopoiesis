@@ -8,11 +8,6 @@ use std::sync::Arc;
 // Buffer by Bufferで再生するという時にどうタイミングを合わせるか？
 // Region{range:0..=2000,2,vec![0.0]}
 
-pub struct Params {
-    pub range: AtomicRange,
-    pub max_size: u64,
-}
-
 pub struct Model {
     params: Arc<data::Region>,
     channels: usize,

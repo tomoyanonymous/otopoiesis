@@ -11,7 +11,7 @@ impl egui::Widget for Model {
         ui.vertical(|ui| {
             //regions maybe overlap to each other, so we need to split layer
             for (i, region) in self.param.0.iter().enumerate() {
-                ui.add(&mut region::Model::new(Arc::clone(region), 60000.))
+                ui.add(&mut region::Model::new(Arc::clone(region)))
                     .interact(egui::Sense::click_and_drag());
             }
         })

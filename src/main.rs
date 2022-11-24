@@ -4,8 +4,8 @@ use nannou_egui::{
     Egui,
 };
 use otopoiesis::*;
+use std::sync::atomic::{AtomicBool, AtomicU64};
 use std::sync::Arc;
-use std::sync::atomic::AtomicBool;
 
 use parameter::{FloatParameter, Parameter};
 use utils::AtomicRange;
@@ -34,6 +34,7 @@ struct Model {
 impl Model {
     pub fn new(egui: Egui) -> Self {
         let region_len = 60000;
+        let sample_rate = 44100;
         let osc_param = Arc::new(data::OscillatorParam {
             amp: FloatParameter::new(1.0, 0.0..=1.0, "amp"),
             freq: FloatParameter::new(440.0, 20.0..=20000.0, "freq"),
@@ -41,11 +42,13 @@ impl Model {
         });
         let region_param = Arc::new(data::Region {
             range: AtomicRange::new(1000, 50000),
+            max_size: AtomicU64::from(60000),
             generator: Arc::new(data::Generator::Oscillator(Arc::clone(&osc_param))),
             filters: vec![],
         });
         let project = Arc::new(data::Project {
             global_setting: data::GlobalSetting {},
+            sample_rate,
             tracks: Arc::new(vec![Arc::new(data::Track(vec![Arc::clone(&region_param)]))]),
         });
 
@@ -54,7 +57,7 @@ impl Model {
         let mut region =
             audio::region::Model::new(Arc::clone(&region_param), 2, Box::new(sinewave));
         let info = audio::PlaybackInfo {
-            sample_rate: 44100,
+            sample_rate: sample_rate as u32,
             current_time: 0,
         };
         region.prepare_play(&info);
@@ -123,13 +126,19 @@ fn update(_app: &App, model: &mut Model, update: Update) {
 
     egui.set_elapsed_time(update.since_start);
     let ctx = egui.begin_frame();
+
     model.is_played = model.audio.is_playing();
+    egui::panel::TopBottomPanel::top("header").show(&ctx, |ui| {
+        ui.label("otopoiesis");
+    });
+    let now = model.audio.get_current_time().as_secs_f64();
     egui::CentralPanel::default().show(&ctx, |ui| {
         ui.add(gui::timeline::Model {
             played: AtomicBool::from(model.is_played),
-            time:model.audio.get_current_time().as_secs_f64(),
+            time: now,
             params: Arc::clone(&model.project),
-        })
+        });
+        ui.label(format!("main time:{:.2}", now));
     });
 }
 
