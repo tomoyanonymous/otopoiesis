@@ -127,7 +127,7 @@ fn update(_app: &App, model: &mut Model, update: Update) {
     egui::CentralPanel::default().show(&ctx, |ui| {
         ui.add(gui::timeline::Model {
             played: AtomicBool::from(model.is_played),
-            time: update.since_start.as_secs(),
+            time:model.audio.get_current_time().as_secs_f64(),
             params: Arc::clone(&model.project),
         })
     });

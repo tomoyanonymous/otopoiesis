@@ -8,7 +8,7 @@ use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 
 pub struct Model {
-    pub time: u64,
+    pub time: f64,
     pub played: AtomicBool,
     pub params: Arc<data::Project>,
 }
@@ -16,6 +16,8 @@ pub struct Model {
 impl egui::Widget for Model {
     fn ui(self, ui: &mut egui::Ui) -> egui::Response {
         let main = egui::ScrollArea::horizontal().show(ui, |ui| {
+            let x = self.time * 100.;//ratio is tekitou
+
             let res = ui
                 .vertical(|ui| {
                     let label = if self.played.into_inner() {
@@ -32,14 +34,15 @@ impl egui::Widget for Model {
                     }
                 })
                 .response;
-            let x = self.time as f32 / 100.;
             let stroke = egui::Stroke::new(3.0, egui::Color32::GREEN);
-            let painter = ui.painter();
+            let mut painter =  ui.painter_at(ui.clip_rect());
             let rect = painter.clip_rect();
             painter.line_segment(
-                [egui::pos2(x, rect.top()), egui::pos2(x, rect.bottom())],
+                [egui::pos2(x as f32, rect.top()), egui::pos2(x as f32, rect.bottom())],
                 stroke,
             );
+            painter.debug_text(rect.center(), egui::Align2::LEFT_BOTTOM, egui::Color32::GREEN, format!("time:{}",x));
+            painter.debug_rect(rect, egui::Color32::GREEN, "timeline");
             res
         });
         main
