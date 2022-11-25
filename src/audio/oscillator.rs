@@ -11,15 +11,18 @@ impl<T> Component for T
 where
     T: GeneratorComponent,
 {
-    fn get_input_channels(&self) -> usize {
+    fn get_input_channels(&self) -> u64 {
         0
     }
-    fn get_output_channels(&self) -> usize {
+    fn get_output_channels(&self) -> u64 {
         2
     }
     fn prepare_play(&mut self, _info: &PlaybackInfo) {}
     fn render(&mut self, _input: &[f32], output: &mut [f32], info: &PlaybackInfo) {
-        for (_count, out_per_channel) in output.chunks_mut(self.get_output_channels()).enumerate() {
+        for (_count, out_per_channel) in output
+            .chunks_mut(self.get_output_channels() as usize)
+            .enumerate()
+        {
             let mut res = 0.0;
             self.render_sample(&mut res, info);
             for (ch, s) in out_per_channel.iter_mut().enumerate() {
@@ -59,5 +62,11 @@ impl GeneratorComponent for SineModel {
     }
     fn render_sample(&mut self, out: &mut f32, info: &PlaybackInfo) {
         self.render_sample_internal(out, info)
+    }
+}
+
+pub fn get_component_for_generator(kind: &data::Generator) -> Box<dyn Component + Send> {
+    match kind {
+        data::Generator::Oscillator(osc) => Box::new(SineModel::new(Arc::clone(&osc))),
     }
 }

@@ -64,6 +64,8 @@ where
                     omodel.effector.prepare_play(&PlaybackInfo {
                         sample_rate: sr,
                         current_time: 0,
+                        channels: 2,
+                        frame_per_buffer: 512, //tekitou
                     })
                 }, //do nothing
             )
@@ -109,7 +111,7 @@ where
     fn get_current_time_in_sample(&self) -> u64;
     fn get_current_time(&self) -> std::time::Duration {
         let now = self.get_current_time_in_sample();
-        let now_f64 = self.get_outstream().as_ref().map_or(0.,  |os| {
+        let now_f64 = self.get_outstream().as_ref().map_or(0., |os| {
             let sr = os.cpal_config().sample_rate.0;
             now as f64 / sr as f64
         });
@@ -142,6 +144,8 @@ fn pass_out(model: &mut OutputModel<impl Component>, buffer: &mut nannou_audio::
     let info = PlaybackInfo {
         sample_rate: buffer.sample_rate(),
         current_time: t as usize,
+        channels: buffer.channels() as u64,
+        frame_per_buffer: buffer.len_frames() as u64,
     };
     // todo:if  channels are different?
     model.effector.render(buf, buffer.deref_mut(), &info);
@@ -184,7 +188,7 @@ where
     fn get_shared_current_time_in_sample(&self) -> Arc<AtomicU64> {
         Arc::clone(&self.current_time_in_sample)
     }
-    fn get_current_time_in_sample(&self) -> u64{
+    fn get_current_time_in_sample(&self) -> u64 {
         self.current_time_in_sample.load(Ordering::Relaxed)
     }
 }

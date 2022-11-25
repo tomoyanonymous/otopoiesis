@@ -3,7 +3,7 @@ use nannou_egui::{
     egui::{self, Color32},
     Egui,
 };
-use otopoiesis::*;
+use otopoiesis::{audio::timeline, *};
 use std::sync::atomic::{AtomicBool, AtomicU64};
 use std::sync::Arc;
 
@@ -26,7 +26,7 @@ fn main() {
 }
 struct Model {
     project: Arc<data::Project>,
-    audio: Renderer<audio::region::Model>,
+    audio: Renderer<audio::timeline::Model>,
     egui: Egui,
     is_played: bool,
 }
@@ -52,17 +52,19 @@ impl Model {
             tracks: Arc::new(vec![Arc::new(data::Track(vec![Arc::clone(&region_param)]))]),
         });
 
-        let sinewave = audio::oscillator::SineModel::new(Arc::clone(&osc_param));
-
-        let mut region =
-            audio::region::Model::new(Arc::clone(&region_param), 2, Box::new(sinewave));
+        let mut timeline = audio::timeline::Model::new(Arc::clone(&project));
+        // let sinewave = audio::oscillator::SineModel::new(Arc::clone(&osc_param));
+        // let mut region =
+        //     audio::region::Model::new(Arc::clone(&region_param), 2, Box::new(sinewave));
         let info = audio::PlaybackInfo {
             sample_rate: sample_rate as u32,
             current_time: 0,
+            channels: 2,
+            frame_per_buffer: 512,
         };
-        region.prepare_play(&info);
+        timeline.prepare_play(&info);
 
-        let renderer = audio::renderer::create_renderer(region, Some(44100), Some(512));
+        let renderer = audio::renderer::create_renderer(timeline, Some(44100), Some(512));
 
         Self {
             audio: renderer,
