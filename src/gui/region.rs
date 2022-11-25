@@ -1,7 +1,7 @@
 use crate::data;
 use crate::parameter::Parameter;
 use egui::Color32;
-use std::sync::Arc;
+use std::sync::{atomic::Ordering, Arc};
 // use nannou_egui::*;
 use nannou_egui::egui::{self, Widget};
 
@@ -37,6 +37,9 @@ fn default_graph(
         .line(line)
         .allow_drag(false)
         .allow_zoom(false)
+        .show_x(false)
+        .show_y(false)
+        .min_size(egui::vec2(0.,0.))
 }
 
 impl egui::Widget for &mut Model {
@@ -58,11 +61,13 @@ impl egui::Widget for &mut Model {
                     // lrect.set_right(lrect.left() + bar_width);
                     let size = egui::vec2(bar_width, y_size);
                     let left = ui.add_sized(size, &UiBar);
-
+                    let maxsize = self.params.max_size.load(Ordering::Relaxed);
+                    let start = self.params.range.start();
+                    let end = self.params.range.end();
                     if let Some(cursor_pos) = left.interact_pointer_pos() {
                         let new_start = (((cursor_pos.x - bar_width) * scaling_factor) as u64)
-                            .min(self.params.range.end())
-                            .max(0);
+                            .min(end)
+                            .max(end.max(maxsize) - maxsize);
                         self.params.range.set_start(new_start);
                     }
 
@@ -93,13 +98,9 @@ impl egui::Widget for &mut Model {
 
                     if let Some(cursor_pos) = right.interact_pointer_pos() {
                         let new_end = ((cursor_pos.x - bar_width) * scaling_factor) as u64;
-                        let maxsize = &self.params.max_size;
-                        let new_size = (new_end - self.params.range.start())
-                            .min(maxsize.load(std::sync::atomic::Ordering::Relaxed));
-                        println!("hogehoge{}", new_end);
-                        self.params
-                            .range
-                            .set_end(self.params.range.start() + new_size);
+
+                        let new_size = (new_end.max(start) - start).min(maxsize);
+                        self.params.range.set_end(start + new_size);
                     }
                 });
 
