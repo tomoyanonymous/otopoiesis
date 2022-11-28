@@ -3,7 +3,7 @@ name = "otopoiesis"
 version = "0.1.0"
 authors = ["Tomoya Matsuura <me@matsuuratomoya.com>"]
 edition = "2021"
-resolver="2"
+resolver = "2"
 description = "a constructive audio programming environment with timeline-based view"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -17,6 +17,7 @@ nannou_audio = "*"
 nannou_egui = "*"
 ringbuf = "*"
 atomic_float = "*"
-serde = {version = "*",features = ["rc"]}
+serde = { version = "*", features = ["rc"] }
 serde_json = "*"
 serde_with = "2.1.0"
+undo = "0.47.*"

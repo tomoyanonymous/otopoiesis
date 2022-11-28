@@ -1978,6 +1978,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_with",
+ "undo",
 ]
 
 [[package]]
@@ -2649,6 +2650,16 @@ name = "ttf-parser"
 version = "0.17.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "375812fa44dab6df41c195cd2f7fecb488f6c09fbaafb62807488cefab642bff"
+
+[[package]]
+name = "undo"
+version = "0.47.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9db1d262f3ac35028550ddcb8a0145bd15bc2356f62626a1f6ac84d51c4c57c2"
+dependencies = [
+ "arrayvec 0.7.2",
+ "serde",
+]
 
 [[package]]
 name = "unicode-ident"
