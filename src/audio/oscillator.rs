@@ -5,6 +5,7 @@ use std::sync::Arc;
 pub trait GeneratorComponent {
     type Params;
     fn get_params(&self) -> &Self::Params;
+    fn reset_phase(&mut self);
     fn render_sample(&mut self, out: &mut f32, info: &PlaybackInfo);
 }
 impl<T> Component for T
@@ -17,7 +18,10 @@ where
     fn get_output_channels(&self) -> u64 {
         2
     }
-    fn prepare_play(&mut self, _info: &PlaybackInfo) {}
+
+    fn prepare_play(&mut self, _info: &PlaybackInfo) {
+        self.reset_phase();
+    }
     fn render(&mut self, _input: &[f32], output: &mut [f32], info: &PlaybackInfo) {
         for (_count, out_per_channel) in output
             .chunks_mut(self.get_output_channels() as usize)
@@ -37,21 +41,22 @@ where
 }
 pub struct SineModel {
     pub params: Arc<data::OscillatorParam>,
+    pub phase_internal: f32,
 }
 
 impl SineModel {
     pub fn new(params: Arc<data::OscillatorParam>) -> Self {
         Self {
             params: Arc::clone(&params),
+            phase_internal: params.phase.get(),
         }
     }
     pub fn render_sample_internal(&mut self, out: &mut f32, info: &PlaybackInfo) {
         let twopi = std::f32::consts::PI * 2.;
         let params = &self.params;
-        params.phase.set(
-            (params.phase.get() + twopi * params.freq.get() / info.sample_rate as f32) % twopi,
-        );
-        *out = params.phase.get().sin() * self.params.amp.get();
+        self.phase_internal =
+            (self.phase_internal + twopi * params.freq.get() / info.sample_rate as f32) % twopi;
+        *out = self.phase_internal.sin() * self.params.amp.get();
     }
 }
 
@@ -62,6 +67,9 @@ impl GeneratorComponent for SineModel {
     }
     fn render_sample(&mut self, out: &mut f32, info: &PlaybackInfo) {
         self.render_sample_internal(out, info)
+    }
+    fn reset_phase(&mut self) {
+        self.phase_internal = self.get_params().phase.get()
     }
 }
 

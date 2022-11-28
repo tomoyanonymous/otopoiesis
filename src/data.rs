@@ -14,59 +14,14 @@ pub struct GlobalSetting;
 pub struct Project {
     pub global_setting: GlobalSetting,
     pub sample_rate: u64,
-    pub tracks: SharedParamsRt<Vec<Track>>,
+    pub tracks: SharedVec<Track>,
 }
 
-#[derive(Clone, Serialize, Deserialize)]
-#[serde(from = "T")]
-pub struct SharedParamsRt<T>
-where
-    T: Clone + Deref,
-{
-    // pub local: T,
-    pub shared: Arc<Mutex<T>>,
-}
-impl<T> SharedParamsRt<T>
-where
-    T: Clone + Deref,
-{
-    pub fn new(t: T) -> Self {
-        Self {
-            // local: *local_lock,
-            shared: Arc::new(Mutex::new(t)),
-        }
-    }
-    pub fn from(t: Arc<Mutex<T>>) -> Self {
-        Self {
-            shared: Arc::clone(&t),
-        }
-    }
-    // pub fn sync_rt(&mut self) {
-    //     if let Ok(ref mut lock) = self.shared.try_lock() {
+pub type SharedVec<T> = Arc<Mutex<Vec<T>>>;
 
-    //         self.local.clone_from(&*lock);
-    //     }
-    // }
-    pub fn get_arc(&self) -> Arc<Mutex<T>> {
-        self.shared.clone()
-    }
-}
-impl<T> From<T> for SharedParamsRt<T>
-where
-    T: Clone + Deref,
-{
-    fn from(t: T) -> Self {
-        Self {
-            // local: t.clone(),
-            shared: Arc::new(Mutex::new(t.clone())),
-        }
-    }
-}
 
 #[derive(Serialize, Deserialize, Clone)]
-pub struct Track(pub SharedParamsRt<Vec<Arc<Region>>>);
-
-pub type TrackShared = Arc<Mutex<Vec<Arc<Region>>>>;
+pub struct Track(pub SharedVec<Arc<Region>>);
 
 //range stores a real time.
 #[derive(Serialize, Deserialize)]

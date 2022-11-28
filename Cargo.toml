@@ -18,4 +18,5 @@ nannou_egui = "*"
 ringbuf = "*"
 atomic_float = "*"
 serde = {version = "*",features = ["rc"]}
+serde_json = "*"
 serde_with = "2.1.0"

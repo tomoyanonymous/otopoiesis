@@ -1,13 +1,13 @@
-use crate::data::{self, Region, SharedParamsRt};
+use crate::data;
 use crate::gui::region;
 use crate::parameter::{FloatParameter, Parameter};
 use crate::utils::AtomicRange;
 
 use nannou_egui::egui;
 use std::sync::atomic::AtomicU64;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 pub struct Model {
-    pub param: data::TrackShared,
+    pub param: data::Track,
 }
 impl egui::Widget for Model {
     fn ui(self, ui: &mut egui::Ui) -> egui::Response {
@@ -17,10 +17,10 @@ impl egui::Widget for Model {
             "hoge",
         );
         ui.vertical(|ui| {
-            let mut track = self.param.lock().unwrap();
+            let mut track = self.param.0.lock().unwrap();
             //regions maybe overlap to each other, so we need to split layer
             let label = format!("region{}", track.len() + 1).to_string();
-            let  mut  vec = vec![];
+            let mut vec = vec![];
             for (i, region) in track.iter().enumerate() {
                 let model = region::Model::new(Arc::clone(region), region.label.clone());
 
@@ -42,7 +42,7 @@ impl egui::Widget for Model {
                 });
                 track.push(region_param);
             }
-            ui.label(format!("{:?}",vec));
+            ui.label(format!("{:?}", vec));
         })
         .response
     }

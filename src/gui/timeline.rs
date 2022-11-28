@@ -28,10 +28,10 @@ impl egui::Widget for Model {
                     };
                     ui.label(format!("{}", label));
 
-                    if let Ok(tracks) = self.params.tracks.get_arc().try_lock() {
+                    if let Ok(tracks) = self.params.tracks.try_lock() {
                         for (_i, track) in tracks.iter().enumerate() {
                             ui.add(gui::track::Model {
-                                param: track.0.get_arc().clone(),
+                                param: data::Track(track.0.clone()),
                             })
                             .interact(egui::Sense::click_and_drag());
                         }

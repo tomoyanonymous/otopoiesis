@@ -1976,6 +1976,7 @@ dependencies = [
  "nannou_egui",
  "ringbuf",
  "serde",
+ "serde_json",
  "serde_with",
 ]
 

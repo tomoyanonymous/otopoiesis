@@ -2,23 +2,25 @@ use crate::audio::{Component, PlaybackInfo};
 use crate::data;
 use std::sync::Arc;
 pub struct Model {
-    param: data::Track,
+    param: data::SharedVec<Arc<data::Region>>,
     channels: u64,
     regions: Vec<super::region::Model>,
 }
 
 impl Model {
-    pub fn new(param: data::TrackShared, channels: u64) -> Self {
-        let track = data::Track(data::SharedParamsRt::<Vec<Arc<data::Region>>>::from(Arc::clone(&param)));
-        let regions = Self::get_new_regions(param, channels);
+    pub fn new(param: data::SharedVec<Arc<data::Region>>, channels: u64) -> Self {
+        let regions = Self::get_new_regions(&param, channels);
 
         Self {
-            param: track,
+            param: Arc::clone(&param),
             channels,
             regions,
         }
     }
-    fn get_new_regions(param: data::TrackShared, channels: u64) -> Vec<super::region::Model> {
+    fn get_new_regions(
+        param: &data::SharedVec<Arc<data::Region>>,
+        channels: u64,
+    ) -> Vec<super::region::Model> {
         param
             .lock()
             .unwrap()
@@ -34,8 +36,7 @@ impl Model {
     }
     fn renew_regions(&mut self) {
         //fetch update.
-        self.regions = Self::get_new_regions(self.param.0.get_arc(), self.channels);
-
+        self.regions = Self::get_new_regions(&self.param, self.channels);
     }
 }
 

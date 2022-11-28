@@ -1,13 +1,14 @@
 use nannou::prelude::*;
 use nannou_egui::{
-    egui::{self, Color32},
+    egui::{self, Color32, Ui},
     Egui,
 };
 use otopoiesis::*;
-use std::sync::atomic::{AtomicBool, AtomicU64};
-use std::sync::Arc;
-
 use parameter::{FloatParameter, Parameter};
+use serde::{Serialize, Serializer};
+use serde_json;
+use std::sync::atomic::{AtomicBool, AtomicU64};
+use std::sync::{Arc, Mutex};
 use utils::AtomicRange;
 
 use crate::audio::{
@@ -26,6 +27,8 @@ fn main() {
 }
 struct Model {
     project: Arc<data::Project>,
+    project_str: String,
+    code_compiled: serde_json::Result<Arc<data::Project>>,
     audio: Renderer<audio::timeline::Model>,
     egui: Egui,
     is_played: bool,
@@ -50,11 +53,12 @@ impl Model {
         let project = Arc::new(data::Project {
             global_setting: data::GlobalSetting {},
             sample_rate,
-            tracks: data::SharedParamsRt::<Vec<data::Track>>::new(vec![data::Track(
-                vec![Arc::clone(&region_param)].into(),
-            )]),
+            tracks: Arc::new(Mutex::new(vec![data::Track(Arc::new(Mutex::new(vec![
+                Arc::clone(&region_param),
+            ])))])),
         });
-
+        let json = serde_json::to_string_pretty(&project);
+        let json_str = json.unwrap_or("failed to parse".to_string());
         let mut timeline = audio::timeline::Model::new(Arc::clone(&project));
         // let sinewave = audio::oscillator::SineModel::new(Arc::clone(&osc_param));
         // let mut region =
@@ -71,7 +75,9 @@ impl Model {
 
         Self {
             audio: renderer,
-            project,
+            project: Arc::clone(&project),
+            project_str: json_str,
+            code_compiled: Ok(project),
             egui,
             is_played: false,
         }
@@ -81,7 +87,7 @@ impl Model {
 fn model(app: &App) -> Model {
     let window_id = app
         .new_window()
-        .size(800, 800)
+        .size(1200, 800)
         .event(window_event)
         .raw_event(raw_window_event)
         .key_pressed(key_pressed)
@@ -145,6 +151,41 @@ fn update(_app: &App, model: &mut Model, update: Update) {
         });
         ui.label(format!("main time:{:.2}", now));
     });
+
+    egui::panel::SidePanel::right("JSON viewer")
+    .default_width(300.)
+        .min_width(300.)
+        .max_width(1920.)
+        .resizable(true)
+        .show(&ctx, |ui| {
+            egui::ScrollArea::vertical().show(ui, |ui| {
+                let editor = ui.add_sized(
+                    ui.available_size(),
+                    egui::TextEdit::multiline(&mut model.project_str).code_editor(),
+                );
+                if editor.gained_focus() {
+                    let json = serde_json::to_string_pretty(&model.project);
+                    let json_str = json.unwrap_or("failed to parse".to_string());
+                    model.project_str = json_str;
+                }
+                if editor.lost_focus() {
+                    let proj = serde_json::from_str::<Arc<data::Project>>(&model.project_str);
+                    model.code_compiled = proj;
+                    if let Ok(proj) = &model.code_compiled {
+                        model.project = Arc::clone(proj);
+                    }
+                }
+
+                if let Err(err) = &model.code_compiled {
+                    ui.colored_label(
+                        egui::Color32::RED,
+                        format!("failed to evaluate json:{}", err.to_string()),
+                    );
+                }
+
+                // ui.code_editor(model.
+            });
+        });
 }
 
 fn view(app: &App, model: &Model, frame: Frame) {

@@ -21,11 +21,10 @@ impl Model {
     fn get_new_tracks(project: &data::Project) -> Vec<super::track::Model> {
         project
             .tracks
-            .shared
             .lock()
             .unwrap()
             .iter()
-            .map(|t| super::track::Model::new(t.0.get_arc(), 2))
+            .map(|t| super::track::Model::new(t.0.clone(), 2))
             .collect::<Vec<_>>()
     }
 }
