@@ -1,24 +1,48 @@
+
 // mod meta;
 // data format for project file. serialized to json with serde.
 use serde::{Deserialize, Serialize};
-use std::ops::Deref;
-use std::sync::atomic::{AtomicU64, Ordering};
+use serde_with::{serde_as};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 
-use crate::{parameter::FloatParameter, utils::AtomicRange};
+use crate::{
+    parameter::{ FloatParameter},
+    utils::AtomicRange,
+};
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct AppModel {
+    pub transport: Arc<Transport>,
+    pub global_setting: Arc<GlobalSetting>,
+    pub project: Arc<Project>,
+}
+
+#[serde_as]
+#[derive(Serialize, Deserialize)]
+pub struct Transport {
+    pub is_playing: AtomicBool,
+    pub time: Arc<AtomicU64>,//in sample
+}
+impl Transport {
+    pub fn new() -> Self {
+        Self {
+            is_playing: AtomicBool::from(false),
+            time: Arc::new(AtomicU64::from(0)),
+        }
+    }
+}
 
 #[derive(Serialize, Deserialize, Clone, Copy)]
 pub struct GlobalSetting;
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize)]
 pub struct Project {
-    pub global_setting: GlobalSetting,
-    pub sample_rate: u64,
+    pub sample_rate: AtomicU64,
     pub tracks: SharedVec<Track>,
 }
 
 pub type SharedVec<T> = Arc<Mutex<Vec<T>>>;
-
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct Track(pub SharedVec<Arc<Region>>);

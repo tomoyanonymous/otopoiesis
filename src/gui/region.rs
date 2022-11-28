@@ -2,8 +2,7 @@ use crate::data;
 use crate::parameter::Parameter;
 use egui::Color32;
 use std::sync::{atomic::Ordering, Arc};
-// use nannou_egui::*;
-use nannou_egui::egui::{self, Widget};
+use nannou_egui::egui;
 
 pub struct Model {
     pub params: Arc<data::Region>,
@@ -100,9 +99,6 @@ impl egui::Widget for Model {
                     }
                 });
 
-                ui.label(format!("xrange in px:{}", x_size));
-                ui.label(format!("region id{:?}", ui.id()));
-
                 {
                     let data::Generator::Oscillator(osc) = self.params.generator.as_ref();
 
@@ -123,13 +119,13 @@ impl egui::Widget for Model {
             })
             .response;
 
-        let debugger = response.ctx.debug_painter();
-        debugger.rect(
-            response.rect,
-            0.,
-            Color32::TRANSPARENT,
-            egui::Stroke::new(1., Color32::RED),
-        );
+        // let debugger = response.ctx.debug_painter();
+        // debugger.rect(
+        //     response.rect,
+        //     0.,
+        //     Color32::TRANSPARENT,
+        //     egui::Stroke::new(1., Color32::RED),
+        // );
 
         response
     }

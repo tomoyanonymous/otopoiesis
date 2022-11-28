@@ -197,10 +197,10 @@ impl<E> Renderer<E>
 where
     E: Component + Send + 'static,
 {
-    pub fn new(effect: E, sample_rate: Option<u32>, buffer_size: Option<usize>) -> Self {
+    pub fn new(effect: E, sample_rate: Option<u32>, buffer_size: Option<usize>,transport_time:Arc<AtomicU64>) -> Self {
         let mut res = Self {
             host: nannou_audio::Host::default(),
-            current_time_in_sample: Arc::new(AtomicU64::from(0)),
+            current_time_in_sample: transport_time,
             istream: None,
             ostream: None,
         };
@@ -217,9 +217,10 @@ pub fn create_renderer<E>(
     effect: E,
     sample_rate: Option<u32>,
     buffer_size: Option<usize>,
+    transport_time:Arc<AtomicU64>,
 ) -> Renderer<E>
 where
     E: Component + Send + 'static,
 {
-    Renderer::<E>::new(effect, sample_rate, buffer_size)
+    Renderer::<E>::new(effect, sample_rate, buffer_size,transport_time)
 }

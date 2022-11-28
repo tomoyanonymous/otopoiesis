@@ -1,19 +1,22 @@
-use crate::audio::{self, Component, PlaybackInfo};
+use crate::audio::{Component, PlaybackInfo};
 use crate::data;
 use std::sync::Arc;
+use std::sync::atomic::Ordering;
 
 pub struct Model {
     param: Arc<data::Project>,
+    transport:Arc<data::Transport>,
     tracks: Vec<super::track::Model>, // regions: Vec<audio::region::Region<>>
     tmp_buffer: Vec<f32>,
 }
 
 impl Model {
-    pub fn new(param: Arc<data::Project>) -> Self {
-        let tracks = Self::get_new_tracks(param.as_ref());
+    pub fn new(project: Arc<data::Project>,transport:Arc<data::Transport>) -> Self {
+        let tracks = Self::get_new_tracks(project.as_ref());
         let tmp_buffer = vec![0.0; 3];
         Self {
-            param: Arc::clone(&param),
+            param: Arc::clone(&project),
+            transport:Arc::clone(&transport),
             tracks,
             tmp_buffer,
         }

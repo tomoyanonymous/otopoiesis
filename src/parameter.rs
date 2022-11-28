@@ -1,5 +1,4 @@
 use atomic_float::*;
-use nannou::prelude::Float;
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 use std::ops::RangeInclusive;
@@ -7,7 +6,8 @@ use std::sync::atomic::AtomicU64;
 use std::sync::atomic::Ordering;
 
 mod atomicfloat_helper;
-use atomicfloat_helper::AtomicF32Json;
+pub use atomicfloat_helper::AtomicF32Json;
+pub use atomicfloat_helper::AtomicF64Json;
 
 pub trait Parameter<T> {
     fn new(init: T, range: RangeInclusive<T>, label: impl Into<String>) -> Self;

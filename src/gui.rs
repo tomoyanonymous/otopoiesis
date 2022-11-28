@@ -8,6 +8,8 @@ pub mod timeline;
 pub mod region;
 pub mod track;
 pub mod generator;
+pub mod app;
+pub mod transport;
 
 pub const SAMPLES_PER_PIXEL_DEFAULT:f32= 100.0;
 

@@ -11,21 +11,15 @@ pub struct Model {
 }
 impl egui::Widget for Model {
     fn ui(self, ui: &mut egui::Ui) -> egui::Response {
-        let mut ui = ui.child_ui_with_id_source(
-            ui.max_rect(),
-            egui::Layout::top_down(egui::Align::Center),
-            "hoge",
-        );
         ui.vertical(|ui| {
             let mut track = self.param.0.lock().unwrap();
             //regions maybe overlap to each other, so we need to split layer
             let label = format!("region{}", track.len() + 1).to_string();
-            let mut vec = vec![];
-            for (i, region) in track.iter().enumerate() {
+
+            for (_i, region) in track.iter().enumerate() {
                 let model = region::Model::new(Arc::clone(region), region.label.clone());
 
-                let response = ui.add(model);
-                vec.push(response.id);
+                let _response = ui.add(model);
             }
             if ui.button("add_track").clicked() {
                 let osc_param = Arc::new(data::OscillatorParam {
@@ -42,7 +36,6 @@ impl egui::Widget for Model {
                 });
                 track.push(region_param);
             }
-            ui.label(format!("{:?}", vec));
         })
         .response
     }

@@ -1,15 +1,11 @@
+use crate::utils::AtomicRange;
 use nannou::prelude::*;
-use nannou_egui::{
-    egui::{self, Color32, Ui},
-    Egui,
-};
+use nannou_egui::{egui, Egui};
 use otopoiesis::*;
 use parameter::{FloatParameter, Parameter};
-use serde::{Serialize, Serializer};
 use serde_json;
-use std::sync::atomic::{AtomicBool, AtomicU64};
+use std::sync::atomic::AtomicU64;
 use std::sync::{Arc, Mutex};
-use utils::AtomicRange;
 
 use crate::audio::{
     renderer::{Renderer, RendererBase},
@@ -26,7 +22,7 @@ fn main() {
         .run();
 }
 struct Model {
-    project: Arc<data::Project>,
+    app: Arc<data::AppModel>,
     project_str: String,
     code_compiled: serde_json::Result<Arc<data::Project>>,
     audio: Renderer<audio::timeline::Model>,
@@ -37,7 +33,7 @@ struct Model {
 impl Model {
     pub fn new(egui: Egui) -> Self {
         let region_len = 60000;
-        let sample_rate = 44100;
+        let sample_rate = 44100 as u64;
         let osc_param = Arc::new(data::OscillatorParam {
             amp: FloatParameter::new(1.0, 0.0..=1.0, "amp"),
             freq: FloatParameter::new(440.0, 20.0..=20000.0, "freq"),
@@ -51,15 +47,21 @@ impl Model {
             label: String::from("region0"),
         });
         let project = Arc::new(data::Project {
-            global_setting: data::GlobalSetting {},
-            sample_rate,
+            sample_rate: AtomicU64::from(sample_rate),
             tracks: Arc::new(Mutex::new(vec![data::Track(Arc::new(Mutex::new(vec![
                 Arc::clone(&region_param),
             ])))])),
         });
+        let transport = Arc::new(data::Transport::new());
+        let app = Arc::new(data::AppModel {
+            transport: Arc::clone(&transport),
+            global_setting: Arc::new(data::GlobalSetting {}),
+            project: Arc::clone(&project),
+        });
         let json = serde_json::to_string_pretty(&project);
         let json_str = json.unwrap_or("failed to parse".to_string());
-        let mut timeline = audio::timeline::Model::new(Arc::clone(&project));
+        let mut timeline =
+            audio::timeline::Model::new(Arc::clone(&project), Arc::clone(&transport));
         // let sinewave = audio::oscillator::SineModel::new(Arc::clone(&osc_param));
         // let mut region =
         //     audio::region::Model::new(Arc::clone(&region_param), 2, Box::new(sinewave));
@@ -71,11 +73,16 @@ impl Model {
         };
         timeline.prepare_play(&info);
 
-        let renderer = audio::renderer::create_renderer(timeline, Some(44100), Some(512));
+        let renderer = audio::renderer::create_renderer(
+            timeline,
+            Some(44100),
+            Some(512),
+            Arc::clone(&transport.time),
+        );
 
         Self {
             audio: renderer,
-            project: Arc::clone(&project),
+            app: Arc::clone(&app),
             project_str: json_str,
             code_compiled: Ok(project),
             egui,
@@ -114,6 +121,7 @@ fn model(app: &App) -> Model {
 
     let mut res = Model::new(egui);
     res.audio.prepare_play();
+    res.audio.pause();
     // res.audio.play();
     res
 }
@@ -139,21 +147,14 @@ fn update(_app: &App, model: &mut Model, update: Update) {
     let ctx = egui.begin_frame();
 
     model.is_played = model.audio.is_playing();
-    egui::panel::TopBottomPanel::top("header").show(&ctx, |ui| {
-        ui.label("otopoiesis");
-    });
-    let now = model.audio.get_current_time().as_secs_f64();
-    egui::CentralPanel::default().show(&ctx, |ui| {
-        ui.add(gui::timeline::Model {
-            played: AtomicBool::from(model.is_played),
-            time: now,
-            params: Arc::clone(&model.project),
-        });
-        ui.label(format!("main time:{:.2}", now));
-    });
+
+    let mut app_gui = gui::app::Model {
+        param: Arc::clone(&model.app),
+    };
+    app_gui.show_ui(&ctx);
 
     egui::panel::SidePanel::right("JSON viewer")
-    .default_width(300.)
+        .default_width(300.)
         .min_width(300.)
         .max_width(1920.)
         .resizable(true)
@@ -164,7 +165,7 @@ fn update(_app: &App, model: &mut Model, update: Update) {
                     egui::TextEdit::multiline(&mut model.project_str).code_editor(),
                 );
                 if editor.gained_focus() {
-                    let json = serde_json::to_string_pretty(&model.project);
+                    let json = serde_json::to_string_pretty(&model.app.project);
                     let json_str = json.unwrap_or("failed to parse".to_string());
                     model.project_str = json_str;
                 }
@@ -172,7 +173,7 @@ fn update(_app: &App, model: &mut Model, update: Update) {
                     let proj = serde_json::from_str::<Arc<data::Project>>(&model.project_str);
                     model.code_compiled = proj;
                     if let Ok(proj) = &model.code_compiled {
-                        model.project = Arc::clone(proj);
+                        // model.app.project = Arc::clone(proj);
                     }
                 }
 
