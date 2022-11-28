@@ -54,4 +54,10 @@ impl AtomicRange {
             res
         })
     }
+    
+}
+impl Clone for AtomicRange{
+    fn clone(&self) -> Self {
+        Self::new(self.start(),self.end())
+    }
 }

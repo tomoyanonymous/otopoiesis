@@ -10,17 +10,23 @@ pub struct Model {
 
 impl Model {
     pub fn new(param: Arc<data::Project>) -> Self {
-        let tracks = param
-            .tracks
-            .iter()
-            .map(|t| super::track::Model::new(Arc::clone(&t), 2))
-            .collect::<Vec<_>>();
+        let tracks = Self::get_new_tracks(param.as_ref());
         let tmp_buffer = vec![0.0; 3];
         Self {
             param: Arc::clone(&param),
             tracks,
             tmp_buffer,
         }
+    }
+    fn get_new_tracks(project: &data::Project) -> Vec<super::track::Model> {
+        project
+            .tracks
+            .shared
+            .lock()
+            .unwrap()
+            .iter()
+            .map(|t| super::track::Model::new(t.0.get_arc(), 2))
+            .collect::<Vec<_>>()
     }
 }
 impl Component for Model {
@@ -31,7 +37,7 @@ impl Component for Model {
         2
     }
     fn prepare_play(&mut self, info: &PlaybackInfo) {
-        assert_eq!(self.tracks.len(), self.param.tracks.len());
+        self.tracks = Self::get_new_tracks(self.param.as_ref());
         self.tmp_buffer
             .resize((info.channels * info.frame_per_buffer) as usize, 0.0);
         for track in self.tracks.iter_mut() {

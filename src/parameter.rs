@@ -1,6 +1,7 @@
 use atomic_float::*;
+use nannou::prelude::Float;
 use serde::{Deserialize, Serialize};
-use serde_with::{serde_as};
+use serde_with::serde_as;
 use std::ops::RangeInclusive;
 use std::sync::atomic::AtomicU64;
 use std::sync::atomic::Ordering;
@@ -13,7 +14,6 @@ pub trait Parameter<T> {
     fn get(&self) -> T;
     fn set(&self, v: T);
 }
-
 
 #[serde_as]
 #[derive(Serialize, Deserialize)]
@@ -48,6 +48,7 @@ impl Parameter<f32> for FloatParameter {
     }
 }
 
+
 pub struct UIntParameter {
     value: AtomicU64,
     range: RangeInclusive<u64>,
@@ -72,6 +73,17 @@ impl Parameter<u64> for UIntParameter {
             v.max(*self.range.start()).min(*self.range.end()),
             Ordering::Relaxed,
         );
+    }
+}
+
+impl Clone for FloatParameter {
+    fn clone(&self) -> Self {
+        Self::new(self.get(), self.range.clone(), self.label.clone())
+    }
+}
+impl Default for FloatParameter {
+    fn default() -> Self {
+        Self::new(0., 0.0..=f32::MAX, "")
     }
 }
 // pub struct UIntPairParameter {

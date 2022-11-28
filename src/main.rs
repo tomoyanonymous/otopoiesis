@@ -3,7 +3,7 @@ use nannou_egui::{
     egui::{self, Color32},
     Egui,
 };
-use otopoiesis::{audio::timeline, *};
+use otopoiesis::*;
 use std::sync::atomic::{AtomicBool, AtomicU64};
 use std::sync::Arc;
 
@@ -45,11 +45,14 @@ impl Model {
             max_size: AtomicU64::from(60000),
             generator: Arc::new(data::Generator::Oscillator(Arc::clone(&osc_param))),
             filters: vec![],
+            label: String::from("region0"),
         });
         let project = Arc::new(data::Project {
             global_setting: data::GlobalSetting {},
             sample_rate,
-            tracks: Arc::new(vec![Arc::new(data::Track(vec![Arc::clone(&region_param)]))]),
+            tracks: data::SharedParamsRt::<Vec<data::Track>>::new(vec![data::Track(
+                vec![Arc::clone(&region_param)].into(),
+            )]),
         });
 
         let mut timeline = audio::timeline::Model::new(Arc::clone(&project));

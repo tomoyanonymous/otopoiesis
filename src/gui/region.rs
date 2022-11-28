@@ -6,9 +6,15 @@ use std::sync::{atomic::Ordering, Arc};
 use nannou_egui::egui::{self, Widget};
 
 pub struct Model {
+    pub params: Arc<data::Region>,
+    pub label: String,
     samples: Vec<f32>,
     // pub osc_params: Arc<oscillator::SharedParams>,
-    pub params: Arc<data::Region>,
+}
+impl std::hash::Hash for Model {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.label.hash(state)
+    }
 }
 
 struct UiBar;
@@ -28,7 +34,7 @@ impl egui::Widget for &UiBar {
     }
 }
 
-impl egui::Widget for &mut Model {
+impl egui::Widget for Model {
     fn ui(self, ui: &mut egui::Ui) -> egui::Response {
         let scaling_factor = super::SAMPLES_PER_PIXEL_DEFAULT;
         let x_start = self.params.range.start() as f32 / scaling_factor;
@@ -68,7 +74,7 @@ impl egui::Widget for &mut Model {
                         egui::plot::Value::new(x, y)
                     });
                     let line = egui::plot::Line::new(egui::plot::Values::from_values_iter(iter));
-                    let graph_component = egui::plot::Plot::new("region")
+                    let graph_component = egui::plot::Plot::new(self.params.label.clone())
                         .line(line)
                         .allow_drag(false)
                         .allow_zoom(false)
@@ -95,8 +101,11 @@ impl egui::Widget for &mut Model {
                 });
 
                 ui.label(format!("xrange in px:{}", x_size));
+                ui.label(format!("region id{:?}", ui.id()));
+
                 {
                     let data::Generator::Oscillator(osc) = self.params.generator.as_ref();
+
                     let range = &osc.freq.range;
                     ui.add(
                         egui::Slider::from_get_set(
@@ -114,13 +123,13 @@ impl egui::Widget for &mut Model {
             })
             .response;
 
-        // let debugger = response.ctx.debug_painter();
-        // debugger.rect(
-        //     response.rect,
-        //     0.,
-        //     Color32::TRANSPARENT,
-        //     egui::Stroke::new(1., Color32::RED),
-        // );
+        let debugger = response.ctx.debug_painter();
+        debugger.rect(
+            response.rect,
+            0.,
+            Color32::TRANSPARENT,
+            egui::Stroke::new(1., Color32::RED),
+        );
 
         response
     }
@@ -155,11 +164,15 @@ impl Model {
         }
     }
 
-    pub fn new(params: Arc<data::Region>) -> Self {
+    pub fn new(params: Arc<data::Region>, labeltext: impl ToString) -> Self {
         let size = 512;
         let samples = vec![0f32; size];
-
-        let mut res = Self { samples, params };
+        let label = labeltext.to_string();
+        let mut res = Self {
+            samples,
+            label,
+            params,
+        };
         res.update_samples();
         res
     }

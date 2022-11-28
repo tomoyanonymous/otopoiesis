@@ -67,6 +67,6 @@ impl GeneratorComponent for SineModel {
 
 pub fn get_component_for_generator(kind: &data::Generator) -> Box<dyn Component + Send> {
     match kind {
-        data::Generator::Oscillator(osc) => Box::new(SineModel::new(Arc::clone(&osc))),
+        data::Generator::Oscillator(osc) => Box::new(SineModel::new(Arc::clone(osc))),
     }
 }

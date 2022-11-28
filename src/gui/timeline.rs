@@ -27,11 +27,14 @@ impl egui::Widget for Model {
                         "paused"
                     };
                     ui.label(format!("{}", label));
-                    for (_i, track) in self.params.tracks.iter().enumerate() {
-                        ui.add(gui::track::Model {
-                            param: Arc::clone(&track),
-                        })
-                        .interact(egui::Sense::click_and_drag());
+
+                    if let Ok(tracks) = self.params.tracks.get_arc().try_lock() {
+                        for (_i, track) in tracks.iter().enumerate() {
+                            ui.add(gui::track::Model {
+                                param: track.0.get_arc().clone(),
+                            })
+                            .interact(egui::Sense::click_and_drag());
+                        }
                     }
                 })
                 .response;

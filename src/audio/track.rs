@@ -2,14 +2,26 @@ use crate::audio::{Component, PlaybackInfo};
 use crate::data;
 use std::sync::Arc;
 pub struct Model {
-    param: Arc<data::Track>,
+    param: data::Track,
+    channels: u64,
     regions: Vec<super::region::Model>,
 }
 
 impl Model {
-    pub fn new(param: Arc<data::Track>, channels: u64) -> Self {
-        let regions = param
-            .0
+    pub fn new(param: data::TrackShared, channels: u64) -> Self {
+        let track = data::Track(data::SharedParamsRt::<Vec<Arc<data::Region>>>::from(Arc::clone(&param)));
+        let regions = Self::get_new_regions(param, channels);
+
+        Self {
+            param: track,
+            channels,
+            regions,
+        }
+    }
+    fn get_new_regions(param: data::TrackShared, channels: u64) -> Vec<super::region::Model> {
+        param
+            .lock()
+            .unwrap()
             .iter()
             .map(|region| {
                 super::region::Model::new(
@@ -18,9 +30,12 @@ impl Model {
                     super::oscillator::get_component_for_generator(&region.generator),
                 )
             })
-            .collect::<Vec<_>>();
+            .collect::<Vec<_>>()
+    }
+    fn renew_regions(&mut self) {
+        //fetch update.
+        self.regions = Self::get_new_regions(self.param.0.get_arc(), self.channels);
 
-        Self { param, regions }
     }
 }
 
@@ -32,7 +47,7 @@ impl Component for Model {
         2
     }
     fn prepare_play(&mut self, info: &PlaybackInfo) {
-        assert_eq!(self.regions.len(), self.param.0.len());
+        self.renew_regions();
         for region in self.regions.iter_mut() {
             region.prepare_play(info);
         }
@@ -40,6 +55,7 @@ impl Component for Model {
     fn render(&mut self, input: &[f32], output: &mut [f32], info: &PlaybackInfo) {
         //後に入ってるリージョンで基本は上書きする
         //channel is tekitou
+        output.fill(0.0);
         for (count, out_per_channel) in output.chunks_mut(2 as usize).enumerate() {
             let now = (info.current_time + count) as u64;
 
@@ -50,8 +66,6 @@ impl Component for Model {
                         let read_point = ((now - region.params.range.start()) * 2) as usize;
                         let out = region.interleaved_samples_cache[read_point + ch];
                         *s = out;
-                    }else{
-                        *s = 0.0;
                     }
                 }
             });
