@@ -22,7 +22,7 @@ fn main() {
         .run();
 }
 struct Model {
-    app: Arc<data::AppModel>,
+    app: Arc<Mutex<data::AppModel>>,
     project_str: String,
     code_compiled: serde_json::Result<Arc<data::Project>>,
     audio: Renderer<audio::timeline::Model>,
@@ -53,11 +53,11 @@ impl Model {
             ])))])),
         });
         let transport = Arc::new(data::Transport::new());
-        let app = Arc::new(data::AppModel {
-            transport: Arc::clone(&transport),
-            global_setting: Arc::new(data::GlobalSetting {}),
-            project: Arc::clone(&project),
-        });
+        let app = Arc::new(Mutex::new(data::AppModel::new(
+            Arc::clone(&transport),
+            Arc::new(data::GlobalSetting {}),
+            Arc::clone(&project),
+        )));
         let json = serde_json::to_string_pretty(&project);
         let json_str = json.unwrap_or("failed to parse".to_string());
         let mut timeline =
@@ -164,8 +164,9 @@ fn update(_app: &App, model: &mut Model, update: Update) {
                     ui.available_size(),
                     egui::TextEdit::multiline(&mut model.project_str).code_editor(),
                 );
+                let mut app = model.app.lock().unwrap();
                 if editor.gained_focus() {
-                    let json = serde_json::to_string_pretty(&model.app.project);
+                    let json = serde_json::to_string_pretty(&app.project);
                     let json_str = json.unwrap_or("failed to parse".to_string());
                     model.project_str = json_str;
                 }
@@ -173,7 +174,7 @@ fn update(_app: &App, model: &mut Model, update: Update) {
                     let proj = serde_json::from_str::<Arc<data::Project>>(&model.project_str);
                     model.code_compiled = proj;
                     if let Ok(proj) = &model.code_compiled {
-                        // model.app.project = Arc::clone(proj);
+                        app.project = Arc::clone(proj);
                     }
                 }
 
@@ -224,7 +225,13 @@ fn raw_window_event(_app: &App, model: &mut Model, event: &nannou::winit::event:
     model.egui.handle_raw_event(event);
 }
 
-fn key_pressed(_app: &App, model: &mut Model, key: Key) {
+fn key_pressed(app: &App, model: &mut Model, key: Key) {
+    let is_cmd_down = if cfg!(target_os = "macos") {
+        app.keys.mods.logo()
+    } else {
+        app.keys.mods.ctrl()
+    };
+    
     match key {
         Key::Space => {
             if model.audio.is_playing() {
@@ -233,6 +240,18 @@ fn key_pressed(_app: &App, model: &mut Model, key: Key) {
                 model.audio.rewind();
                 model.audio.prepare_play();
                 model.audio.play();
+            }
+        }
+        Key::Z => {
+            if is_cmd_down & !app.keys.mods.shift() {
+                println!("undo");
+                let history = &mut model.app.lock().unwrap().history;
+                let _ = history.undo(&mut ()).unwrap();
+            }
+            if is_cmd_down & app.keys.mods.shift() {
+                println!("redo");
+                let history = &mut model.app.lock().unwrap().history;
+                let _ = history.redo(&mut ()).unwrap();
             }
         }
         _ => {}

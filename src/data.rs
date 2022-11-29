@@ -1,28 +1,42 @@
-
 // mod meta;
 // data format for project file. serialized to json with serde.
 use serde::{Deserialize, Serialize};
-use serde_with::{serde_as};
+use serde_with::serde_as;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
+use undo;
+use crate::action;
 
-use crate::{
-    parameter::{ FloatParameter},
-    utils::AtomicRange,
-};
+use crate::{parameter::FloatParameter, utils::AtomicRange};
 
-#[derive(Serialize, Deserialize, Clone)]
+// #[derive(Serialize, Deserialize, Clone)]
 pub struct AppModel {
     pub transport: Arc<Transport>,
     pub global_setting: Arc<GlobalSetting>,
     pub project: Arc<Project>,
+    pub history: undo::Record<action::Action>,
+}
+
+impl AppModel {
+    pub fn new(
+        transport: Arc<Transport>,
+        global_setting: Arc<GlobalSetting>,
+        project: Arc<Project>,
+    ) -> Self {
+        Self {
+            transport,
+            global_setting,
+            project,
+            history: undo::Record::new(),
+        }
+    }
 }
 
 #[serde_as]
 #[derive(Serialize, Deserialize)]
 pub struct Transport {
     pub is_playing: AtomicBool,
-    pub time: Arc<AtomicU64>,//in sample
+    pub time: Arc<AtomicU64>, //in sample
 }
 impl Transport {
     pub fn new() -> Self {
@@ -80,6 +94,8 @@ impl std::default::Default for Region {
         }
     }
 }
+
+
 
 #[derive(Serialize, Deserialize, Clone, Default)]
 pub struct OscillatorParam {
