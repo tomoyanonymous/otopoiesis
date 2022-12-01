@@ -4,7 +4,8 @@ use nannou_egui::{egui, Egui};
 use otopoiesis::*;
 use parameter::{FloatParameter, Parameter};
 use serde_json;
-use std::sync::atomic::AtomicU64;
+
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 
 use crate::audio::{
@@ -27,7 +28,6 @@ struct Model {
     code_compiled: serde_json::Result<Arc<data::Project>>,
     audio: Renderer<audio::timeline::Model>,
     egui: Egui,
-    is_played: bool,
 }
 
 impl Model {
@@ -77,7 +77,7 @@ impl Model {
             timeline,
             Some(44100),
             Some(512),
-            Arc::clone(&transport.time),
+            Arc::clone(&transport),
         );
 
         Self {
@@ -86,7 +86,28 @@ impl Model {
             project_str: json_str,
             code_compiled: Ok(project),
             egui,
-            is_played: false,
+        }
+    }
+    pub fn undo(&mut self) {
+        let history = &mut self.app.lock().unwrap().history;
+        let _ = history.undo(&mut ()).unwrap();
+    }
+    pub fn redo(&mut self) {
+        let history = &mut self.app.lock().unwrap().history;
+        let _ = history.redo(&mut ()).unwrap();
+    }
+    pub fn play(&mut self) {
+        if !self.audio.is_playing() {
+            let app = &mut self.app.lock().unwrap();
+            app.transport.is_playing.store(true, Ordering::Relaxed);
+            self.audio.play();
+        }
+    }
+    pub fn pause(&mut self) {
+        if self.audio.is_playing() {
+            self.audio.pause();
+            let app = &mut self.app.lock().unwrap();
+            app.transport.is_playing.store(false, Ordering::Relaxed);
         }
     }
 }
@@ -145,8 +166,6 @@ fn update(_app: &App, model: &mut Model, update: Update) {
 
     egui.set_elapsed_time(update.since_start);
     let ctx = egui.begin_frame();
-
-    model.is_played = model.audio.is_playing();
 
     let mut app_gui = gui::app::Model {
         param: Arc::clone(&model.app),
@@ -231,28 +250,27 @@ fn key_pressed(app: &App, model: &mut Model, key: Key) {
     } else {
         app.keys.mods.ctrl()
     };
-    
+
     match key {
         Key::Space => {
             if model.audio.is_playing() {
-                model.audio.pause();
+                model.pause();
             } else {
-                model.audio.rewind();
                 model.audio.prepare_play();
-                model.audio.play();
+                model.play();
             }
         }
         Key::Z => {
             if is_cmd_down & !app.keys.mods.shift() {
-                println!("undo");
-                let history = &mut model.app.lock().unwrap().history;
-                let _ = history.undo(&mut ()).unwrap();
+                let _ = model.undo();
             }
             if is_cmd_down & app.keys.mods.shift() {
-                println!("redo");
-                let history = &mut model.app.lock().unwrap().history;
-                let _ = history.redo(&mut ()).unwrap();
+                let _ = model.redo();
             }
+        }
+        Key::Left => {
+            model.audio.rewind();
+            model.audio.prepare_play();
         }
         _ => {}
     }

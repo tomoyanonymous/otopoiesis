@@ -1,4 +1,5 @@
 use crate::audio::{Component, PlaybackInfo};
+use crate::data;
 use nannou_audio;
 use ringbuf::{HeapConsumer, HeapProducer, HeapRb};
 use std::ops::DerefMut;
@@ -159,7 +160,7 @@ where
     E: Component + Send + 'static,
 {
     pub host: nannou_audio::Host,
-    current_time_in_sample: Arc<AtomicU64>,
+    transport: Arc<data::Transport>,
     istream: Option<nannou_audio::Stream<InputModel>>,
     ostream: Option<nannou_audio::Stream<OutputModel<E>>>,
 }
@@ -179,6 +180,7 @@ where
         self.istream = i;
         self.ostream = o;
     }
+
     fn get_instream(&self) -> &Option<nannou_audio::Stream<InputModel>> {
         &self.istream
     }
@@ -186,10 +188,10 @@ where
         &self.ostream
     }
     fn get_shared_current_time_in_sample(&self) -> Arc<AtomicU64> {
-        Arc::clone(&self.current_time_in_sample)
+        self.transport.time.clone()
     }
     fn get_current_time_in_sample(&self) -> u64 {
-        self.current_time_in_sample.load(Ordering::Relaxed)
+        self.transport.time.load(Ordering::Relaxed)
     }
 }
 
@@ -197,10 +199,15 @@ impl<E> Renderer<E>
 where
     E: Component + Send + 'static,
 {
-    pub fn new(effect: E, sample_rate: Option<u32>, buffer_size: Option<usize>,transport_time:Arc<AtomicU64>) -> Self {
+    pub fn new(
+        effect: E,
+        sample_rate: Option<u32>,
+        buffer_size: Option<usize>,
+        transport: Arc<data::Transport>,
+    ) -> Self {
         let mut res = Self {
             host: nannou_audio::Host::default(),
-            current_time_in_sample: transport_time,
+            transport: transport.clone(),
             istream: None,
             ostream: None,
         };
@@ -217,10 +224,10 @@ pub fn create_renderer<E>(
     effect: E,
     sample_rate: Option<u32>,
     buffer_size: Option<usize>,
-    transport_time:Arc<AtomicU64>,
+    transport: Arc<data::Transport>,
 ) -> Renderer<E>
 where
     E: Component + Send + 'static,
 {
-    Renderer::<E>::new(effect, sample_rate, buffer_size,transport_time)
+    Renderer::<E>::new(effect, sample_rate, buffer_size, transport)
 }

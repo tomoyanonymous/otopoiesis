@@ -25,16 +25,16 @@ impl Model {
         });
 
         egui::CentralPanel::default().show(&ctx, |ui| {
-            ui.add(gui::timeline::Model {
-                param: self.get_timeline(),
-                app: Arc::clone(&self.param),
-            });
+            ui.add(gui::timeline::Model::new(
+                self.get_timeline(),
+                Arc::clone(&self.param),
+            ));
         });
         egui::panel::TopBottomPanel::bottom("footer").show(&ctx, |ui| {
-            ui.add(gui::transport::Model {
-                param: self.get_transport(),
-                sample_rate: self.get_timeline().sample_rate.load(Ordering::Relaxed),
-            })
+            ui.add(gui::transport::Model::new(
+                self.get_transport(),
+                self.get_timeline().sample_rate.load(Ordering::Relaxed),
+            ))
         });
     }
 }

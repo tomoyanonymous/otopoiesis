@@ -1,8 +1,8 @@
 use crate::data;
 use crate::parameter::Parameter;
 use egui::Color32;
-use std::sync::{atomic::Ordering, Arc};
 use nannou_egui::egui;
+use std::sync::{atomic::Ordering, Arc};
 
 pub struct Model {
     pub params: Arc<data::Region>,
@@ -46,8 +46,8 @@ impl egui::Widget for Model {
                 ui.horizontal(|ui| {
                     ui.spacing_mut().item_spacing = egui::vec2(0., 0.);
                     //draw left handle
-                    ui.add_space(x_start);
-                    let bar_width = 10.;
+                    let bar_width = 5.;
+                    ui.add_space(x_start - bar_width);
                     // let mut lrect = egui::Rect::from(graph.rect);
                     // lrect.set_right(lrect.left() + bar_width);
                     let size = egui::vec2(bar_width, y_size);
