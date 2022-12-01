@@ -12,8 +12,8 @@ name = "otopoiesis"
 
 
 [dependencies]
-nannou = "*"
-nannou_audio = "*"
+nannou = "0.18.1"
+nannou_audio = "0.18.0"
 nannou_egui = "*"
 ringbuf = "*"
 atomic_float = "*"
