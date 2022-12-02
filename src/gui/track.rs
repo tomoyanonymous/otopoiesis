@@ -1,10 +1,10 @@
+use super::region;
 use crate::data;
-use crate::gui::region;
 use crate::parameter::{FloatParameter, Parameter};
 use crate::utils::AtomicRange;
 
 use crate::action;
-use nannou_egui::egui;
+use egui;
 use std::sync::atomic::AtomicU64;
 use std::sync::{Arc, Mutex};
 use undo::{Action, Record};
@@ -15,7 +15,7 @@ pub struct Model {
 }
 impl egui::Widget for Model {
     fn ui(self, ui: &mut egui::Ui) -> egui::Response {
-        ui.vertical(|ui| {
+        ui.with_layout(egui::Layout::top_down(egui::Align::LEFT), |ui| {
             let track_len;
             {
                 let track = self.param.0.lock().unwrap();
@@ -24,8 +24,8 @@ impl egui::Widget for Model {
 
                 for (_i, region) in track.iter().enumerate() {
                     let model = region::Model::new(Arc::clone(region), region.label.clone());
-                    let mut rect = ui.max_rect();
-                    rect.extend_with_y(100.);
+                    let rect = ui.min_rect();
+
                     let _response = ui.put(rect, model);
                 }
             } //first lock drops here
@@ -48,9 +48,6 @@ impl egui::Widget for Model {
 
                 let _res = action::add_region(&mut app, self.param.0.clone(), region_param);
             }
-
-            // let _res = app.history.apply((),action).unwrap();
-            // track.push(region_param);
         })
         .response
     }

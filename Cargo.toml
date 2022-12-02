@@ -12,9 +12,12 @@ name = "otopoiesis"
 
 
 [dependencies]
-nannou = "0.18.1"
+
 nannou_audio = "0.18.0"
-nannou_egui = "*"
+egui = { vertion = "0.19.0", git = "https://github.com/emilk/egui", rev = "7133818" }
+eframe = { vertion = "0.19.0", git = "https://github.com/emilk/egui", rev = "7133818" }
+# to resolve conflict versions used between egui and nannou_audio(cpal)
+web-sys = "0.3.60"
 ringbuf = "*"
 atomic_float = "*"
 serde = { version = "*", features = ["rc"] }

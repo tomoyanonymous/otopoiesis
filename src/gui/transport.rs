@@ -1,11 +1,11 @@
 use crate::data;
 use crate::gui;
 
-use nannou::time::DurationF64;
-use nannou_egui::egui;
+use egui;
 use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
+use std::time::Duration;
 
 struct Toggle {
     transport: Arc<data::Transport>,
@@ -66,8 +66,8 @@ impl Model {
 impl egui::Widget for Model {
     fn ui(self, ui: &mut egui::Ui) -> egui::Response {
         ui.horizontal(|mut ui| {
-            
             let time = std::time::Duration::from_secs_f64(self.get_time());
+
             if ui.button("|<<").clicked() {
                 self.param.time.store(0, Ordering::Relaxed);
             }
@@ -75,11 +75,12 @@ impl egui::Widget for Model {
                 //stop
             }
             ui.add(self.playbutton);
-
+            let min = time.div_f64(60.0).as_secs();
+            let secs = time.as_secs() % 60;
             ui.label(format!(
                 "{:02} : {:02} : {:06}",
-                time.mins().floor() as u64,
-                time.as_secs(),
+                min,
+                secs,
                 time.subsec_micros()
             ));
         })
