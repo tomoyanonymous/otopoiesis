@@ -30,6 +30,7 @@ struct Model {
     project_str: String,
     code_compiled: serde_json::Result<Arc<data::Project>>,
     audio: Renderer<audio::timeline::Model>,
+    editor_open: bool,
 }
 
 impl Model {
@@ -89,6 +90,7 @@ impl Model {
             app: Arc::clone(&app),
             project_str: json_str,
             code_compiled: Ok(project),
+            editor_open: false,
         }
     }
     pub fn undo(&mut self) {
@@ -161,12 +163,19 @@ impl eframe::App for Model {
         }
         let mut app_gui = gui::app::Model::new(Arc::clone(&self.app));
         app_gui.show_ui(&ctx);
+        if self.audio.is_playing() {
+            //needs constant update while playing
+            ctx.request_repaint();
+        }
+        let mut style = egui::Style::default();
+        style.animation_time = 0.2;
+        ctx.set_style(style);
+
         let _panel = egui::panel::SidePanel::right("JSON viewer")
             .default_width(300.)
-            .min_width(300.)
             .max_width(1920.)
             .resizable(true)
-            .show(&ctx, |ui| {
+            .show_animated(&ctx, self.editor_open, |ui| {
                 egui::ScrollArea::vertical().show(ui, |ui| {
                     let editor = ui.add_sized(
                         ui.available_size(),
@@ -194,6 +203,18 @@ impl eframe::App for Model {
                     }
 
                     // ui.code_editor(model.
+                });
+            });
+        egui::panel::SidePanel::right("toggle")
+            .min_width(30.)
+            .resizable(false)
+            .show(&ctx, |ui| {
+                let text = if self.editor_open { "[>]" } else { "[<]" };
+                ui.vertical(|ui| {
+                    let button = ui.button(text);
+                    if button.clicked() {
+                        self.editor_open = !self.editor_open;
+                    }
                 });
             });
     }
