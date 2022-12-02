@@ -1,5 +1,5 @@
-use super::region;
 use crate::data;
+use crate::gui;
 use crate::parameter::{FloatParameter, Parameter};
 use crate::utils::AtomicRange;
 
@@ -11,44 +11,70 @@ use undo::{Action, Record};
 
 pub struct Model {
     pub param: data::Track,
-    pub app: Arc<Mutex<data::AppModel>>,
+    app: Arc<Mutex<data::AppModel>>,
+    regions: Vec<gui::region::Model>,
+    scroll_x: f32,
 }
-impl egui::Widget for Model {
+
+impl Model {
+    pub fn new(param: data::Track, app: Arc<Mutex<data::AppModel>>) -> Self {
+        let track = param.0.lock().unwrap();
+        let regions = track
+            .iter()
+            .map(|region| gui::region::Model::new(region.clone(), region.label.clone()))
+            .collect::<Vec<_>>();
+
+        Self {
+            param: param.clone(),
+            app: app.clone(),
+            regions,
+            scroll_x: 0.0,
+        }
+    }
+}
+impl Model {
+    pub fn set_offset_x(&mut self, newx: f32) {
+        self.scroll_x = newx
+    }
+}
+impl egui::Widget for &mut Model {
     fn ui(self, ui: &mut egui::Ui) -> egui::Response {
-        ui.with_layout(egui::Layout::top_down(egui::Align::LEFT), |ui| {
-            let track_len;
-            {
-                let track = self.param.0.lock().unwrap();
-                //regions maybe overlap to each other, so we need to split layer
-                track_len = track.len() + 1;
+        let response = ui
+            .with_layout(egui::Layout::top_down(egui::Align::LEFT), |ui| {
+                let track_len;
+                let x_rightmost;
 
-                for (_i, region) in track.iter().enumerate() {
-                    let model = region::Model::new(Arc::clone(region), region.label.clone());
+                {
                     let rect = ui.min_rect();
+                    for region in self.regions.iter_mut() {
+                        let _response = ui.put(rect, region);
+                    }
+                    let track = self.param.0.lock().unwrap();
 
-                    let _response = ui.put(rect, model);
+                    track_len = track.len() + 1;
+                    x_rightmost = track
+                        .iter()
+                        .fold(0u64, |acc, region| acc.max(region.range.end()));
+                } //first lock drops here
+                if ui.button("+").clicked() {
+                    let label = format!("region{}", track_len).to_string();
+                    let region_param = Arc::new(data::Region {
+                        range: AtomicRange::new(x_rightmost, x_rightmost + 49000),
+                        max_size: AtomicU64::from(60000),
+                        generator: Arc::new(data::Generator::Oscillator(Arc::new(
+                            data::OscillatorParam::default(),
+                        ))),
+                        filters: vec![],
+                        label,
+                    });
+                    let mut app = self.app.lock().unwrap();
+                    let _res = action::add_region(&mut app, self.param.0.clone(), region_param);
                 }
-            } //first lock drops here
-
-            if ui.button("add_region").clicked() {
-                let osc_param = Arc::new(data::OscillatorParam {
-                    amp: FloatParameter::new(1.0, 0.0..=1.0, "amp"),
-                    freq: FloatParameter::new(440.0, 20.0..=20000.0, "freq"),
-                    phase: FloatParameter::new(0.0, 0.0..=6.3, "phase"),
-                });
-                let label = format!("region{}", track_len).to_string();
-                let region_param = Arc::new(data::Region {
-                    range: AtomicRange::new(1000, 50000),
-                    max_size: AtomicU64::from(60000),
-                    generator: Arc::new(data::Generator::Oscillator(Arc::clone(&osc_param))),
-                    filters: vec![],
-                    label,
-                });
-                let mut app = self.app.lock().unwrap();
-
-                let _res = action::add_region(&mut app, self.param.0.clone(), region_param);
-            }
-        })
-        .response
+            })
+            .response;
+        let text = response
+            .hover_pos()
+            .map_or("none".to_string(), |p| format!("{:?}", p).to_string());
+        response.on_hover_text_at_pointer(text)
     }
 }

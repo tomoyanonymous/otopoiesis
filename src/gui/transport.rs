@@ -65,7 +65,7 @@ impl Model {
 
 impl egui::Widget for Model {
     fn ui(self, ui: &mut egui::Ui) -> egui::Response {
-        ui.horizontal(|mut ui| {
+        ui.horizontal(|ui| {
             let time = std::time::Duration::from_secs_f64(self.get_time());
 
             if ui.button("|<<").clicked() {

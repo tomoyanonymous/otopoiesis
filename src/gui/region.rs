@@ -1,7 +1,7 @@
 use crate::data;
 use crate::parameter::Parameter;
 use egui;
-use egui::Color32;
+
 use std::sync::{atomic::Ordering, Arc};
 
 pub struct Model {
@@ -10,6 +10,7 @@ pub struct Model {
     samples: Vec<f32>,
     // pub osc_params: Arc<oscillator::SharedParams>,
 }
+
 impl std::hash::Hash for Model {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.label.hash(state)
@@ -33,38 +34,34 @@ impl egui::Widget for &UiBar {
     }
 }
 
-impl egui::Widget for Model {
+impl egui::Widget for &mut Model {
     fn ui(self, ui: &mut egui::Ui) -> egui::Response {
         let scaling_factor = super::SAMPLES_PER_PIXEL_DEFAULT;
         let bar_width = 5.;
-        let x_start = self.params.range.start() as f32 / scaling_factor;
-        let x_size = self.params.range.getrange() as f32 / scaling_factor;
-        let y_size = 100.0;
+        let start = self.params.range.start();
+        let x_start = start as f32 / scaling_factor;
+        let width = self.params.range.getrange() as f32 / scaling_factor;
+        let maxsize = self.params.max_size.load(Ordering::Relaxed);
+        let end = self.params.range.end();
+        let height = 100.0;
 
-        // .translate(egui::vec2(ui.min_rect().left(), 0.));
-        // ui.painter_at(ui.ctx().used_rect()).debug_rect(
-        //     ui.ctx().used_rect(),
-        //     egui::Color32::RED,
-        //     "region",
-        // );
         let response = ui
             .vertical(|ui| {
                 ui.horizontal(|ui| {
                     ui.spacing_mut().item_spacing = egui::vec2(0., 0.);
                     //draw left handle
                     ui.add_space(x_start - bar_width);
-                    // let mut lrect = egui::Rect::from(graph.rect);
-                    // lrect.set_right(lrect.left() + bar_width);
-                    let size = egui::vec2(bar_width, y_size);
+                    let size = egui::vec2(bar_width, height);
+
                     let left = ui.add_sized(size, &UiBar);
-                    let maxsize = self.params.max_size.load(Ordering::Relaxed);
-                    let start = self.params.range.start();
-                    let end = self.params.range.end();
-                    if let Some(cursor_pos) = left.interact_pointer_pos() {
-                        let new_start = (((cursor_pos.x - bar_width) * scaling_factor) as u64)
+
+                    if let Some(p) = left.interact_pointer_pos() {
+                        let new_start = (((p.x - bar_width) * scaling_factor) as u64)
                             .min(end)
                             .max(end.max(maxsize) - maxsize);
                         self.params.range.set_start(new_start);
+
+
                     }
                     let points = self
                         .samples
@@ -74,10 +71,10 @@ impl egui::Widget for Model {
                             let x = egui::emath::remap(
                                 i as f64,
                                 0.0..=self.samples.len() as f64,
-                                0.0..=x_size as f64,
+                                0.0..=width as f64,
                             );
 
-                            let y = *s * y_size * self.get_current_amp();
+                            let y = *s * height * self.get_current_amp();
                             [x, y as f64]
                         })
                         .collect::<Vec<_>>();
@@ -88,8 +85,8 @@ impl egui::Widget for Model {
                         .allow_boxed_zoom(false)
                         .allow_scroll(false)
                         .allow_double_click_reset(false)
-                        .width(x_size)
-                        .height(y_size)
+                        .width(width)
+                        .height(height)
                         .show_x(false)
                         .show_y(false)
                         .show_axes([false, true])

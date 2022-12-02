@@ -159,9 +159,7 @@ impl eframe::App for Model {
             self.audio.rewind();
             self.audio.prepare_play();
         }
-        let mut app_gui = gui::app::Model {
-            param: Arc::clone(&self.app),
-        };
+        let mut app_gui = gui::app::Model::new(Arc::clone(&self.app));
         app_gui.show_ui(&ctx);
         let _panel = egui::panel::SidePanel::right("JSON viewer")
             .default_width(300.)

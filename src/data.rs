@@ -1,11 +1,12 @@
 // mod meta;
 // data format for project file. serialized to json with serde.
+use crate::action;
+use crate::parameter::Parameter;
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use undo;
-use crate::action;
 
 use crate::{parameter::FloatParameter, utils::AtomicRange};
 
@@ -95,13 +96,20 @@ impl std::default::Default for Region {
     }
 }
 
-
-
-#[derive(Serialize, Deserialize, Clone, Default)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct OscillatorParam {
     pub amp: FloatParameter,
     pub freq: FloatParameter,
     pub phase: FloatParameter,
+}
+impl Default for OscillatorParam {
+    fn default() -> Self {
+        Self {
+            amp: FloatParameter::new(1.0, 0.0..=1.0, "amp"),
+            freq: FloatParameter::new(440.0, 20.0..=20000.0, "freq"),
+            phase: FloatParameter::new(0.0, 0.0..=std::f32::consts::PI * 2.0, "phase"),
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone)]

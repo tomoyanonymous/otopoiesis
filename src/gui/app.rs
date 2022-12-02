@@ -7,9 +7,20 @@ use std::sync::{Arc, Mutex, MutexGuard};
 use undo;
 pub struct Model {
     pub param: Arc<Mutex<data::AppModel>>,
+    timeline: gui::timeline::Model,
 }
 
 impl Model {
+    pub fn new(param: Arc<Mutex<data::AppModel>>) -> Self {
+        let p = param.clone();
+        let t = param.lock().unwrap().project.clone();
+
+        Self {
+            param: p.clone(),
+            timeline: gui::timeline::Model::new(t, p.clone()),
+        }
+    }
+
     fn get_model_mut(&self) -> MutexGuard<data::AppModel> {
         self.param.lock().unwrap()
     }
@@ -25,10 +36,7 @@ impl Model {
         });
 
         egui::CentralPanel::default().show(&ctx, |ui| {
-            ui.add(gui::timeline::Model::new(
-                self.get_timeline(),
-                Arc::clone(&self.param),
-            ));
+            ui.add(&mut self.timeline);
         });
         egui::panel::TopBottomPanel::bottom("footer").show(&ctx, |ui| {
             ui.add(gui::transport::Model::new(
