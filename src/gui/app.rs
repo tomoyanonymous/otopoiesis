@@ -1,6 +1,6 @@
 use crate::data;
 use crate::gui;
-use nannou_egui::egui;
+use egui;
 
 use std::sync::atomic::Ordering;
 use std::sync::{Arc, Mutex, MutexGuard};
@@ -19,7 +19,7 @@ impl Model {
     fn get_transport(&self) -> Arc<data::Transport> {
         self.get_model_mut().transport.clone()
     }
-    pub fn show_ui(&mut self, ctx: &egui::CtxRef) {
+    pub fn show_ui(&mut self, ctx: &egui::Context) {
         egui::panel::TopBottomPanel::top("header").show(&ctx, |ui| {
             ui.label("otopoiesis");
         });

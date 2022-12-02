@@ -2,7 +2,7 @@ use crate::data;
 use crate::gui;
 use crate::parameter::Parameter;
 use crate::utils::AtomicRange;
-use nannou_egui::egui;
+use egui;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 
@@ -61,6 +61,6 @@ impl egui::Widget for Model {
             );
             res
         });
-        main
+        main.inner
     }
 }

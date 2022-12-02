@@ -3,7 +3,6 @@
 // no more needed?
 
 
-use nannou::prelude::*;
 pub mod timeline;
 pub mod region;
 pub mod track;

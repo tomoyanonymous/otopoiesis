@@ -1,7 +1,7 @@
 use crate::data;
 use crate::parameter::Parameter;
+use egui;
 use egui::Color32;
-use nannou_egui::egui;
 use std::sync::{atomic::Ordering, Arc};
 
 pub struct Model {
@@ -40,7 +40,7 @@ impl egui::Widget for Model {
         let x_start = self.params.range.start() as f32 / scaling_factor;
         let x_size = self.params.range.getrange() as f32 / scaling_factor;
         let y_size = 100.0;
-        let region_size = egui::vec2(x_size, y_size);
+
         // .translate(egui::vec2(ui.min_rect().left(), 0.));
         // ui.painter_at(ui.ctx().used_rect()).debug_rect(
         //     ui.ctx().used_rect(),
@@ -49,7 +49,6 @@ impl egui::Widget for Model {
         // );
         let response = ui
             .vertical(|ui| {
- 
                 ui.horizontal(|ui| {
                     ui.spacing_mut().item_spacing = egui::vec2(0., 0.);
                     //draw left handle
@@ -67,28 +66,36 @@ impl egui::Widget for Model {
                             .max(end.max(maxsize) - maxsize);
                         self.params.range.set_start(new_start);
                     }
-                    let iter = self.samples.iter().enumerate().map(|(i, s)| {
-                        let x = nannou::math::map_range(
-                            i as f32,
-                            0.,
-                            self.samples.len() as f32,
-                            0.,
-                            x_size,
-                        );
-                        let y = *s * y_size * self.get_current_amp();
-                        egui::plot::Value::new(x, y)
-                    });
-                    let line = egui::plot::Line::new(egui::plot::Values::from_values_iter(iter));
-                    let graph_component = egui::plot::Plot::new(self.params.label.clone())
-                        .line(line)
+                    let points = self
+                        .samples
+                        .iter()
+                        .enumerate()
+                        .map(|(i, s)| {
+                            let x = egui::emath::remap(
+                                i as f64,
+                                0.0..=self.samples.len() as f64,
+                                0.0..=x_size as f64,
+                            );
+
+                            let y = *s * y_size * self.get_current_amp();
+                            [x, y as f64]
+                        })
+                        .collect::<Vec<_>>();
+
+                    let graph = egui::plot::Plot::new(self.params.label.clone())
                         .allow_drag(false)
                         .allow_zoom(false)
+                        .allow_boxed_zoom(false)
+                        .allow_scroll(false)
+                        .allow_double_click_reset(false)
+                        .width(x_size)
+                        .height(y_size)
                         .show_x(false)
                         .show_y(false)
                         .show_axes([false, true])
-                        .min_size(egui::vec2(0., 0.));
-                    let graph = ui
-                        .add_sized(region_size, graph_component)
+                        .min_size(egui::vec2(0., 0.))
+                        .show(ui, |plot_ui| plot_ui.line(egui::plot::Line::new(points)))
+                        .response
                         .interact(egui::Sense::hover());
 
                     // ui.painter_at(lrect)
@@ -138,15 +145,6 @@ impl egui::Widget for Model {
 
         response
     }
-}
-
-pub fn range_to_bound(horizontal_scale: f32, range: (u64, u64)) -> nannou::geom::Rect {
-    nannou::geom::Rect::from_x_y_w_h(
-        range.0 as f32 * horizontal_scale,
-        50.,
-        range.1 as f32 * horizontal_scale,
-        400.,
-    )
 }
 
 impl Model {

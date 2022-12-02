@@ -1,26 +1,28 @@
-
 use crate::data;
 
 use egui::Color32;
 use std::sync::Arc;
 // use nannou_egui::*;
-use nannou_egui::egui;
+use egui;
 
-struct Model{
-    params:Arc<data::Generator>
+struct Model {
+    params: Arc<data::Generator>,
 }
 fn default_graph(
     label: impl std::hash::Hash,
-    iter: impl Iterator<Item = egui::plot::Value>,
-) -> egui::plot::Plot {
-    let line = egui::plot::Line::new(egui::plot::Values::from_values_iter(iter));
+    ui: &mut egui::Ui,
+    points: &Vec<[f64; 2]>,
+) -> egui::InnerResponse<()> {
+    // let line = egui::plot::;
     egui::plot::Plot::new(label)
-        .line(line)
         .allow_drag(false)
         .allow_zoom(false)
+        .show(ui, |plot_ui| {
+            plot_ui.line(egui::plot::Line::new(points.clone()))
+        })
 }
 
-impl egui::Widget for &Model{
+impl egui::Widget for &Model {
     fn ui(self, ui: &mut egui::Ui) -> egui::Response {
         // let center = ui.add_sized(
         //     region_size,
@@ -41,7 +43,7 @@ impl egui::Widget for &Model{
         // );
         // match self.params.as_ref() {
         //     data::Generator::Oscillator(osc)=>{
-                
+
         //     }
         // }
         ui.label("dummy")
