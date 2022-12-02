@@ -1,17 +1,21 @@
 pub mod lockfree_container;
 
+use serde::{Deserialize, Serialize};
 use std::sync::atomic::AtomicU64;
 use std::sync::atomic::Ordering;
-use serde::{Serialize,Deserialize};
+use std::sync::Arc;
 
-#[derive(Serialize,Deserialize)]
-pub struct AtomicRange(pub AtomicU64, pub AtomicU64);
+#[derive(Serialize, Deserialize)]
+pub struct AtomicRange(pub Arc<AtomicU64>, pub Arc<AtomicU64>);
 
 type EguiGetSet<'a> = Box<dyn FnMut(Option<f64>) -> f64 + 'a>;
 
 impl AtomicRange {
     pub fn new(start: u64, end: u64) -> Self {
-        Self(AtomicU64::from(start), AtomicU64::from(end))
+        Self(
+            Arc::new(AtomicU64::from(start)),
+            Arc::new(AtomicU64::from(end)),
+        )
     }
     pub fn get_pair(&self) -> (u64, u64) {
         (self.start(), self.end())
@@ -35,7 +39,10 @@ impl AtomicRange {
     pub fn set_end(&self, v: u64) {
         self.1.store(v, Ordering::Relaxed);
     }
-
+    pub fn shift(&self, v: i64) {
+        self.set_start((self.start() as i64 + v).max(0) as u64);
+        self.set_end((self.end() as i64 + v).max(0) as u64);
+    }
     pub fn egui_get_set_start(&self, scaling_factor: f64) -> EguiGetSet {
         Box::new(move |f: Option<f64>| -> f64 {
             if let Some(v) = f {
@@ -54,10 +61,9 @@ impl AtomicRange {
             res
         })
     }
-    
 }
-impl Clone for AtomicRange{
+impl Clone for AtomicRange {
     fn clone(&self) -> Self {
-        Self::new(self.start(),self.end())
+        Self::new(self.start(), self.end())
     }
 }

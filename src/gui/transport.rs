@@ -2,10 +2,8 @@ use crate::data;
 use crate::gui;
 
 use egui;
-use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
-use std::time::Duration;
 
 struct Toggle {
     transport: Arc<data::Transport>,

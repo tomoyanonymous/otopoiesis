@@ -2,7 +2,6 @@ use crate::audio::{Component, PlaybackInfo};
 
 // use crate::parameter::UIntParameter
 use crate::data;
-use crate::utils::AtomicRange;
 use std::ops::RangeInclusive;
 use std::sync::Arc;
 // modifierが後で追加されたりする。生成用にComponentを持っている？
@@ -47,7 +46,7 @@ impl Model {
 
         self.cache_completed = true;
     }
-    pub fn render_offline_async(&mut self, info: PlaybackInfo) {
+    pub fn render_offline_async(&mut self, _info: PlaybackInfo) {
         todo!()
     }
     pub fn contains_samples(&self, range: RangeInclusive<u64>) -> bool {

@@ -4,7 +4,6 @@ use egui;
 
 use std::sync::atomic::Ordering;
 use std::sync::{Arc, Mutex, MutexGuard};
-use undo;
 pub struct Model {
     pub param: Arc<Mutex<data::AppModel>>,
     timeline: gui::timeline::Model,

@@ -1,5 +1,5 @@
 use crate::data::{self, SharedVec};
-use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
+use std::sync::{Arc, MutexGuard, PoisonError};
 use undo;
 
 #[derive(Debug)]

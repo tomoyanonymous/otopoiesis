@@ -1,19 +1,19 @@
 use crate::data;
 use crate::gui;
-use crate::parameter::{FloatParameter, Parameter};
 use crate::utils::AtomicRange;
 
 use crate::action;
 use egui;
-use std::sync::atomic::AtomicU64;
+
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
-use undo::{Action, Record};
+
+
 
 pub struct Model {
     pub param: data::Track,
     app: Arc<Mutex<data::AppModel>>,
     regions: Vec<gui::region::Model>,
-    scroll_x: f32,
 }
 
 impl Model {
@@ -28,17 +28,13 @@ impl Model {
             param: param.clone(),
             app: app.clone(),
             regions,
-            scroll_x: 0.0,
         }
     }
 }
-impl Model {
-    pub fn set_offset_x(&mut self, newx: f32) {
-        self.scroll_x = newx
-    }
-}
+
 impl egui::Widget for &mut Model {
     fn ui(self, ui: &mut egui::Ui) -> egui::Response {
+        let offset_x = ui.clip_rect().left();
         let response = ui
             .with_layout(egui::Layout::top_down(egui::Align::LEFT), |ui| {
                 let track_len;
@@ -47,7 +43,10 @@ impl egui::Widget for &mut Model {
                 {
                     let rect = ui.min_rect();
                     for region in self.regions.iter_mut() {
-                        let _response = ui.put(rect, region);
+                        let x = region.params.range.start() as f32
+                            / gui::SAMPLES_PER_PIXEL_DEFAULT as f32;
+                        ui.spacing_mut().item_spacing = egui::vec2(0.0, 0.0);
+                        ui.put(rect.translate([x, 0.0].into()), region);
                     }
                     let track = self.param.0.lock().unwrap();
 
@@ -72,9 +71,9 @@ impl egui::Widget for &mut Model {
                 }
             })
             .response;
-        let text = response
-            .hover_pos()
-            .map_or("none".to_string(), |p| format!("{:?}", p).to_string());
+        let text = response.hover_pos().map_or("none".to_string(), |p| {
+            format!("{:?}/offset:{}", p, offset_x).to_string()
+        });
         response.on_hover_text_at_pointer(text)
     }
 }

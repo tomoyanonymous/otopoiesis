@@ -115,10 +115,24 @@ impl Model {
             app.transport.is_playing.store(false, Ordering::Relaxed);
         }
     }
+    fn ui_to_code(&mut self) {
+        let app = self.app.lock().unwrap();
+        let json = serde_json::to_string_pretty(&app.project);
+        let json_str = json.unwrap_or("failed to parse".to_string());
+        self.project_str = json_str;
+    }
+    fn code_to_ui(&mut self) {
+        let mut app = self.app.lock().unwrap();
+        let proj = serde_json::from_str::<Arc<data::Project>>(&self.project_str);
+        self.code_compiled = proj;
+        if let Ok(proj) = &self.code_compiled {
+            app.project = Arc::clone(proj);
+        }
+    }
 }
 
 impl eframe::App for Model {
-    fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
+    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         if ctx
             .input_mut()
             .consume_shortcut(&egui::KeyboardShortcut::new(
@@ -181,18 +195,12 @@ impl eframe::App for Model {
                         ui.available_size(),
                         egui::TextEdit::multiline(&mut self.project_str).code_editor(),
                     );
-                    let mut app = self.app.lock().unwrap();
+
                     if editor.gained_focus() {
-                        let json = serde_json::to_string_pretty(&app.project);
-                        let json_str = json.unwrap_or("failed to parse".to_string());
-                        self.project_str = json_str;
+                        self.ui_to_code();
                     }
                     if editor.lost_focus() {
-                        let proj = serde_json::from_str::<Arc<data::Project>>(&self.project_str);
-                        self.code_compiled = proj;
-                        if let Ok(proj) = &self.code_compiled {
-                            app.project = Arc::clone(proj);
-                        }
+                        self.code_to_ui();
                     }
 
                     if let Err(err) = &self.code_compiled {
@@ -201,8 +209,6 @@ impl eframe::App for Model {
                             format!("failed to evaluate json:{}", err.to_string()),
                         );
                     }
-
-                    // ui.code_editor(model.
                 });
             });
         egui::panel::SidePanel::right("toggle")
@@ -214,6 +220,9 @@ impl eframe::App for Model {
                     let button = ui.button(text);
                     if button.clicked() {
                         self.editor_open = !self.editor_open;
+                        if self.editor_open{
+                            self.ui_to_code();
+                        }
                     }
                 });
             });

@@ -52,7 +52,7 @@ impl Parameter<f32> for FloatParameter {
 pub struct UIntParameter {
     value: AtomicU64,
     range: RangeInclusive<u64>,
-    label: String,
+    _label: String,
 }
 
 impl Parameter<u64> for UIntParameter {
@@ -60,7 +60,7 @@ impl Parameter<u64> for UIntParameter {
         Self {
             value: AtomicU64::new(init),
             range,
-            label: label.into(),
+            _label: label.into(),
         }
     }
 

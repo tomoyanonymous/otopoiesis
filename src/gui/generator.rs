@@ -1,6 +1,5 @@
 use crate::data;
 
-use egui::Color32;
 use std::sync::Arc;
 // use nannou_egui::*;
 use egui;
