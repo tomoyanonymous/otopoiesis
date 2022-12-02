@@ -36,17 +36,23 @@ impl egui::Widget for &UiBar {
 impl egui::Widget for Model {
     fn ui(self, ui: &mut egui::Ui) -> egui::Response {
         let scaling_factor = super::SAMPLES_PER_PIXEL_DEFAULT;
+        let bar_width = 5.;
         let x_start = self.params.range.start() as f32 / scaling_factor;
         let x_size = self.params.range.getrange() as f32 / scaling_factor;
         let y_size = 100.0;
         let region_size = egui::vec2(x_size, y_size);
         // .translate(egui::vec2(ui.min_rect().left(), 0.));
+        // ui.painter_at(ui.ctx().used_rect()).debug_rect(
+        //     ui.ctx().used_rect(),
+        //     egui::Color32::RED,
+        //     "region",
+        // );
         let response = ui
             .vertical(|ui| {
+ 
                 ui.horizontal(|ui| {
                     ui.spacing_mut().item_spacing = egui::vec2(0., 0.);
                     //draw left handle
-                    let bar_width = 5.;
                     ui.add_space(x_start - bar_width);
                     // let mut lrect = egui::Rect::from(graph.rect);
                     // lrect.set_right(lrect.left() + bar_width);
@@ -103,18 +109,21 @@ impl egui::Widget for Model {
                     let data::Generator::Oscillator(osc) = self.params.generator.as_ref();
 
                     let range = &osc.freq.range;
-                    ui.add(
-                        egui::Slider::from_get_set(
-                            *range.start() as f64..=*range.end() as f64,
-                            |v: Option<f64>| {
-                                if let Some(n) = v {
-                                    osc.freq.set(n as f32)
-                                }
-                                osc.freq.get() as f64
-                            },
-                        )
-                        .logarithmic(true),
-                    );
+                    ui.horizontal(|ui| {
+                        ui.add_space(x_start - bar_width);
+                        ui.add(
+                            egui::Slider::from_get_set(
+                                *range.start() as f64..=*range.end() as f64,
+                                |v: Option<f64>| {
+                                    if let Some(n) = v {
+                                        osc.freq.set(n as f32)
+                                    }
+                                    osc.freq.get() as f64
+                                },
+                            )
+                            .logarithmic(true),
+                        );
+                    })
                 };
             })
             .response;

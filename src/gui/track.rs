@@ -24,11 +24,11 @@ impl egui::Widget for Model {
 
                 for (_i, region) in track.iter().enumerate() {
                     let model = region::Model::new(Arc::clone(region), region.label.clone());
-
-                    let _response = ui.add(model);
+                    let mut rect = ui.max_rect();
+                    rect.extend_with_y(100.);
+                    let _response = ui.put(rect, model);
                 }
             } //first lock drops here
-            let label = format!("region{}", track_len).to_string();
 
             if ui.button("add_region").clicked() {
                 let osc_param = Arc::new(data::OscillatorParam {
@@ -36,6 +36,7 @@ impl egui::Widget for Model {
                     freq: FloatParameter::new(440.0, 20.0..=20000.0, "freq"),
                     phase: FloatParameter::new(0.0, 0.0..=6.3, "phase"),
                 });
+                let label = format!("region{}", track_len).to_string();
                 let region_param = Arc::new(data::Region {
                     range: AtomicRange::new(1000, 50000),
                     max_size: AtomicU64::from(60000),
