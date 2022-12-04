@@ -12,3 +12,4 @@ pub mod transport;
 
 pub const SAMPLES_PER_PIXEL_DEFAULT:f32= 100.0;
 
+pub const TRACK_HEIGHT:f32= 100.0;

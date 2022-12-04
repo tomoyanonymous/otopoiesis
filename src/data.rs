@@ -31,6 +31,22 @@ impl AppModel {
             history: undo::Record::new(),
         }
     }
+    pub fn can_undo(&self) -> bool {
+        let history = &self.history;
+        history.can_undo()
+    }
+    pub fn undo(&mut self) {
+        let history = &mut self.history;
+        let _ = history.undo(&mut ()).unwrap();
+    }
+    pub fn can_redo(&self) -> bool {
+        let history = &self.history;
+        history.can_redo()
+    }
+    pub fn redo(&mut self) {
+        let history = &mut self.history;
+        let _ = history.redo(&mut ()).unwrap();
+    }
 }
 
 #[serde_as]
@@ -67,7 +83,12 @@ impl Track {
         Self(Arc::new(Mutex::new(vec![])))
     }
 }
-
+impl std::fmt::Display for Track {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // write!(f, "track {}", self.label)
+        write!(f, "track")
+    }
+}
 //range stores a real time.
 #[derive(Serialize, Deserialize)]
 pub struct Region {
@@ -99,6 +120,12 @@ impl std::default::Default for Region {
             filters: vec![],
             label: "".to_string(),
         }
+    }
+}
+
+impl std::fmt::Display for Region {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "region {}", self.label)
     }
 }
 

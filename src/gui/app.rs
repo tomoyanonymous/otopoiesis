@@ -2,6 +2,7 @@ use crate::data;
 use crate::gui;
 use egui;
 
+use std::fmt::Pointer;
 use std::sync::atomic::Ordering;
 use std::sync::{Arc, Mutex, MutexGuard};
 pub struct Model {
@@ -29,6 +30,7 @@ impl Model {
     fn get_transport(&self) -> Arc<data::Transport> {
         self.get_model_mut().transport.clone()
     }
+
     pub fn show_ui(&mut self, ctx: &egui::Context) {
         let is_mac = ctx.os() == egui::os::OperatingSystem::Mac;
         egui::panel::TopBottomPanel::top("header").show(&ctx, |ui| {
@@ -45,13 +47,24 @@ impl Model {
                                 egui::Key::Z,
                             );
                             let str = undo_sk.format(&egui::ModifierNames::NAMES, is_mac);
-                            if ui.button(format!("Undo {}", str)).clicked() {
-                                app.history.undo(&mut ());
-                            }
+                            let undobutton = ui.add_enabled(
+                                app.can_undo(),
+                                egui::Button::new(format!("Undo {}", str)),
+                            );
+                            // list truncated history here
+                            if undobutton.clicked() {
+                                println!("{}",app.history.display());
+                                app.undo();
+                            };
                             let str = redo_sk.format(&egui::ModifierNames::NAMES, is_mac);
-
-                            if ui.button(format!("Redo {}", str)).clicked() {
-                                app.history.redo(&mut ());
+                            if ui
+                                .add_enabled(
+                                    app.can_redo(),
+                                    egui::Button::new(format!("Redo {}", str)),
+                                )
+                                .clicked()
+                            {
+                                app.redo();
                             }
                         }
                     })

@@ -112,8 +112,8 @@ impl Model {
         let size = 512;
         let samples = vec![0f32; size];
         let label = labeltext.to_string();
-        let handle_left = UiBar::new(params.range.0.clone(),HandleMode::Start);
-        let handle_right = UiBar::new(params.range.1.clone(),HandleMode::End);
+        let handle_left = UiBar::new(params.range.0.clone(), HandleMode::Start);
+        let handle_right = UiBar::new(params.range.1.clone(), HandleMode::End);
 
         let mut res = Self {
             samples,
@@ -152,7 +152,7 @@ impl egui::Widget for &mut Model {
 
         self.range_handles[1].set_limit(start..=max_end);
 
-        let height = 100.0;
+        let height = gui::TRACK_HEIGHT;
         let response = ui
             .vertical(|ui| {
                 ui.horizontal_centered(|ui| {
@@ -176,23 +176,23 @@ impl egui::Widget for &mut Model {
                             [x, y as f64]
                         })
                         .collect::<Vec<_>>();
-
-                    let mut graph = egui::plot::Plot::new(self.params.label.clone())
-                        .allow_drag(false)
-                        .allow_zoom(false)
-                        .allow_boxed_zoom(false)
-                        .allow_scroll(false)
-                        .allow_double_click_reset(false)
-                        .width(width)
-                        .height(height)
-                        .show_x(false)
-                        .show_y(false)
-                        .show_axes([false, true])
-                        .min_size(egui::vec2(0., 0.))
-                        .show(ui, |plot_ui| plot_ui.line(egui::plot::Line::new(points)))
-                        .response
-                        .on_hover_cursor(egui::CursorIcon::Grab)
-                        .interact(egui::Sense::click_and_drag());
+                    let mut graph =
+                        egui::plot::Plot::new(ui.auto_id_with(self.params.label.clone()))
+                            .allow_drag(false)
+                            .allow_zoom(false)
+                            .allow_boxed_zoom(false)
+                            .allow_scroll(false)
+                            .allow_double_click_reset(false)
+                            .width(width)
+                            .height(height)
+                            .show_x(false)
+                            .show_y(false)
+                            .show_axes([false, true])
+                            .min_size(egui::vec2(0., 0.))
+                            .show(ui, |plot_ui| plot_ui.line(egui::plot::Line::new(points)))
+                            .response
+                            .on_hover_cursor(egui::CursorIcon::Grab)
+                            .interact(egui::Sense::click_and_drag());
                     if graph.drag_started() {
                         self.offset_saved = self.params.range.start() as i64;
                     }

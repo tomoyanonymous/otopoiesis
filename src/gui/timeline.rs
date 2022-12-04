@@ -67,11 +67,15 @@ impl Model {
     }
     fn add_track(&mut self) {
         if let Ok(mut app) = self.app.lock() {
-            action::add_track(&mut app, data::Track::new());
+            let _res = action::add_track(&mut app, data::Track::new());
+            println!("{}",app.project.tracks.lock().unwrap().len());
         }
         if let Ok(app) = self.app.lock() {
             let ts = app.project.tracks.clone();
             self.track = param_to_track(&ts, self.app.clone()).unwrap();
+            println!("{}",self.track.len());
+
+
         }
     }
 }

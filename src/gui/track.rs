@@ -32,14 +32,23 @@ impl Model {
 
 impl egui::Widget for &mut Model {
     fn ui(self, ui: &mut egui::Ui) -> egui::Response {
-        let offset_x = ui.clip_rect().left();
-        ui.painter().rect_stroke(
-            ui.min_rect(),
-            2.0,
-            egui::Stroke::new(2.0, egui::Color32::DARK_GRAY),
+        let (bg_response, bg_painter) = ui.allocate_painter(
+            egui::vec2(ui.available_width(), gui::TRACK_HEIGHT+30.0),
+            egui::Sense::hover(),
         );
-        let response = ui
-            .with_layout(egui::Layout::left_to_right(egui::Align::TOP), |ui| {
+        if bg_response.hovered() {
+            bg_painter.rect(
+                bg_response.rect,
+                2.0,
+                ui.style().visuals.faint_bg_color,
+                egui::Stroke::new(2.0, egui::Color32::DARK_GRAY),
+            );
+        }
+        let response = ui.allocate_ui_at_rect(bg_response.rect, |ui| {
+            ui.with_layout(egui::Layout::left_to_right(egui::Align::TOP), |ui| {
+                ui.set_min_width(ui.available_width() * 0.9); //tekitou
+                ui.set_min_height(gui::TRACK_HEIGHT);//tekitou
+
                 let mut track_len = 0;
                 let mut x_rightmost = 0;
                 let mut stroke = ui.style().visuals.window_stroke();
@@ -83,6 +92,7 @@ impl egui::Widget for &mut Model {
                 });
             })
             .response;
+        }).response;
         response
     }
 }

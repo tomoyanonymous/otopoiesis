@@ -37,19 +37,10 @@ impl Model {
     pub fn new(_cc: &eframe::CreationContext<'_>) -> Self {
         let region_len = 60000;
         let sample_rate = 44100 as u64;
-        let osc_param = Arc::new(data::OscillatorParam::default());
-        let region_param = Arc::new(data::Region {
-            range: AtomicRange::new(1000, 50000),
-            max_size: AtomicU64::from(region_len),
-            generator: Arc::new(data::Generator::Oscillator(Arc::clone(&osc_param))),
-            filters: vec![],
-            label: String::from("region0"),
-        });
+
         let project = Arc::new(data::Project {
             sample_rate: AtomicU64::from(sample_rate),
-            tracks: Arc::new(Mutex::new(vec![data::Track(Arc::new(Mutex::new(vec![
-                Arc::clone(&region_param),
-            ])))])),
+            tracks: Arc::new(Mutex::new(vec![])),
         });
         let transport = Arc::new(data::Transport::new());
         let app = Arc::new(Mutex::new(data::AppModel::new(
@@ -89,14 +80,7 @@ impl Model {
             editor_open: false,
         }
     }
-    pub fn undo(&mut self) {
-        let history = &mut self.app.lock().unwrap().history;
-        let _ = history.undo(&mut ()).unwrap();
-    }
-    pub fn redo(&mut self) {
-        let history = &mut self.app.lock().unwrap().history;
-        let _ = history.redo(&mut ()).unwrap();
-    }
+
     pub fn play(&mut self) {
         if !self.audio.is_playing() {
             let app = &mut self.app.lock().unwrap();
@@ -129,23 +113,31 @@ impl Model {
 
 impl eframe::App for Model {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        if ctx
-            .input_mut()
-            .consume_shortcut(&egui::KeyboardShortcut::new(
-                egui::Modifiers::COMMAND,
-                egui::Key::Z,
-            ))
         {
-            self.undo();
-        }
-        if ctx
-            .input_mut()
-            .consume_shortcut(&egui::KeyboardShortcut::new(
-                egui::Modifiers::COMMAND.plus(egui::Modifiers::SHIFT),
-                egui::Key::Z,
-            ))
-        {
-            self.redo();
+            let mut app = self.app.lock().unwrap();
+
+            if ctx
+                .input_mut()
+                .consume_shortcut(&egui::KeyboardShortcut::new(
+                    egui::Modifiers::COMMAND,
+                    egui::Key::Z,
+                ))
+            {
+                if app.can_undo() {
+                    app.undo();
+                }
+            }
+            if ctx
+                .input_mut()
+                .consume_shortcut(&egui::KeyboardShortcut::new(
+                    egui::Modifiers::COMMAND.plus(egui::Modifiers::SHIFT),
+                    egui::Key::Z,
+                ))
+            {
+                if app.can_redo() {
+                    app.redo();
+                }
+            }
         }
         if ctx
             .input_mut()
@@ -216,7 +208,7 @@ impl eframe::App for Model {
                     let button = ui.button(text);
                     if button.clicked() {
                         self.editor_open = !self.editor_open;
-                        if self.editor_open{
+                        if self.editor_open {
                             self.ui_to_code();
                         }
                     }

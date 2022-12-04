@@ -66,7 +66,7 @@ struct RemovefromContainer<T: Clone>(OpsContainer<T>);
 
 impl<T> undo::Action for AddtoContainer<T>
 where
-    T: Clone,
+    T: Clone + std::fmt::Display,
 {
     type Target = (); //target will be managed on action side
     type Output = ();
@@ -81,7 +81,7 @@ where
 
 impl<T> undo::Action for RemovefromContainer<T>
 where
-    T: Clone,
+    T: Clone + std::fmt::Display,
 {
     type Target = ();
     type Output = ();
@@ -93,8 +93,47 @@ where
         self.0.add()
     }
 }
+impl<T> std::fmt::Display for AddtoContainer<T>
+where
+    T: Clone + std::fmt::Display,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "Add {}",
+            self.0.elem_to_add.as_ref().map_or("".to_string(), |v| v.to_string())
+        )
+    }
+}
+impl<T> std::fmt::Display for RemovefromContainer<T>
+where
+    T: Clone + std::fmt::Display,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "Remove {}",
+            self.0.elem_to_add.as_ref().map_or("".to_string(), |v| v.to_string())
+        )
+    }
+}
+trait DisplayableAction: undo::Action + std::fmt::Display {}
+impl<T> DisplayableAction for AddtoContainer<T>
+where
+    T: Clone,
+    AddtoContainer<T>: undo::Action + std::fmt::Display,
+{
+}
+impl<T> DisplayableAction for RemovefromContainer<T>
+where
+    T: Clone,
+    RemovefromContainer<T>: undo::Action + std::fmt::Display,
+{
+}
 
-pub struct Action(Box<dyn undo::Action<Target = (), Output = (), Error = OpsContainerError>>);
+pub struct Action(
+    Box<dyn DisplayableAction<Target = (), Output = (), Error = OpsContainerError> + 'static>,
+);
 pub enum Target {
     Tracks(data::Project),
     Regions(SharedVec<Arc<data::Region>>),
@@ -112,8 +151,14 @@ impl undo::Action for Action {
     }
 }
 
+impl std::fmt::Display for Action {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
 fn make_action_dyn<'a>(
-    a: impl undo::Action<Target = (), Output = (), Error = OpsContainerError> + 'static,
+    a: impl DisplayableAction<Target = (), Output = (), Error = OpsContainerError> + 'static,
 ) -> Action {
     Action(Box::new(a))
 }
@@ -127,7 +172,7 @@ pub fn add_region(
     app.history.apply(
         &mut (),
         make_action_dyn(AddtoContainer::<Arc<data::Region>>(OpsContainer {
-            container: track,
+            container: track.clone(),
             elem_to_add: Some(region),
         })),
     )
@@ -136,7 +181,7 @@ pub fn add_track(app: &mut data::AppModel, track: data::Track) -> Result<(), Ops
     app.history.apply(
         &mut (),
         make_action_dyn(AddtoContainer::<data::Track>(OpsContainer {
-            container: app.project.tracks.clone(),
+            container: Arc::clone(&app.project.tracks),
             elem_to_add: Some(track),
         })),
     )
