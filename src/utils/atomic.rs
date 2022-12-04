@@ -56,7 +56,7 @@ macro_rules! impl_simple_atomic {
         }
         #[derive(Clone, Serialize, Deserialize)]
         #[serde(from=$ps,into=$ps)]
-        pub struct $name(Primitive<$p, $a>);
+        pub struct $name(pub Primitive<$p, $a>);
 
         impl From<$p> for $name {
             fn from(v: $p) -> Self {
