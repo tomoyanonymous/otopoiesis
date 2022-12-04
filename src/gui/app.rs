@@ -30,8 +30,33 @@ impl Model {
         self.get_model_mut().transport.clone()
     }
     pub fn show_ui(&mut self, ctx: &egui::Context) {
+        let is_mac = ctx.os() == egui::os::OperatingSystem::Mac;
         egui::panel::TopBottomPanel::top("header").show(&ctx, |ui| {
-            ui.label("otopoiesis");
+            ui.vertical(|ui| {
+                ui.label("otopoiesis");
+                ui.horizontal(|ui| {
+                    ui.menu_button("File", |ui| {});
+                    ui.menu_button("Edit", |ui| {
+                        if let Ok(mut app) = self.param.try_lock() {
+                            let undo_sk =
+                                egui::KeyboardShortcut::new(egui::Modifiers::COMMAND, egui::Key::Z);
+                            let redo_sk = egui::KeyboardShortcut::new(
+                                egui::Modifiers::COMMAND.plus(egui::Modifiers::SHIFT),
+                                egui::Key::Z,
+                            );
+                            let str = undo_sk.format(&egui::ModifierNames::NAMES, is_mac);
+                            if ui.button(format!("Undo {}", str)).clicked() {
+                                app.history.undo(&mut ());
+                            }
+                            let str = redo_sk.format(&egui::ModifierNames::NAMES, is_mac);
+
+                            if ui.button(format!("Redo {}", str)).clicked() {
+                                app.history.redo(&mut ());
+                            }
+                        }
+                    })
+                })
+            });
         });
 
         egui::CentralPanel::default().show(&ctx, |ui| {

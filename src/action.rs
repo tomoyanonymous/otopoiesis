@@ -132,3 +132,12 @@ pub fn add_region(
         })),
     )
 }
+pub fn add_track(app: &mut data::AppModel, track: data::Track) -> Result<(), OpsContainerError> {
+    app.history.apply(
+        &mut (),
+        make_action_dyn(AddtoContainer::<data::Track>(OpsContainer {
+            container: app.project.tracks.clone(),
+            elem_to_add: Some(track),
+        })),
+    )
+}

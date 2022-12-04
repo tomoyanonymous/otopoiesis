@@ -43,6 +43,13 @@ impl AtomicRange {
         self.set_start((self.start() as i64 + v).max(0) as u64);
         self.set_end((self.end() as i64 + v).max(0) as u64);
     }
+    //does not shrink when the range reached to 0.
+    pub fn shift_bounded(&self, v: i64) {
+        let start_bounded = (self.start() as i64 + v).max(0) as u64;
+        let end_bounded = start_bounded + self.getrange();
+        self.set_start(start_bounded);
+        self.set_end(end_bounded);
+    }
     pub fn egui_get_set_start(&self, scaling_factor: f64) -> EguiGetSet {
         Box::new(move |f: Option<f64>| -> f64 {
             if let Some(v) = f {

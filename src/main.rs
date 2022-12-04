@@ -37,11 +37,7 @@ impl Model {
     pub fn new(_cc: &eframe::CreationContext<'_>) -> Self {
         let region_len = 60000;
         let sample_rate = 44100 as u64;
-        let osc_param = Arc::new(data::OscillatorParam {
-            amp: FloatParameter::new(1.0, 0.0..=1.0, "amp"),
-            freq: FloatParameter::new(440.0, 20.0..=20000.0, "freq"),
-            phase: FloatParameter::new(0.0, 0.0..=6.3, "phase"),
-        });
+        let osc_param = Arc::new(data::OscillatorParam::default());
         let region_param = Arc::new(data::Region {
             range: AtomicRange::new(1000, 50000),
             max_size: AtomicU64::from(region_len),

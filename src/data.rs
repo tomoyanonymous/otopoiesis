@@ -62,6 +62,12 @@ pub type SharedVec<T> = Arc<Mutex<Vec<T>>>;
 #[derive(Serialize, Deserialize, Clone)]
 pub struct Track(pub SharedVec<Arc<Region>>);
 
+impl Track {
+    pub fn new() -> Self {
+        Self(Arc::new(Mutex::new(vec![])))
+    }
+}
+
 //range stores a real time.
 #[derive(Serialize, Deserialize)]
 pub struct Region {

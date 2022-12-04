@@ -76,8 +76,7 @@ impl egui::Widget for &mut UiBar {
         let text = response.hover_pos().map_or("none".to_string(), |p| {
             format!("{:?}/offset:{}", p, rect_x).to_string()
         });
-        response.on_hover_text_at_pointer(text)
-        // response
+        response
     }
 }
 
@@ -199,7 +198,7 @@ impl egui::Widget for &mut Model {
                     }
                     if graph.dragged() {
                         let offset = (graph.drag_delta().x * gui::SAMPLES_PER_PIXEL_DEFAULT) as i64;
-                        self.params.range.shift(offset);
+                        self.params.range.shift_bounded(offset);
                         graph = graph.on_hover_cursor(egui::CursorIcon::Grabbing)
                     }
                     if graph.drag_released() {
