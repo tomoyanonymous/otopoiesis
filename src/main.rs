@@ -6,7 +6,7 @@ use otopoiesis::*;
 use parameter::{FloatParameter, Parameter};
 use serde_json;
 
-use std::sync::atomic::{AtomicU64, Ordering};
+use crate::utils::atomic;
 use std::sync::{Arc, Mutex};
 
 use crate::audio::{
@@ -39,7 +39,7 @@ impl Model {
         let sample_rate = 44100 as u64;
 
         let project = Arc::new(data::Project {
-            sample_rate: AtomicU64::from(sample_rate),
+            sample_rate: atomic::U64::from(sample_rate),
             tracks: Arc::new(Mutex::new(vec![])),
         });
         let transport = Arc::new(data::Transport::new());
@@ -84,7 +84,7 @@ impl Model {
     pub fn play(&mut self) {
         if !self.audio.is_playing() {
             let app = &mut self.app.lock().unwrap();
-            app.transport.is_playing.store(true, Ordering::Relaxed);
+            app.transport.is_playing.store(true);
             self.audio.play();
         }
     }
@@ -92,7 +92,7 @@ impl Model {
         if self.audio.is_playing() {
             self.audio.pause();
             let app = &mut self.app.lock().unwrap();
-            app.transport.is_playing.store(false, Ordering::Relaxed);
+            app.transport.is_playing.store(false);
         }
     }
     fn ui_to_code(&mut self) {

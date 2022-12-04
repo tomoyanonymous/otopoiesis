@@ -4,7 +4,7 @@ use crate::action;
 use crate::parameter::Parameter;
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use crate::utils::atomic;
 use std::sync::{Arc, Mutex};
 use undo;
 
@@ -52,14 +52,14 @@ impl AppModel {
 #[serde_as]
 #[derive(Serialize, Deserialize)]
 pub struct Transport {
-    pub is_playing: AtomicBool,
-    pub time: Arc<AtomicU64>, //in sample
+    pub is_playing: atomic::Bool,
+    pub time: Arc<atomic::U64>, //in sample
 }
 impl Transport {
     pub fn new() -> Self {
         Self {
-            is_playing: AtomicBool::from(false),
-            time: Arc::new(AtomicU64::from(0)),
+            is_playing: atomic::Bool::from(false),
+            time: Arc::new(atomic::U64::from(0)),
         }
     }
 }
@@ -69,7 +69,7 @@ pub struct GlobalSetting;
 
 #[derive(Serialize, Deserialize)]
 pub struct Project {
-    pub sample_rate: AtomicU64,
+    pub sample_rate: atomic::U64,
     pub tracks: SharedVec<Track>,
 }
 
@@ -93,7 +93,7 @@ impl std::fmt::Display for Track {
 #[derive(Serialize, Deserialize)]
 pub struct Region {
     pub range: AtomicRange,
-    pub max_size: AtomicU64,
+    pub max_size: atomic::U64,
     pub generator: Arc<Generator>,
     pub filters: Vec<Arc<RegionFilter>>,
     pub label: String,
@@ -101,10 +101,10 @@ pub struct Region {
 
 impl Clone for Region {
     fn clone(&self) -> Self {
-        let max = self.max_size.load(Ordering::Relaxed);
+        let max = self.max_size.load();
         Self {
             range: self.range.clone(),
-            max_size: AtomicU64::new(max),
+            max_size: atomic::U64::from(max),
             generator: self.generator.clone(),
             filters: self.filters.clone(),
             label: self.label.clone(),
@@ -115,7 +115,7 @@ impl std::default::Default for Region {
     fn default() -> Self {
         Self {
             range: AtomicRange::new(0, 0),
-            max_size: AtomicU64::from(0),
+            max_size: atomic::U64::from(0),
             generator: Arc::new(Generator::Oscillator(Arc::new(OscillatorParam::default()))),
             filters: vec![],
             label: "".to_string(),

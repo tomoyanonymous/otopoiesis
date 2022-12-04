@@ -3,25 +3,23 @@ use crate::gui;
 use crate::parameter::Parameter;
 use egui;
 
+use crate::utils::atomic;
 use std::ops::RangeInclusive;
-use std::sync::{
-    atomic::{AtomicU64, Ordering},
-    Arc,
-};
+use std::sync::Arc;
 
 enum HandleMode {
     Start,
     End,
 }
 struct UiBar {
-    state: Arc<AtomicU64>,
+    state: Arc<atomic::U64>,
     saved_state: u64,
     range: RangeInclusive<u64>,
     mode: HandleMode,
 }
 impl UiBar {
-    pub fn new(state: Arc<AtomicU64>, mode: HandleMode) -> Self {
-        let init = state.load(Ordering::Relaxed);
+    pub fn new(state: Arc<atomic::U64>, mode: HandleMode) -> Self {
+        let init = state.load();
         Self {
             state,
             saved_state: init,
@@ -34,17 +32,15 @@ impl UiBar {
     }
     fn react(&mut self, response: &egui::Response) {
         if response.drag_started() {
-            self.saved_state = self.state.load(Ordering::Relaxed);
+            self.saved_state = self.state.load();
         }
         if let Some(_pos) = response.interact_pointer_pos() {
             let new_v = (self.saved_state as i64
                 + ((response.drag_delta().x * gui::SAMPLES_PER_PIXEL_DEFAULT) as i64))
                 .max(0) as u64;
 
-            self.state.store(
-                new_v.clamp(*self.range.start(), *self.range.end()),
-                Ordering::Relaxed,
-            );
+            self.state
+                .store(new_v.clamp(*self.range.start(), *self.range.end()));
         }
         if response.drag_released() {
             self.saved_state = 0
@@ -145,7 +141,7 @@ impl egui::Widget for &mut Model {
         let width = self.params.range.getrange() as f32 / scaling_factor;
         let start = self.params.range.start();
         let end = self.params.range.end();
-        let maxsize = self.params.max_size.load(Ordering::Relaxed);
+        let maxsize = self.params.max_size.load();
         let min_start = (end as i64 - maxsize as i64).max(0) as u64;
         let max_end = start + maxsize;
         self.range_handles[0].set_limit(min_start..=end);

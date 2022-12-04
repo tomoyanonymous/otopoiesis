@@ -1,12 +1,10 @@
 use crate::audio::{Component, PlaybackInfo};
 use crate::data;
+use crate::utils::atomic;
 use nannou_audio;
 use ringbuf::{HeapConsumer, HeapProducer, HeapRb};
 use std::ops::DerefMut;
-use std::sync::{
-    atomic::{AtomicU64, Ordering},
-    Arc,
-};
+use std::sync::Arc;
 
 pub trait RendererBase<E>
 where
@@ -108,7 +106,7 @@ where
             self.play();
         }
     }
-    fn get_shared_current_time_in_sample(&self) -> Arc<AtomicU64>;
+    fn get_shared_current_time_in_sample(&self) -> Arc<atomic::U64>;
     fn get_current_time_in_sample(&self) -> u64;
     fn get_current_time(&self) -> std::time::Duration {
         let now = self.get_current_time_in_sample();
@@ -128,7 +126,7 @@ pub struct OutputModel<E: Component> {
     pub consumer: HeapConsumer<f32>,
     pub internal_buf: Vec<f32>,
     pub effector: E,
-    pub current_time: Arc<AtomicU64>,
+    pub current_time: Arc<atomic::U64>,
 }
 
 fn pass_in(model: &mut InputModel, buffer: &nannou_audio::Buffer) {
@@ -141,7 +139,7 @@ fn pass_out(model: &mut OutputModel<impl Component>, buffer: &mut nannou_audio::
     let len = buffer.channels() * buffer.len_frames();
     let buf = &mut model.internal_buf.as_mut_slice()[0..len];
     let _num = model.consumer.pop_slice(buf);
-    let t = model.current_time.load(Ordering::Relaxed);
+    let t = model.current_time.load();
     let info = PlaybackInfo {
         sample_rate: buffer.sample_rate(),
         current_time: t as usize,
@@ -150,9 +148,7 @@ fn pass_out(model: &mut OutputModel<impl Component>, buffer: &mut nannou_audio::
     };
     // todo:if  channels are different?
     model.effector.render(buf, buffer.deref_mut(), &info);
-    model
-        .current_time
-        .store(t + buffer.len_frames() as u64, Ordering::Relaxed);
+    model.current_time.store(t + buffer.len_frames() as u64);
 }
 
 pub struct Renderer<E>
@@ -187,11 +183,11 @@ where
     fn get_outstream(&self) -> &Option<nannou_audio::Stream<OutputModel<E>>> {
         &self.ostream
     }
-    fn get_shared_current_time_in_sample(&self) -> Arc<AtomicU64> {
+    fn get_shared_current_time_in_sample(&self) -> Arc<atomic::U64> {
         self.transport.time.clone()
     }
     fn get_current_time_in_sample(&self) -> u64 {
-        self.transport.time.load(Ordering::Relaxed)
+        self.transport.time.load()
     }
 }
 
@@ -215,8 +211,7 @@ where
         res
     }
     pub fn rewind(&mut self) {
-        self.get_shared_current_time_in_sample()
-            .store(0, Ordering::Relaxed)
+        self.get_shared_current_time_in_sample().store(0)
     }
 }
 

@@ -1,8 +1,7 @@
 use crate::data;
-use crate::gui;
 
 use egui;
-use std::sync::atomic::Ordering;
+
 use std::sync::Arc;
 
 struct Toggle {
@@ -18,16 +17,16 @@ impl Toggle {
 impl egui::Widget for Toggle {
     fn ui(self, ui: &mut egui::Ui) -> egui::Response {
         let playing = &self.transport.is_playing;
-        if playing.load(Ordering::Relaxed) {
+        if playing.load() {
             let res = ui.button("pause");
             if res.clicked() {
-                playing.store(true, Ordering::Relaxed);
+                playing.store(true);
             };
             res
         } else {
             let res = ui.button("play");
             if res.clicked() {
-                playing.store(false, Ordering::Relaxed);
+                playing.store(false);
             };
             res
         }
@@ -51,13 +50,13 @@ impl Model {
         }
     }
     fn get_time_in_sample(&self) -> u64 {
-        self.param.time.load(Ordering::Relaxed)
+        self.param.time.load()
     }
     fn get_time(&self) -> f64 {
         self.get_time_in_sample() as f64 / self.sample_rate as f64
     }
     fn is_playing(&self) -> bool {
-        self.param.is_playing.load(Ordering::Relaxed)
+        self.param.is_playing.load()
     }
 }
 
@@ -67,7 +66,7 @@ impl egui::Widget for Model {
             let time = std::time::Duration::from_secs_f64(self.get_time());
 
             if ui.button("|<<").clicked() {
-                self.param.time.store(0, Ordering::Relaxed);
+                self.param.time.store(0);
             }
             if ui.button("[  ]").clicked() {
                 //stop

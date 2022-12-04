@@ -2,15 +2,13 @@ use crate::action;
 use crate::data;
 use crate::data::SharedVec;
 use crate::gui;
-use crate::parameter::Parameter;
-use crate::utils::AtomicRange;
+use crate::utils::atomic;
 use egui;
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 
 pub struct Model {
     pub app: Arc<Mutex<data::AppModel>>,
-    time: Arc<AtomicU64>,
+    time: Arc<atomic::U64>,
     track: Vec<gui::track::Model>,
 }
 
@@ -40,7 +38,7 @@ impl Model {
     //     self.param.sample_rate.load(Ordering::Relaxed)
     // }
     fn get_current_time_in_sample(&self) -> u64 {
-        self.time.load(Ordering::Relaxed)
+        self.time.load()
     }
     fn draw_frame(&mut self, painter: &egui::Painter, style: &egui::Style) {
         let rect = painter.clip_rect();
@@ -68,14 +66,10 @@ impl Model {
     fn add_track(&mut self) {
         if let Ok(mut app) = self.app.lock() {
             let _res = action::add_track(&mut app, data::Track::new());
-            println!("{}",app.project.tracks.lock().unwrap().len());
         }
         if let Ok(app) = self.app.lock() {
             let ts = app.project.tracks.clone();
             self.track = param_to_track(&ts, self.app.clone()).unwrap();
-            println!("{}",self.track.len());
-
-
         }
     }
 }

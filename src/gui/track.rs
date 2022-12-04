@@ -1,11 +1,11 @@
 use crate::data;
 use crate::gui;
-use crate::utils::AtomicRange;
-
+use crate::utils::{atomic,AtomicRange};
 use crate::action;
+
 use egui;
 
-use std::sync::atomic::{AtomicU64, Ordering};
+
 use std::sync::{Arc, Mutex};
 
 pub struct Model {
@@ -77,7 +77,7 @@ impl egui::Widget for &mut Model {
                             let label = format!("region{}", track_len).to_string();
                             let region_param = Arc::new(data::Region {
                                 range: AtomicRange::new(x_rightmost, x_rightmost + 49000),
-                                max_size: AtomicU64::from(60000),
+                                max_size: atomic::U64::from(60000),
                                 generator: Arc::new(data::Generator::Oscillator(Arc::new(
                                     data::OscillatorParam::default(),
                                 ))),

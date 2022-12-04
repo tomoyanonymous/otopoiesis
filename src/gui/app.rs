@@ -2,8 +2,6 @@ use crate::data;
 use crate::gui;
 use egui;
 
-use std::fmt::Pointer;
-use std::sync::atomic::Ordering;
 use std::sync::{Arc, Mutex, MutexGuard};
 pub struct Model {
     pub param: Arc<Mutex<data::AppModel>>,
@@ -49,18 +47,25 @@ impl Model {
                             let str = undo_sk.format(&egui::ModifierNames::NAMES, is_mac);
                             let undobutton = ui.add_enabled(
                                 app.can_undo(),
-                                egui::Button::new(format!("Undo {}", str)),
+                                egui::Button::new(format!(
+                                    "Undo {} | {}",
+                                    app.history.display(),
+                                    str
+                                )),
                             );
                             // list truncated history here
                             if undobutton.clicked() {
-                                println!("{}",app.history.display());
                                 app.undo();
                             };
                             let str = redo_sk.format(&egui::ModifierNames::NAMES, is_mac);
                             if ui
                                 .add_enabled(
                                     app.can_redo(),
-                                    egui::Button::new(format!("Redo {}", str)),
+                                    egui::Button::new(format!(
+                                        "Redo {} | {}",
+                                        app.history.display(),
+                                        str
+                                    )),
                                 )
                                 .clicked()
                             {
@@ -78,7 +83,7 @@ impl Model {
         egui::panel::TopBottomPanel::bottom("footer").show(&ctx, |ui| {
             ui.add(gui::transport::Model::new(
                 self.get_transport(),
-                self.get_timeline().sample_rate.load(Ordering::Relaxed),
+                self.get_timeline().sample_rate.load(),
             ))
         });
     }

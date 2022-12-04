@@ -63,9 +63,17 @@ macro_rules! impl_simple_atomic {
                 $name(Primitive::<$p, $a>::from(v))
             }
         }
-        impl Into<$p> for $name{
-            fn into(self)-> $p {
+        impl Into<$p> for $name {
+            fn into(self) -> $p {
                 self.0.load()
+            }
+        }
+        impl $name {
+            pub fn load(&self) -> $p {
+                self.0.load()
+            }
+            pub fn store(&self, v: $p) {
+                self.0.store(v)
             }
         }
     };
@@ -91,7 +99,6 @@ impl_simple_atomic!(F32, f32, "f32", atomic_float::AtomicF32);
 impl_simple_atomic!(I64, i64, "i64", atomic::AtomicI64);
 impl_simple_atomic!(U64, u64, "u64", atomic::AtomicU64);
 impl_simple_atomic!(F64, f64, "f64", atomic_float::AtomicF64);
-
 
 #[cfg(test)]
 mod test {
