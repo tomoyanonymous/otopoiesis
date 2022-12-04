@@ -1,5 +1,5 @@
 pub mod lockfree_container;
-
+pub mod atomic;
 use serde::{Deserialize, Serialize};
 use std::sync::atomic::AtomicU64;
 use std::sync::atomic::Ordering;
