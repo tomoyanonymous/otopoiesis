@@ -1,5 +1,4 @@
 pub mod atomic;
-pub mod lockfree_container;
 use serde::{Deserialize, Serialize};
 
 use std::sync::Arc;
