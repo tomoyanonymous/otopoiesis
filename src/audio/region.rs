@@ -6,6 +6,7 @@ use std::ops::RangeInclusive;
 use std::sync::{Arc, Mutex};
 // 基本はオフラインレンダリング
 
+#[derive(Debug)]
 pub struct Model {
     pub params: Arc<data::Region>,
     channels: u64,
@@ -23,7 +24,6 @@ impl Model {
         // assert!(params.range.getrange() < params.max_size);
         let buf_size = channels as u64 * 60000; //todo!
         let generator = super::generator::get_component_for_generator(&params.generator);
-
         Self {
             params,
             channels,
@@ -58,21 +58,37 @@ impl Model {
     }
 }
 
-pub fn render_region_offline_async(
+pub fn render_region_offline_async<'a>(
     region: Arc<Mutex<Model>>,
     info: &PlaybackInfo,
-) -> std::thread::JoinHandle<bool> {
-    let i = info.clone();
+) -> std::thread::JoinHandle<Arc<Mutex<Model>>> {
+    let name = { &region.lock().unwrap().params.label };
+    let info = info.clone();
     let region = region.clone();
-    std::thread::spawn(move || {
-        let mut r = region.lock().unwrap();
-        let dummy_input = [0.0];
-        // make a temporary local copy to prevent from double-mutable borrowing
-        let mut dest = r.interleaved_samples_cache.clone();
-        r.generator.render(&dummy_input, dest.as_mut_slice(), &i);
-        r.interleaved_samples_cache.copy_from_slice(dest.as_slice());
-        return true;
-    })
+    let res = std::thread::Builder::new()
+        .name(name.clone())
+        .spawn(move || {
+            {
+                let mut r = region.lock().unwrap();
+                // make a temporary local copy to prevent from double-mutable borrowing
+                let info_local = PlaybackInfo {
+                    sample_rate: info.sample_rate,
+                    current_time: 0,
+                    frame_per_buffer: r.interleaved_samples_cache.len() as u64 / info.channels,
+                    channels: info.channels,
+                };
+                let dummy_input = [0.0];
+                let mut dest = r.interleaved_samples_cache.clone();
+                r.generator.prepare_play(&info_local);
+                r.generator
+                    .render(&dummy_input, dest.as_mut_slice(), &info_local);
+                r.cache_completed = true;
+                r.interleaved_samples_cache.copy_from_slice(dest.as_slice());
+            }
+            return region;
+        })
+        .expect("failed to launch thread");
+    res
 }
 
 impl Component for Model {

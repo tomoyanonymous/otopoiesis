@@ -10,7 +10,7 @@ pub trait GeneratorComponent {
 }
 impl<T> Component for T
 where
-    T: GeneratorComponent,
+    T: GeneratorComponent + Clone + std::fmt::Debug,
 {
     fn get_input_channels(&self) -> u64 {
         0
@@ -39,6 +39,8 @@ where
         }
     }
 }
+
+#[derive(Clone, Debug)]
 pub struct SineModel {
     pub params: Arc<data::OscillatorParam>,
     pub phase_internal: f32,
@@ -73,6 +75,7 @@ impl GeneratorComponent for SineModel {
     }
 }
 
+#[derive(Debug)]
 pub struct FadeModel {
     pub param: Arc<data::FadeParam>,
     pub origin: super::region::Model,

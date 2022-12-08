@@ -50,7 +50,7 @@ impl AppModel {
 }
 
 #[serde_as]
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct Transport {
     pub is_playing: atomic::Bool,
     pub time: Arc<atomic::U64>, //in sample
@@ -67,7 +67,7 @@ impl Transport {
 #[derive(Serialize, Deserialize, Clone, Copy)]
 pub struct GlobalSetting;
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct Project {
     pub sample_rate: atomic::U64,
     pub tracks: SharedVec<Track>,
@@ -75,7 +75,7 @@ pub struct Project {
 
 pub type SharedVec<T> = Arc<Mutex<Vec<T>>>;
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Track(pub SharedVec<Arc<Region>>);
 
 impl Track {
@@ -90,7 +90,7 @@ impl std::fmt::Display for Track {
     }
 }
 //range stores a real time.
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Region {
     pub range: AtomicRange,
     pub max_size: atomic::U64,
@@ -132,7 +132,7 @@ impl std::fmt::Display for Region {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct OscillatorParam {
     pub amp: FloatParameter,
     pub freq: FloatParameter,
@@ -148,25 +148,25 @@ impl Default for OscillatorParam {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub enum Generator {
     Oscillator(Arc<OscillatorParam>),
     Transformer(RegionTransformer),
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct RegionTransformer {
     pub filter: Arc<RegionFilter>,
     pub origin: Arc<Region>,
 }
 
-#[derive(Serialize, Deserialize, Clone, Default)]
+#[derive(Serialize, Deserialize, Clone, Default, Debug)]
 pub struct FadeParam {
     pub time_in: atomic::F32,
     pub time_out: atomic::F32,
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub enum RegionFilter {
     Gain,
     FadeInOut(Arc<FadeParam>),

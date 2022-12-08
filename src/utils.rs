@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 
 use std::sync::Arc;
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct AtomicRange(pub Arc<atomic::U64>, pub Arc<atomic::U64>);
 
 type EguiGetSet<'a> = Box<dyn FnMut(Option<f64>) -> f64 + 'a>;

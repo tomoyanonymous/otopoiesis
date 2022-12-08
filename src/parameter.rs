@@ -11,7 +11,7 @@ pub trait Parameter<T> {
     fn set(&self, v: T);
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct FloatParameter {
     value: atomic::F32,
     pub range: RangeInclusive<f32>,

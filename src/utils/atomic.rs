@@ -2,6 +2,7 @@ use atomic_float;
 use serde::{Deserialize, Serialize};
 use std::{marker::PhantomData, sync::atomic};
 
+#[derive(Debug)]
 pub struct Primitive<P, A>
 where
     P: Copy,
@@ -54,7 +55,7 @@ macro_rules! impl_simple_atomic {
                 Self::from(self.load())
             }
         }
-        #[derive(Clone, Serialize, Deserialize)]
+        #[derive(Clone, Serialize, Deserialize, Debug)]
         #[serde(from=$ps,into=$ps)]
         pub struct $name(pub Primitive<$p, $a>);
 
@@ -76,8 +77,8 @@ macro_rules! impl_simple_atomic {
                 self.0.store(v)
             }
         }
-        impl std::default::Default for $name{
-            fn default()-> $name{
+        impl std::default::Default for $name {
+            fn default() -> $name {
                 $name(Primitive::<$p, $a>::from(<$p>::default()))
             }
         }

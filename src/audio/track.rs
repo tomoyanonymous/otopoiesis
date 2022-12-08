@@ -1,6 +1,8 @@
 use crate::audio::{Component, PlaybackInfo};
 use crate::data;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
+
+#[derive(Debug)]
 pub struct Model {
     param: data::SharedVec<Arc<data::Region>>,
     channels: u64,
@@ -25,17 +27,39 @@ impl Model {
             .lock()
             .unwrap()
             .iter()
-            .map(|region| {
-                super::region::Model::new(
-                    Arc::clone(&region),
-                    channels,
-                )
-            })
+            .map(|region| super::region::Model::new(Arc::clone(&region), channels))
             .collect::<Vec<_>>()
     }
-    fn renew_regions(&mut self) {
+    fn renew_regions(&mut self, info: &PlaybackInfo) {
         //fetch update.
-        self.regions = Self::get_new_regions(&self.param, self.channels);
+
+        let channels = info.channels;
+        let handles = self
+            .param
+            .lock()
+            .unwrap()
+            .iter()
+            .map(|region| {
+                //temporary moves value to
+                let model = Arc::new(Mutex::new(super::region::Model::new(
+                    Arc::clone(&region),
+                    channels,
+                )));
+                super::region::render_region_offline_async(model, info)
+            })
+            .collect::<Vec<_>>();
+        let res = handles
+            .into_iter()
+            .map(move |h| {
+                let arc = h.join().expect("hoge");
+                Arc::try_unwrap(arc)
+                    .expect("arc has multiple refcount")
+                    .into_inner()
+                    .unwrap()
+            })
+            .collect::<Vec<super::region::Model>>();
+
+        self.regions = res;
     }
 }
 
@@ -47,10 +71,7 @@ impl Component for Model {
         2
     }
     fn prepare_play(&mut self, info: &PlaybackInfo) {
-        self.renew_regions();
-        for region in self.regions.iter_mut() {
-            region.prepare_play(info);
-        }
+        self.renew_regions(info);
     }
     fn render(&mut self, input: &[f32], output: &mut [f32], info: &PlaybackInfo) {
         //後に入ってるリージョンで基本は上書きする

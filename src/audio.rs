@@ -2,8 +2,8 @@
 pub struct PlaybackInfo {
     pub sample_rate: u32,
     pub current_time: usize,
-    pub frame_per_buffer:u64,
-    pub channels:u64
+    pub frame_per_buffer: u64,
+    pub channels: u64,
 }
 
 impl PlaybackInfo {
@@ -15,7 +15,7 @@ impl PlaybackInfo {
     }
 }
 
-pub trait Component {
+pub trait Component: std::fmt::Debug {
     fn get_input_channels(&self) -> u64;
     fn get_output_channels(&self) -> u64;
     fn prepare_play(&mut self, info: &PlaybackInfo);
@@ -25,5 +25,5 @@ pub trait Component {
 pub mod generator;
 pub mod region;
 pub mod renderer;
-pub mod track;
 pub mod timeline;
+pub mod track;
