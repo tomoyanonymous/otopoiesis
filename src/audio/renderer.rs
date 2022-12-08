@@ -131,7 +131,6 @@ pub struct OutputModel<E: Component> {
 
 fn pass_in(model: &mut InputModel, buffer: &nannou_audio::Buffer) {
     let _num = model.producer.push_slice(buffer.as_ref());
-    // println!("{:.2?}",buffer.as_ref());
 }
 
 fn pass_out(model: &mut OutputModel<impl Component>, buffer: &mut nannou_audio::Buffer) {

@@ -106,7 +106,6 @@ impl Model {
     }
 
     pub fn new(params: Arc<data::Region>, labeltext: impl ToString) -> Self {
-        println!("region_constructor");
         let size = 512;
         let samples = vec![0f32; size];
         let label = labeltext.to_string();
