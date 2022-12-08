@@ -59,33 +59,32 @@ impl Model {
 }
 
 pub fn render_region_offline_async<'a>(
-    region: Arc<Mutex<Model>>,
+    region: Model,
     info: &PlaybackInfo,
-) -> std::thread::JoinHandle<Arc<Mutex<Model>>> {
-    let name = { &region.lock().unwrap().params.label };
+) -> std::thread::JoinHandle<Model> {
+    let name = region.params.label.clone();
     let info = info.clone();
-    let region = region.clone();
+
     let res = std::thread::Builder::new()
         .name(name.clone())
         .spawn(move || {
-            {
-                let mut r = region.lock().unwrap();
-                // make a temporary local copy to prevent from double-mutable borrowing
-                let info_local = PlaybackInfo {
-                    sample_rate: info.sample_rate,
-                    current_time: 0,
-                    frame_per_buffer: r.interleaved_samples_cache.len() as u64 / info.channels,
-                    channels: info.channels,
-                };
-                let dummy_input = [0.0];
-                let mut dest = r.interleaved_samples_cache.clone();
-                r.generator.prepare_play(&info_local);
-                r.generator
-                    .render(&dummy_input, dest.as_mut_slice(), &info_local);
-                r.cache_completed = true;
-                r.interleaved_samples_cache.copy_from_slice(dest.as_slice());
-            }
-            return region;
+            let mut r = region;
+            // make a temporary local copy to prevent from double-mutable borrowing
+            let info_local = PlaybackInfo {
+                sample_rate: info.sample_rate,
+                current_time: 0,
+                frame_per_buffer: r.interleaved_samples_cache.len() as u64 / info.channels,
+                channels: info.channels,
+            };
+            let dummy_input = [0.0];
+            let mut dest = r.interleaved_samples_cache.clone();
+            r.generator.prepare_play(&info_local);
+            r.generator
+                .render(&dummy_input, dest.as_mut_slice(), &info_local);
+            r.cache_completed = true;
+            r.interleaved_samples_cache.copy_from_slice(dest.as_slice());
+
+            return r;
         })
         .expect("failed to launch thread");
     res

@@ -41,22 +41,13 @@ impl Model {
             .iter()
             .map(|region| {
                 //temporary moves value to
-                let model = Arc::new(Mutex::new(super::region::Model::new(
-                    Arc::clone(&region),
-                    channels,
-                )));
+                let model = super::region::Model::new(Arc::clone(&region), channels);
                 super::region::render_region_offline_async(model, info)
             })
             .collect::<Vec<_>>();
         let res = handles
             .into_iter()
-            .map(move |h| {
-                let arc = h.join().expect("hoge");
-                Arc::try_unwrap(arc)
-                    .expect("arc has multiple refcount")
-                    .into_inner()
-                    .unwrap()
-            })
+            .map(move |h| h.join().expect("hoge"))
             .collect::<Vec<super::region::Model>>();
 
         self.regions = res;
