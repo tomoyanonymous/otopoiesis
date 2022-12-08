@@ -29,7 +29,6 @@ impl Model {
                 super::region::Model::new(
                     Arc::clone(&region),
                     channels,
-                    super::oscillator::get_component_for_generator(&region.generator),
                 )
             })
             .collect::<Vec<_>>()

@@ -22,7 +22,7 @@ pub trait Component {
     fn render(&mut self, input: &[f32], output: &mut [f32], info: &PlaybackInfo);
 }
 
-pub mod oscillator;
+pub mod generator;
 pub mod region;
 pub mod renderer;
 pub mod track;

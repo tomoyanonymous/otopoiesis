@@ -2,9 +2,9 @@
 // data format for project file. serialized to json with serde.
 use crate::action;
 use crate::parameter::Parameter;
+use crate::utils::atomic;
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
-use crate::utils::atomic;
 use std::sync::{Arc, Mutex};
 use undo;
 
@@ -90,34 +90,37 @@ impl std::fmt::Display for Track {
     }
 }
 //range stores a real time.
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct Region {
     pub range: AtomicRange,
     pub max_size: atomic::U64,
     pub generator: Arc<Generator>,
-    pub filters: Vec<Arc<RegionFilter>>,
     pub label: String,
 }
 
-impl Clone for Region {
-    fn clone(&self) -> Self {
-        let max = self.max_size.load();
-        Self {
-            range: self.range.clone(),
-            max_size: atomic::U64::from(max),
-            generator: self.generator.clone(),
-            filters: self.filters.clone(),
-            label: self.label.clone(),
-        }
+impl Region {
+    pub fn with_fade(origin: Arc<Self>) -> Arc<Self> {
+        Arc::new(Self {
+            range: origin.range.clone(),
+            max_size: origin.max_size.clone(),
+            generator: Arc::new(Generator::Transformer(RegionTransformer {
+                filter: Arc::new(RegionFilter::FadeInOut(Arc::new(FadeParam {
+                    time_in: 0.1.into(),
+                    time_out: 0.1.into(),
+                }))),
+                origin: Arc::clone(&origin),
+            })),
+            label: origin.label.clone(),
+        })
     }
 }
+
 impl std::default::Default for Region {
     fn default() -> Self {
         Self {
             range: AtomicRange::new(0, 0),
             max_size: atomic::U64::from(0),
             generator: Arc::new(Generator::Oscillator(Arc::new(OscillatorParam::default()))),
-            filters: vec![],
             label: "".to_string(),
         }
     }
@@ -148,10 +151,23 @@ impl Default for OscillatorParam {
 #[derive(Serialize, Deserialize, Clone)]
 pub enum Generator {
     Oscillator(Arc<OscillatorParam>),
+    Transformer(RegionTransformer),
 }
 
-#[derive(Serialize, Deserialize, Clone, Copy)]
+#[derive(Serialize, Deserialize, Clone)]
+pub struct RegionTransformer {
+    pub filter: Arc<RegionFilter>,
+    pub origin: Arc<Region>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Default)]
+pub struct FadeParam {
+    pub time_in: atomic::F32,
+    pub time_out: atomic::F32,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
 pub enum RegionFilter {
     Gain,
-    FadeInOut,
+    FadeInOut(Arc<FadeParam>),
 }

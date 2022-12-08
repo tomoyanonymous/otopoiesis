@@ -3,16 +3,14 @@ use crate::audio::{Component, PlaybackInfo};
 // use crate::parameter::UIntParameter
 use crate::data;
 use std::ops::RangeInclusive;
-use std::sync::Arc;
-// modifierが後で追加されたりする。生成用にComponentを持っている？
-// Buffer by Bufferで再生するという時にどうタイミングを合わせるか？
-// Region{range:0..=2000,2,vec![0.0]}
+use std::sync::{Arc, Mutex};
+// 基本はオフラインレンダリング
 
 pub struct Model {
     pub params: Arc<data::Region>,
     channels: u64,
     pub interleaved_samples_cache: Vec<f32>,
-    pub generator: Box<dyn Component + Send>,
+    pub generator: Box<dyn Component + Send + Sync>,
     cache_completed: bool,
 }
 
@@ -21,13 +19,11 @@ pub struct Model {
 // }
 
 impl Model {
-    pub fn new(
-        params: Arc<data::Region>,
-        channels: u64,
-        generator: Box<dyn Component + Send>,
-    ) -> Self {
+    pub fn new(params: Arc<data::Region>, channels: u64) -> Self {
         // assert!(params.range.getrange() < params.max_size);
         let buf_size = channels as u64 * 60000; //todo!
+        let generator = super::generator::get_component_for_generator(&params.generator);
+
         Self {
             params,
             channels,
@@ -37,17 +33,20 @@ impl Model {
         }
     }
     pub fn render_offline(&mut self, info: &PlaybackInfo) {
+        let info_local = PlaybackInfo {
+            sample_rate: info.sample_rate,
+            current_time: 0,
+            frame_per_buffer: self.interleaved_samples_cache.len() as u64 / info.channels,
+            channels: info.channels,
+        };
         let dummy_input = [0.0];
+        self.generator.prepare_play(&info_local);
         self.generator.render(
             &dummy_input,
             self.interleaved_samples_cache.as_mut_slice(),
-            info,
+            &info_local,
         );
-
         self.cache_completed = true;
-    }
-    pub fn render_offline_async(&mut self, _info: PlaybackInfo) {
-        todo!()
     }
     pub fn contains_samples(&self, range: RangeInclusive<u64>) -> bool {
         let t_range = &self.params.range;
@@ -57,6 +56,23 @@ impl Model {
         let c2 = t_range.contains(*range.start()) && t_range.contains(*range.end());
         c1 || c2
     }
+}
+
+pub fn render_region_offline_async(
+    region: Arc<Mutex<Model>>,
+    info: &PlaybackInfo,
+) -> std::thread::JoinHandle<bool> {
+    let i = info.clone();
+    let region = region.clone();
+    std::thread::spawn(move || {
+        let mut r = region.lock().unwrap();
+        let dummy_input = [0.0];
+        // make a temporary local copy to prevent from double-mutable borrowing
+        let mut dest = r.interleaved_samples_cache.clone();
+        r.generator.render(&dummy_input, dest.as_mut_slice(), &i);
+        r.interleaved_samples_cache.copy_from_slice(dest.as_slice());
+        return true;
+    })
 }
 
 impl Component for Model {

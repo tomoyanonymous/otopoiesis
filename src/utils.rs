@@ -69,6 +69,6 @@ impl AtomicRange {
 }
 impl Clone for AtomicRange {
     fn clone(&self) -> Self {
-        Self::new(self.start(), self.end())
+        Self(Arc::clone(&self.0), Arc::clone(&self.1))
     }
 }

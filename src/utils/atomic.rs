@@ -76,6 +76,11 @@ macro_rules! impl_simple_atomic {
                 self.0.store(v)
             }
         }
+        impl std::default::Default for $name{
+            fn default()-> $name{
+                $name(Primitive::<$p, $a>::from(<$p>::default()))
+            }
+        }
     };
 }
 

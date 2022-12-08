@@ -1,9 +1,6 @@
-use crate::utils::AtomicRange;
-
 use eframe;
 use egui;
 use otopoiesis::*;
-use parameter::{FloatParameter, Parameter};
 use serde_json;
 
 use crate::utils::atomic;
@@ -30,12 +27,12 @@ struct Model {
     project_str: String,
     code_compiled: serde_json::Result<Arc<data::Project>>,
     audio: Renderer<audio::timeline::Model>,
+    ui: gui::app::Model,
     editor_open: bool,
 }
 
 impl Model {
     pub fn new(_cc: &eframe::CreationContext<'_>) -> Self {
-        let region_len = 60000;
         let sample_rate = 44100 as u64;
 
         let project = Arc::new(data::Project {
@@ -48,6 +45,8 @@ impl Model {
             Arc::new(data::GlobalSetting {}),
             Arc::clone(&project),
         )));
+        let ui = gui::app::Model::new(Arc::clone(&app));
+
         let json = serde_json::to_string_pretty(&project);
         let json_str = json.unwrap_or("failed to parse".to_string());
         let mut timeline =
@@ -77,6 +76,7 @@ impl Model {
             app: Arc::clone(&app),
             project_str: json_str,
             code_compiled: Ok(project),
+            ui,
             editor_open: false,
         }
     }
@@ -163,8 +163,8 @@ impl eframe::App for Model {
             self.audio.rewind();
             self.audio.prepare_play();
         }
-        let mut app_gui = gui::app::Model::new(Arc::clone(&self.app));
-        app_gui.show_ui(&ctx);
+
+        self.ui.show_ui(&ctx);
         if self.audio.is_playing() {
             //needs constant update while playing
             ctx.request_repaint();

@@ -1,8 +1,6 @@
 use crate::audio::{Component, PlaybackInfo};
 use crate::data;
 use std::sync::Arc;
-use std::sync::atomic::Ordering;
-
 pub struct Model {
     param: Arc<data::Project>,
     transport:Arc<data::Transport>,
@@ -12,6 +10,7 @@ pub struct Model {
 
 impl Model {
     pub fn new(project: Arc<data::Project>,transport:Arc<data::Transport>) -> Self {
+
         let tracks = Self::get_new_tracks(project.as_ref());
         let tmp_buffer = vec![0.0; 3];
         Self {
