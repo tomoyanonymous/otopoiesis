@@ -1,3 +1,5 @@
+//! The definitions of un/redo-able actions for applications.
+
 use crate::data::{self, SharedVec};
 use std::sync::{Arc, MutexGuard, PoisonError};
 use undo;

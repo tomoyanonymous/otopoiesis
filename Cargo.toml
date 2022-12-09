@@ -10,7 +10,6 @@ description = "a constructive audio programming environment with timeline-based 
 [[bin]]
 name = "otopoiesis"
 
-
 [dependencies]
 
 nannou_audio = "0.18.0"

@@ -1,3 +1,7 @@
+//! Generic atomic data structures that can be easily converted from/into inner data types.
+//! The ordering of store/load is fixed to [ `std::sync::atomic` ].
+//! 
+
 use atomic_float;
 use serde::{Deserialize, Serialize};
 use std::{marker::PhantomData, sync::atomic};

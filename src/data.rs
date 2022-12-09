@@ -1,4 +1,5 @@
-// data format for project file. serialized to json with serde.
+//! The main data format like project file, track, region and etc. Can be (de)serialized to/from json with serde.
+
 use crate::action;
 use crate::parameter::{FloatParameter, Parameter};
 use crate::utils::{atomic, AtomicRange};
@@ -64,6 +65,7 @@ impl Transport {
 #[derive(Serialize, Deserialize, Clone, Copy)]
 pub struct GlobalSetting;
 
+/// A main project data. It should be imported/exported via serde.
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Project {
     pub sample_rate: atomic::U64,
@@ -72,10 +74,15 @@ pub struct Project {
 
 pub type SharedVec<T> = Arc<Mutex<Vec<T>>>;
 
+/// Data structure for track.
+/// The track has some input/output stream.
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub enum Track {
+    ///Contains Multiple Regions.
     Regions(SharedVec<Arc<Region>>),
+    ///Contains one audio generator(0 input).
     Generator(Arc<Generator>),
+    ///Take another track and transform it (like filter).
     Transformer(),
 }
 
@@ -90,9 +97,13 @@ impl std::fmt::Display for Track {
         write!(f, "track")
     }
 }
-//range stores a real time.
+
+/// Data structure for region.
+/// The region has certain start time and end time, and one generator (including an audio file).
+
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Region {
+    /// range stores a real time, not in sample.
     pub range: AtomicRange,
     pub max_size: atomic::U64,
     pub generator: Arc<Generator>,
@@ -100,6 +111,8 @@ pub struct Region {
 }
 
 impl Region {
+    /// Utility function that converts a raw region into the region with fadein/out transformer.
+    ///
     pub fn with_fade(origin: Arc<Self>) -> Arc<Self> {
         Arc::new(Self {
             range: origin.range.clone(),
@@ -132,6 +145,8 @@ impl std::fmt::Display for Region {
         write!(f, "region {}", self.label)
     }
 }
+
+/// Utility Parameter for oscillator with some default values.
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct OscillatorParam {

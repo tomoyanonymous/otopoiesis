@@ -3,7 +3,6 @@ use crate::data;
 use crate::data::SharedVec;
 use crate::gui;
 use crate::utils::atomic;
-use egui;
 use std::sync::{Arc, Mutex};
 
 pub struct Model {

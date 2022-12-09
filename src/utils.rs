@@ -1,7 +1,10 @@
+//! Misc utilities such as Atomic Structure.
+
 pub mod atomic;
 use serde::{Deserialize, Serialize};
 
 use std::sync::Arc;
+
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct AtomicRange(pub Arc<atomic::U64>, pub Arc<atomic::U64>);

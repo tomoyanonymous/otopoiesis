@@ -1,10 +1,9 @@
-use eframe;
-use egui;
-use otopoiesis::*;
-use serde_json;
-
-use crate::utils::atomic;
 use std::sync::{Arc, Mutex};
+extern crate eframe;
+extern crate egui;
+extern crate serde_json;
+
+use otopoiesis::*;
 
 use crate::audio::{
     renderer::{Renderer, RendererBase},
@@ -12,6 +11,7 @@ use crate::audio::{
 };
 use crate::data;
 use crate::gui;
+use crate::utils::atomic;
 
 fn main() {
     let mut native_options = eframe::NativeOptions::default();

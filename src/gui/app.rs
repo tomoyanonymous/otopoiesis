@@ -1,6 +1,5 @@
 use crate::data;
 use crate::gui;
-use egui;
 
 use std::sync::{Arc, Mutex, MutexGuard};
 pub struct Model {

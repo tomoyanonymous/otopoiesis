@@ -1,3 +1,5 @@
+//! The interpreter implementations for audio rendering.
+
 #[derive(Clone)]
 pub struct PlaybackInfo {
     pub sample_rate: u32,

@@ -1,7 +1,6 @@
 use crate::data;
 use crate::gui;
 use crate::parameter::Parameter;
-use egui;
 
 use crate::utils::atomic;
 use std::ops::RangeInclusive;

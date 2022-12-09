@@ -1,6 +1,5 @@
 use super::*;
 use crate::data;
-use crate::parameter::Parameter;
 use std::sync::Arc;
 pub mod oscillator;
 
@@ -41,7 +40,6 @@ where
         }
     }
 }
-
 
 #[derive(Debug)]
 pub struct FadeModel {
@@ -116,8 +114,7 @@ impl Component for FadeModel {
         let chs = info.channels as usize;
         for (count, out_per_channel) in output.chunks_mut(chs).enumerate() {
             let now = (info.current_time + count) as u64;
-            let in_range = now < range.getrange();
-            if in_range {
+            if now < range.getrange() {
                 let read_point = now as usize * chs;
                 out_per_channel
                     .iter_mut()

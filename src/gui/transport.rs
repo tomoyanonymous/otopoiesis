@@ -1,7 +1,4 @@
 use crate::data;
-
-use egui;
-
 use std::sync::Arc;
 
 struct Toggle {

@@ -1,8 +1,8 @@
+//! Generic parameter data structure with a bounded range. Shared between GUI and Audio thread.
+
 use crate::utils::atomic::{self, SimpleAtomic};
 use serde::{Deserialize, Serialize};
 use std::ops::RangeInclusive;
-
-mod atomicfloat_helper;
 
 
 pub trait Parameter<T> {

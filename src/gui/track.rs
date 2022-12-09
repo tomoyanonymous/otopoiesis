@@ -3,8 +3,6 @@ use crate::data;
 use crate::gui;
 use crate::utils::{atomic, AtomicRange};
 
-use egui;
-
 use std::sync::{Arc, Mutex};
 
 pub struct Model {
