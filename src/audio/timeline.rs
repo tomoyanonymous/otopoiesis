@@ -26,7 +26,11 @@ impl Model {
             .lock()
             .unwrap()
             .iter()
-            .map(|t| super::track::Model::new(t.0.clone(), 2))
+            .map(|t| match t {
+                data::Track::Regions(r) => super::track::Model::new(r.clone(), 2),
+                data::Track::Generator(_) => todo!(),
+                data::Track::Transformer() => todo!(),
+            })
             .collect::<Vec<_>>()
     }
 }

@@ -1,14 +1,11 @@
-// mod meta;
 // data format for project file. serialized to json with serde.
 use crate::action;
-use crate::parameter::Parameter;
-use crate::utils::atomic;
+use crate::parameter::{FloatParameter, Parameter};
+use crate::utils::{atomic, AtomicRange};
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 use std::sync::{Arc, Mutex};
 use undo;
-
-use crate::{parameter::FloatParameter, utils::AtomicRange};
 
 // #[derive(Serialize, Deserialize, Clone)]
 pub struct AppModel {
@@ -76,11 +73,15 @@ pub struct Project {
 pub type SharedVec<T> = Arc<Mutex<Vec<T>>>;
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct Track(pub SharedVec<Arc<Region>>);
+pub enum Track {
+    Regions(SharedVec<Arc<Region>>),
+    Generator(Arc<Generator>),
+    Transformer(),
+}
 
 impl Track {
     pub fn new() -> Self {
-        Self(Arc::new(Mutex::new(vec![])))
+        Track::Regions(Arc::new(Mutex::new(vec![])))
     }
 }
 impl std::fmt::Display for Track {

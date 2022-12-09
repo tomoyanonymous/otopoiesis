@@ -13,13 +13,16 @@ pub struct Model {
     regions: Vec<gui::region::Model>,
 }
 fn get_region_from_param(track: &data::Track) -> Vec<gui::region::Model> {
-    track
-        .0
-        .lock()
-        .unwrap()
-        .iter()
-        .map(|region| gui::region::Model::new(region.clone(), region.label.clone()))
-        .collect::<Vec<_>>()
+    match track {
+        data::Track::Regions(regions) => regions
+            .lock()
+            .unwrap()
+            .iter()
+            .map(|region| gui::region::Model::new(region.clone(), region.label.clone()))
+            .collect::<Vec<_>>(),
+        data::Track::Generator(_) => todo!(),
+        data::Track::Transformer() => todo!(),
+    }
 }
 
 impl Model {
@@ -48,7 +51,13 @@ impl Model {
         let faderegion_p = data::Region::with_fade(region_param);
         {
             let mut app = self.app.lock().unwrap();
-            let _res = action::add_region(&mut app, self.param.0.clone(), faderegion_p);
+            match &self.param {
+                data::Track::Regions(regions) => {
+                    let _res = action::add_region(&mut app, regions.clone(), faderegion_p);
+                }
+                data::Track::Generator(_) => todo!(),
+                data::Track::Transformer() => todo!(),
+            }
         }
         self.regions = get_region_from_param(&self.param);
     }

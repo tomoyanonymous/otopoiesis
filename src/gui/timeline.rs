@@ -18,7 +18,7 @@ fn param_to_track(
 ) -> Option<Vec<gui::track::Model>> {
     track_p.lock().ok().map(|ts| {
         ts.iter()
-            .map(|t| gui::track::Model::new(data::Track(t.0.clone()), app.clone()))
+            .map(|t| gui::track::Model::new(t.clone(), app.clone()))
             .collect::<Vec<_>>()
     })
 }
