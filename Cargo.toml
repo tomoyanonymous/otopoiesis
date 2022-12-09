@@ -21,7 +21,6 @@ web = [
 ]
 
 [dependencies]
-nannou_audio = "0.18.0"
 cpal = { version = "0.14.0", features = ["wasm-bindgen"] }
 egui = "0.20.0"
 eframe = { version = "0.20.0", features = ["wgpu"] }

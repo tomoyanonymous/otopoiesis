@@ -27,7 +27,9 @@ impl Model {
     fn get_transport(&self) -> Arc<data::Transport> {
         self.get_model_mut().transport.clone()
     }
-
+    pub fn sync_state(&mut self){
+        self.timeline.sync_state()
+    }
     pub fn show_ui(&mut self, ctx: &egui::Context) {
         let is_mac = ctx.os() == egui::os::OperatingSystem::Mac;
         egui::panel::TopBottomPanel::top("header").show(&ctx, |ui| {

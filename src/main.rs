@@ -1,4 +1,7 @@
+use crate::app;
 use otopoiesis::*;
+extern crate eframe;
+extern crate egui;
 
 #[cfg(not(target_arch = "wasm32"))]
 fn main() {
@@ -7,7 +10,7 @@ fn main() {
     eframe::run_native(
         "otopoiesis",
         native_options,
-        Box::new(|cc| Box::new(Model::new(cc))),
+        Box::new(|cc| Box::new(app::Model::new(cc))),
     );
 }
 

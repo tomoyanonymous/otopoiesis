@@ -71,6 +71,11 @@ impl Model {
             self.track = param_to_track(&ts, self.app.clone()).unwrap();
         }
     }
+    pub fn sync_state(&self) {
+        if let Ok(app) = self.app.try_lock() {
+            param_to_track(&app.project.tracks, self.app.clone());
+        }
+    }
 }
 
 impl egui::Widget for &mut Model {
