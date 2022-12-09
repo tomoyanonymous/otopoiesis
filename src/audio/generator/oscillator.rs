@@ -110,3 +110,8 @@ pub fn rect(params: Arc<data::OscillatorParam>, duty: f32) -> GenericOscillator 
         },
     )
 }
+pub fn triangle(params: Arc<data::OscillatorParam>) -> GenericOscillator {
+    GenericOscillator::new(params, move |phase: f32| {
+        ((phase * 2.0 - 1.0).abs() * 2.0 - 1.0)
+    })
+}
