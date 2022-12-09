@@ -69,7 +69,6 @@ pub fn render_region_offline_async<'a>(
         .name(name.clone())
         .spawn(move || {
             let mut r = region;
-            // make a temporary local copy to prevent from double-mutable borrowing
             let info_local = PlaybackInfo {
                 sample_rate: info.sample_rate,
                 current_time: 0,
@@ -77,6 +76,7 @@ pub fn render_region_offline_async<'a>(
                 channels: info.channels,
             };
             let dummy_input = [0.0];
+            // make a temporary local copy to prevent from double-mutable borrowing
             let mut dest = r.interleaved_samples_cache.clone();
             r.generator.prepare_play(&info_local);
             r.generator

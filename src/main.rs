@@ -165,6 +165,7 @@ impl eframe::App for Model {
         }
 
         self.ui.show_ui(&ctx);
+
         if self.audio.is_playing() {
             //needs constant update while playing
             ctx.request_repaint();

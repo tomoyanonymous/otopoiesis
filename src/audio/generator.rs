@@ -2,6 +2,8 @@ use super::*;
 use crate::data;
 use crate::parameter::Parameter;
 use std::sync::Arc;
+pub mod oscillator;
+
 pub trait GeneratorComponent {
     type Params;
     fn get_params(&self) -> &Self::Params;
@@ -40,40 +42,6 @@ where
     }
 }
 
-#[derive(Clone, Debug)]
-pub struct SineModel {
-    pub params: Arc<data::OscillatorParam>,
-    pub phase_internal: f32,
-}
-
-impl SineModel {
-    pub fn new(params: Arc<data::OscillatorParam>) -> Self {
-        Self {
-            params: Arc::clone(&params),
-            phase_internal: params.phase.get(),
-        }
-    }
-    pub fn render_sample_internal(&mut self, out: &mut f32, info: &PlaybackInfo) {
-        let twopi = std::f32::consts::PI * 2.;
-        let params = &self.params;
-        self.phase_internal =
-            (self.phase_internal + twopi * params.freq.get() / info.sample_rate as f32) % twopi;
-        *out = self.phase_internal.sin() * self.params.amp.get();
-    }
-}
-
-impl GeneratorComponent for SineModel {
-    type Params = data::OscillatorParam;
-    fn get_params(&self) -> &Self::Params {
-        self.params.as_ref()
-    }
-    fn render_sample(&mut self, out: &mut f32, info: &PlaybackInfo) {
-        self.render_sample_internal(out, info)
-    }
-    fn reset_phase(&mut self) {
-        self.phase_internal = self.get_params().phase.get()
-    }
-}
 
 #[derive(Debug)]
 pub struct FadeModel {
@@ -162,7 +130,7 @@ impl Component for FadeModel {
 
 pub fn get_component_for_generator(kind: &data::Generator) -> Box<dyn Component + Send + Sync> {
     match kind {
-        data::Generator::Oscillator(osc) => Box::new(SineModel::new(Arc::clone(osc))),
+        data::Generator::Oscillator(osc) => Box::new(oscillator::sinewave(Arc::clone(osc))),
         data::Generator::Transformer(t) => {
             let t = FadeModel::new(t);
             Box::new(t)
