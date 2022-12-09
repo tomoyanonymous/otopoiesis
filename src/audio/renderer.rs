@@ -5,7 +5,7 @@ use nannou_audio;
 use ringbuf::{HeapConsumer, HeapProducer, HeapRb};
 use std::ops::DerefMut;
 use std::sync::Arc;
-
+use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 pub trait RendererBase<E>
 where
     E: Component + Send + 'static,
@@ -30,6 +30,24 @@ where
             effector: effect,
             current_time: Arc::clone(&self.get_shared_current_time_in_sample()),
         };
+        let host_debug =   cpal::default_host();
+
+        match host_debug.devices() {
+            Ok(d) => {
+                let mut count = 0;
+                d.into_iter().enumerate().for_each(|(i, d)| {
+                    match d.name() {
+                        Ok(x) => web_sys::console::log_1(&x.into()),
+                        Err(e) => web_sys::console::log_1(&e.to_string().into()),
+                    };
+                    count = i;
+                });
+                if count == 0 {
+                    web_sys::console::log_1(&"no devices".to_string().into())
+                }
+            }
+            Err(e) => web_sys::console::log_1(&e.to_string().into()),
+        };
 
         let mut in_stream_builder = host.new_input_stream(in_model).capture(pass_in).channels(2);
 
@@ -46,9 +64,15 @@ where
             out_stream_builder = out_stream_builder.frames_per_buffer(bufsize);
         }
 
-        let in_stream = in_stream_builder.build().unwrap();
-        let out_stream = out_stream_builder.build().unwrap();
-        self.set_streams(Some(in_stream), Some(out_stream));
+        let in_stream = in_stream_builder.build();
+        if let Err(e) = &in_stream {
+            web_sys::console::log_1(&e.to_string().into())
+        }
+        let out_stream = out_stream_builder.build();
+        if let Err(e) = &out_stream {
+            web_sys::console::log_1(&e.to_string().into())
+        }
+        self.set_streams(Some(in_stream.unwrap()), Some(out_stream.unwrap()));
     }
     fn prepare_play(&mut self) {
         self.get_instream().as_ref().map(|i| {

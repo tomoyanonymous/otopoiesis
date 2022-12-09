@@ -10,17 +10,29 @@ description = "a constructive audio programming environment with timeline-based 
 [[bin]]
 name = "otopoiesis"
 
-[dependencies]
+[lib]
+crate-type = ["cdylib", "rlib"]
 
+[features]
+web = [
+    "dep:wasm-bindgen-futures",
+    "dep:wee_alloc",
+    "dep:console_error_panic_hook",
+]
+
+[dependencies]
 nannou_audio = "0.18.0"
-# muse use head version to solve ui-overlapping problems.
-egui = { version = "0.19.0", git = "https://github.com/emilk/egui", rev = "7133818" }
-eframe = { version = "0.19.0", git = "https://github.com/emilk/egui", rev = "7133818" }
+cpal = { version = "0.14.0", features = ["wasm-bindgen"] }
+egui = "0.20.0"
+eframe = { version = "0.20.0", features = ["wgpu"] }
 # to resolve conflict versions used between egui and nannou_audio(cpal)
-web-sys = "0.3.60"
+web-sys = { version = "0.3.60", features = ["console"] }
 ringbuf = "*"
 atomic_float = "*"
 serde = { version = "*", features = ["rc"] }
 serde_json = "*"
 serde_with = "2.1.0"
 undo = "0.47.*"
+console_error_panic_hook = { version = "0.1.6", optional = true }
+wasm-bindgen-futures = { version = "0.4.33", optional = true }
+wee_alloc = { version = "0.4.5", optional = true }
