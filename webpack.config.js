@@ -27,6 +27,7 @@ module.exports = {
   devServer: {
     static: [dist, pkg],
   },
+  performance: { hints: false },
   plugins: [
     new WasmPackPlugin({
       crateDirectory: __dirname,

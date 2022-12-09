@@ -178,6 +178,7 @@ pub fn add_region(
             elem_to_add: Some(region),
         })),
     )
+
 }
 pub fn add_track(app: &mut data::AppModel, track: data::Track) -> Result<(), OpsContainerError> {
     app.history.apply(

@@ -23,7 +23,7 @@ web = [
 [dependencies]
 cpal = { version = "0.14.0", features = ["wasm-bindgen"] }
 egui = "0.20.0"
-eframe = { version = "0.20.0", features = ["wgpu"] }
+eframe = { version = "0.20.0" }
 # to resolve conflict versions used between egui and nannou_audio(cpal)
 web-sys = { version = "0.3.60", features = ["console"] }
 ringbuf = "*"

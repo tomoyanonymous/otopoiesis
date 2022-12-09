@@ -34,21 +34,36 @@ impl Model {
         //fetch update.
 
         let channels = info.channels;
-        let handles = self
+        #[cfg(not(target_arch = "wasm32"))]
+        let res = {
+            let handles = self
+                .param
+                .lock()
+                .unwrap()
+                .iter()
+                .map(|region| {
+                    //temporary moves value to
+                    let model = super::region::Model::new(Arc::clone(&region), channels);
+                    super::region::render_region_offline_async(model, info)
+                })
+                .collect::<Vec<_>>();
+            handles
+                .into_iter()
+                .map(move |h| h.join().expect("hoge"))
+                .collect::<Vec<super::region::Model>>()
+        };
+        #[cfg(target_arch = "wasm32")]
+        let res = self
             .param
             .lock()
             .unwrap()
             .iter()
             .map(|region| {
-                //temporary moves value to
-                let model = super::region::Model::new(Arc::clone(&region), channels);
-                super::region::render_region_offline_async(model, info)
+                let mut model = super::region::Model::new(Arc::clone(&region), channels);
+                model.render_offline(info);
+                model
             })
             .collect::<Vec<_>>();
-        let res = handles
-            .into_iter()
-            .map(move |h| h.join().expect("hoge"))
-            .collect::<Vec<super::region::Model>>();
 
         self.regions = res;
     }

@@ -2,6 +2,27 @@
 
 a constructive audio programming environment with timeline-based view.
 
+
+# How to build
+
+### native
+```sh
+cargo run
+```
+
+### web
+
+```sh
+cargo build --target wasm32-unknown-unknown --features "web"
+```
+
+Debug with wasm-pack.
+
+```sh
+npm install
+npm start
+```
+
 # Todo
 
 - [ ] project file export/import

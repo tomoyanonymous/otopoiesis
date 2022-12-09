@@ -30,84 +30,69 @@ where
         omodel: Arc<Mutex<OutputModel<E>>>,
     ) {
         let host = cpal::default_host();
-
-        #[cfg(target_arch = "wasm32")]
-        {
-            let host_debug = cpal::default_host();
-            match host_debug.devices() {
-                Ok(d) => {
-                    let mut count = 0;
-                    d.into_iter().enumerate().for_each(|(i, d)| {
-                        match d.name() {
-                            Ok(x) => web_sys::console::log_1(&x.into()),
-                            Err(e) => web_sys::console::log_1(&e.to_string().into()),
-                        };
-                        count = i;
-                    });
-                    if count == 0 {
-                        web_sys::console::log_1(&"no devices".to_string().into())
-                    }
-                }
-                Err(e) => web_sys::console::log_1(&e.to_string().into()),
+        let idevice = host.default_input_device();
+        let (iconfig, istream) = if let Some(device) = idevice.as_ref() {
+            let iconfig_builder = device
+                .supported_input_configs()
+                .unwrap()
+                .next()
+                .expect("no supported config?!");
+            let iconfig = if let Some(sr) = sample_rate {
+                iconfig_builder
+                    .with_sample_rate(cpal::SampleRate(sr))
+                    .config()
+            } else {
+                iconfig_builder.with_max_sample_rate().config()
             };
-        }
-        let idevice = host.default_input_device().unwrap();
-        let iconfig_builder = idevice
-            .supported_input_configs()
-            .unwrap()
-            .next()
-            .expect("no supported config?!");
-        let iconfig = if let Some(sr) = sample_rate {
-            iconfig_builder
-                .with_sample_rate(cpal::SampleRate(sr))
-                .config()
+            let c = iconfig.clone();
+            let in_stream = device.build_input_stream(
+                &iconfig,
+                move |data: &[f32], _s: &cpal::InputCallbackInfo| {
+                    pass_in(imodel.clone(), data, c.clone())
+                },
+                |_e| {},
+            );
+            let _ = in_stream.as_ref().map(|i| i.pause());
+            // if let Err(e) = &in_stream {
+            //     web_sys::console::log_1(&e.to_string().into())
+            // }
+            (Some(iconfig), in_stream.ok())
         } else {
-            iconfig_builder.with_max_sample_rate().config()
+            (None, None)
         };
-        let c = iconfig.clone();
-        let in_stream = idevice.build_input_stream(
-            &iconfig,
-            move |data: &[f32], _s: &cpal::InputCallbackInfo| {
-                pass_in(imodel.clone(), data, c.clone())
-            },
-            |_e| {},
-        );
 
-        let odevice = host.default_output_device().unwrap();
-        let oconfig_builder = odevice
-            .supported_output_configs()
-            .unwrap()
-            .next()
-            .expect("no supported config?!");
-        let oconfig = if let Some(sr) = sample_rate {
-            oconfig_builder
-                .with_sample_rate(cpal::SampleRate(sr))
-                .config()
+        let odevice = host.default_output_device();
+        let (oconfig, ostream) = if let Some(device) = odevice.as_ref() {
+            let oconfig_builder = device
+                .supported_output_configs()
+                .unwrap()
+                .next()
+                .expect("no supported config?!");
+            let oconfig = if let Some(sr) = sample_rate {
+                oconfig_builder
+                    .with_sample_rate(cpal::SampleRate(sr))
+                    .config()
+            } else {
+                oconfig_builder.with_max_sample_rate().config()
+            };
+            let oc = oconfig.clone();
+            let out_stream = device.build_output_stream(
+                &oconfig,
+                move |data: &mut [f32], _s: &cpal::OutputCallbackInfo| {
+                    pass_out(omodel.clone(), data, oc.clone())
+                },
+                |_e| {},
+            );
+            // if let Err(e) = &out_stream {
+            //     web_sys::console::log_1(&e.to_string().into())
+            // }
+            let _ = out_stream.as_ref().map(|o| o.pause());
+            (Some(oconfig), out_stream.ok())
         } else {
-            oconfig_builder.with_max_sample_rate().config()
+            (None, None)
         };
-        let oc = oconfig.clone();
-        let out_stream = odevice.build_output_stream(
-            &oconfig,
-            move |data: &mut [f32], _s: &cpal::OutputCallbackInfo| {
-                pass_out(omodel.clone(), data, oc.clone())
-            },
-            |_e| {},
-        );
-        let _ = in_stream.as_ref().map(|i| i.pause());
-        let _ = out_stream.as_ref().map(|o| o.pause());
-        if let Err(e) = &in_stream {
-            web_sys::console::log_1(&e.to_string().into())
-        }
-        if let Err(e) = &out_stream {
-            web_sys::console::log_1(&e.to_string().into())
-        }
-        self.set_streams(
-            Some(in_stream.unwrap()),
-            Some(out_stream.unwrap()),
-            Some(iconfig),
-            Some(oconfig),
-        );
+
+        self.set_streams(istream, ostream, iconfig, oconfig);
     }
     fn prepare_play(&mut self);
     fn is_playing(&self) -> bool;

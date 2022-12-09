@@ -50,7 +50,7 @@ impl Component for Model {
         }
     }
     fn render(&mut self, input: &[f32], output: &mut [f32], info: &PlaybackInfo) {
-        assert_eq!(output.len(), self.tmp_buffer.len());
+        // assert_eq!(output.len(), self.tmp_buffer.len());
         for track in self.tracks.iter_mut() {
             track.render(input, self.tmp_buffer.as_mut_slice(), info);
             output

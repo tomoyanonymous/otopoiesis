@@ -58,6 +58,7 @@ impl Model {
     }
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 pub fn render_region_offline_async<'a>(
     region: Model,
     info: &PlaybackInfo,
@@ -87,6 +88,7 @@ pub fn render_region_offline_async<'a>(
             return r;
         })
         .expect("failed to launch thread");
+
     res
 }
 

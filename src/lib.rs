@@ -5,14 +5,13 @@ extern crate eframe;
 extern crate egui;
 extern crate serde_json;
 
-pub mod app;
 pub mod action;
+pub mod app;
 pub mod audio;
 pub mod data;
 pub mod gui;
 pub mod parameter;
 pub mod utils;
-
 
 #[cfg(target_arch = "wasm32")]
 use eframe::wasm_bindgen::{self, prelude::*};
@@ -31,7 +30,6 @@ pub struct WebHandle {
     handle: eframe::web::AppRunnerRef,
 }
 
-
 /// Call this once from the HTML.
 #[cfg(target_arch = "wasm32")]
 #[wasm_bindgen]
@@ -41,11 +39,8 @@ pub async fn start(canvas_id: &str) -> Result<WebHandle, eframe::wasm_bindgen::J
     eframe::start_web(
         canvas_id,
         web_options,
-        Box::new(|cc| Box::new(appModel::new(cc))),
+        Box::new(|cc| Box::new(app::Model::new(cc))),
     )
     .await
     .map(|handle| WebHandle { handle })
 }
-
-
-

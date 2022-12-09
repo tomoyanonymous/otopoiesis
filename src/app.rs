@@ -36,9 +36,7 @@ impl Model {
         let json_str = json.unwrap_or("failed to parse".to_string());
         let mut timeline =
             audio::timeline::Model::new(Arc::clone(&project), Arc::clone(&transport));
-        // let sinewave = audio::oscillator::SineModel::new(Arc::clone(&osc_param));
-        // let mut region =
-        //     audio::region::Model::new(Arc::clone(&region_param), 2, Box::new(sinewave));
+
         let info = audio::PlaybackInfo {
             sample_rate: sample_rate as u32,
             current_time: 0,
@@ -124,7 +122,6 @@ impl eframe::App for Model {
                 if app.can_redo() {
                     app.redo();
                     self.ui.sync_state();
-
                 }
             }
         }
@@ -152,15 +149,16 @@ impl eframe::App for Model {
             self.audio.prepare_play();
         }
 
+        let mut style = egui::Style::default();
+        style.animation_time = 0.2;
+        ctx.set_style(style);
+
         self.ui.show_ui(&ctx);
 
         if self.audio.is_playing() {
             //needs constant update while playing
             ctx.request_repaint();
         }
-        let mut style = egui::Style::default();
-        style.animation_time = 0.2;
-        ctx.set_style(style);
 
         let _panel = egui::panel::SidePanel::right("JSON viewer")
             .default_width(300.)

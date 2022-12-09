@@ -27,11 +27,12 @@ impl Model {
     fn get_transport(&self) -> Arc<data::Transport> {
         self.get_model_mut().transport.clone()
     }
-    pub fn sync_state(&mut self){
+    pub fn sync_state(&mut self) {
         self.timeline.sync_state()
     }
     pub fn show_ui(&mut self, ctx: &egui::Context) {
         let is_mac = ctx.os() == egui::os::OperatingSystem::Mac;
+        
         egui::panel::TopBottomPanel::top("header").show(&ctx, |ui| {
             ui.vertical(|ui| {
                 ui.label("otopoiesis");
@@ -77,15 +78,16 @@ impl Model {
                 })
             });
         });
-
         egui::CentralPanel::default().show(&ctx, |ui| {
-            ui.add(&mut self.timeline);
-        });
-        egui::panel::TopBottomPanel::bottom("footer").show(&ctx, |ui| {
-            ui.add(gui::transport::Model::new(
-                self.get_transport(),
-                self.get_timeline().sample_rate.load(),
-            ))
+            egui::ScrollArea::both().show(ui, |ui| {
+                ui.add(&mut self.timeline);
+                egui::panel::TopBottomPanel::bottom("footer").show(&ctx, |ui| {
+                    ui.add(gui::transport::Model::new(
+                        self.get_transport(),
+                        self.get_timeline().sample_rate.load(),
+                    ))
+                });
+            });
         });
     }
 }
