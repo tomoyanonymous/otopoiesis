@@ -1,5 +1,7 @@
 //! The interpreter implementations for audio rendering.
 
+pub const DEFAULT_BUFFER_LEN:usize = 2048;
+
 #[derive(Clone)]
 pub struct PlaybackInfo {
     pub sample_rate: u32,

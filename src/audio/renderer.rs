@@ -63,18 +63,24 @@ where
 
         let odevice = host.default_output_device();
         let (oconfig, ostream) = if let Some(device) = odevice.as_ref() {
+  
+
             let oconfig_builder = device
                 .supported_output_configs()
                 .unwrap()
+                .filter(|c| c.channels() == 2)
                 .next()
                 .expect("no supported config?!");
-            let oconfig = if let Some(sr) = sample_rate {
+            let mut oconfig = if let Some(sr) = sample_rate {
                 oconfig_builder
                     .with_sample_rate(cpal::SampleRate(sr))
                     .config()
             } else {
                 oconfig_builder.with_max_sample_rate().config()
             };
+            assert_eq!(oconfig.channels, 2);
+            oconfig.buffer_size = cpal::BufferSize::Fixed(super::DEFAULT_BUFFER_LEN as u32);
+
             let oc = oconfig.clone();
             let out_stream = device.build_output_stream(
                 &oconfig,
@@ -250,9 +256,10 @@ where
         }
         let config = self.oconfig.as_ref().unwrap();
         let buffer_size = match config.buffer_size {
-            cpal::BufferSize::Default => 512,
-            cpal::BufferSize::Fixed(s) => s,
-        };
+            cpal::BufferSize::Default => todo!(),
+            cpal::BufferSize::Fixed(s) => s as usize,
+        } * config.channels as usize;
+
         if let Ok(mut model) = self.omodel.lock() {
             let info = PlaybackInfo {
                 sample_rate: config.sample_rate.0.into(),
@@ -275,7 +282,7 @@ where
         buffer_size: Option<usize>,
         transport: Arc<data::Transport>,
     ) -> Self {
-        let latency_samples = buffer_size.unwrap_or(1024);
+        let latency_samples = buffer_size.unwrap_or(super::DEFAULT_BUFFER_LEN);
         let ring_buffer = HeapRb::<f32>::new(latency_samples * 4); // Add some latency
         let (producer, consumer) = ring_buffer.split();
         let mut res = Self {
@@ -286,7 +293,7 @@ where
             imodel: Arc::new(Mutex::new(InputModel { producer })),
             omodel: Arc::new(Mutex::new(OutputModel::<E> {
                 consumer,
-                internal_buf: vec![0.0; latency_samples],
+                internal_buf: vec![0.0; latency_samples * 2],
                 effector: effect,
                 current_time: Arc::clone(&transport.time),
             })),

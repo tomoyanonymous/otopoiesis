@@ -85,7 +85,6 @@ impl Component for Model {
         output.fill(0.0);
         for (count, out_per_channel) in output.chunks_mut(2 as usize).enumerate() {
             let now = (info.current_time + count) as u64;
-
             out_per_channel.iter_mut().enumerate().for_each(|(ch, s)| {
                 //順にリージョンを読んでいくので、重なってる場合は後の要素のやつが上書きする形になる
                 for region in self.regions.iter() {

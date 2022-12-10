@@ -59,7 +59,7 @@ impl Model {
 }
 
 #[cfg(not(target_arch = "wasm32"))]
-pub fn render_region_offline_async<'a>(
+pub fn render_region_offline_async(
     region: Model,
     info: &PlaybackInfo,
 ) -> std::thread::JoinHandle<Model> {
@@ -104,6 +104,7 @@ impl Component for Model {
         self.render_offline(info);
     }
     fn render(&mut self, input: &[f32], output: &mut [f32], info: &PlaybackInfo) {
+        output.fill(0.0);
         for (count, out_per_channel) in output.chunks_mut(self.channels as usize).enumerate() {
             let now = (info.current_time + count) as u64;
             let in_range = self.params.range.contains(now);

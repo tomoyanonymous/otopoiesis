@@ -34,21 +34,11 @@ impl Model {
 
         let json = serde_json::to_string_pretty(&project);
         let json_str = json.unwrap_or("failed to parse".to_string());
-        let mut timeline =
-            audio::timeline::Model::new(Arc::clone(&project), Arc::clone(&transport));
-
-        let info = audio::PlaybackInfo {
-            sample_rate: sample_rate as u32,
-            current_time: 0,
-            channels: 2,
-            frame_per_buffer: 512,
-        };
-        timeline.prepare_play(&info);
-
+        let timeline = audio::timeline::Model::new(Arc::clone(&project), Arc::clone(&transport));
         let mut renderer = audio::renderer::create_renderer(
             timeline,
             Some(44100),
-            Some(512),
+            Some(audio::DEFAULT_BUFFER_LEN),
             Arc::clone(&transport),
         );
         renderer.prepare_play();
@@ -66,17 +56,21 @@ impl Model {
 
     pub fn play(&mut self) {
         if !self.audio.is_playing() {
-            let app = &mut self.app.lock().unwrap();
-            app.transport.is_playing.store(true);
             self.audio.prepare_play();
+            {
+                let app = &mut self.app.lock().unwrap();
+                app.transport.is_playing.store(true);
+            }
             self.audio.play();
         }
     }
     pub fn pause(&mut self) {
         if self.audio.is_playing() {
             self.audio.pause();
-            let app = &mut self.app.lock().unwrap();
-            app.transport.is_playing.store(false);
+            {
+                let app = &mut self.app.lock().unwrap();
+                app.transport.is_playing.store(false);
+            }
         }
     }
     fn ui_to_code(&mut self) {

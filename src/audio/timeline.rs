@@ -43,14 +43,21 @@ impl Component for Model {
     }
     fn prepare_play(&mut self, info: &PlaybackInfo) {
         self.tracks = Self::get_new_tracks(self.param.as_ref());
-        self.tmp_buffer
-            .resize((info.channels * info.frame_per_buffer) as usize, 0.0);
+        let new_len = (info.frame_per_buffer) as usize;
+        self.tmp_buffer.resize(new_len, 0.0);
+
         for track in self.tracks.iter_mut() {
             track.prepare_play(info);
         }
     }
     fn render(&mut self, input: &[f32], output: &mut [f32], info: &PlaybackInfo) {
-        // assert_eq!(output.len(), self.tmp_buffer.len());
+        output.fill(0.0);
+        assert_eq!(
+            output.len(),
+            (info.channels * info.frame_per_buffer) as usize
+        );
+
+        assert_eq!(output.len(), self.tmp_buffer.len());
         for track in self.tracks.iter_mut() {
             track.render(input, self.tmp_buffer.as_mut_slice(), info);
             output
