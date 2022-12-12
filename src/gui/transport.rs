@@ -1,9 +1,10 @@
 use crate::data;
+use crate::utils::atomic;
 use std::sync::Arc;
-
 struct Toggle {
     transport: Arc<data::Transport>,
 }
+
 impl Toggle {
     fn new(t: Arc<data::Transport>) -> Self {
         Self {
@@ -11,19 +12,18 @@ impl Toggle {
         }
     }
 }
-impl egui::Widget for Toggle {
+impl egui::Widget for &mut Toggle {
     fn ui(self, ui: &mut egui::Ui) -> egui::Response {
-        let playing = &self.transport.is_playing;
-        if playing.load() {
-            let res = ui.button("pause");
+        if self.transport.is_playing() {
+            let res = ui.button("⏸");
             if res.clicked() {
-                playing.store(true);
+                self.transport.request_play(data::PlayOp::Pause);
             };
             res
         } else {
-            let res = ui.button("play");
+            let res = ui.button("▶");
             if res.clicked() {
-                playing.store(false);
+                self.transport.request_play(data::PlayOp::Play);
             };
             res
         }
@@ -53,22 +53,25 @@ impl Model {
         self.get_time_in_sample() as f64 / self.sample_rate as f64
     }
     fn is_playing(&self) -> bool {
-        self.param.is_playing.load()
+        self.param.is_playing()
     }
 }
 
-impl egui::Widget for Model {
+impl egui::Widget for &mut Model {
     fn ui(self, ui: &mut egui::Ui) -> egui::Response {
+        for (_text_style, font_id) in ui.style_mut().text_styles.iter_mut() {
+            font_id.size = 24.0 // whatever size you want here
+        }
         ui.horizontal(|ui| {
             let time = std::time::Duration::from_secs_f64(self.get_time());
 
-            if ui.button("|<<").clicked() {
+            if ui.button("⏮").clicked() {
                 self.param.time.store(0);
             }
-            if ui.button("[  ]").clicked() {
-                //stop
+            if ui.button("⏹").clicked() {
+                self.param.request_play(data::PlayOp::Halt);
             }
-            ui.add(self.playbutton);
+            ui.add(&mut self.playbutton);
             let min = time.div_f64(60.0).as_secs();
             let secs = time.as_secs() % 60;
             ui.label(format!(

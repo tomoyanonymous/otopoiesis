@@ -1,9 +1,6 @@
 use std::sync::{Arc, Mutex};
 
-use crate::audio::{
-    renderer::{Renderer, RendererBase},
-    Component,
-};
+use crate::audio::renderer::{Renderer, RendererBase};
 use crate::{audio, data, gui, utils::atomic};
 extern crate eframe;
 extern crate serde_json;
@@ -55,23 +52,11 @@ impl Model {
     }
 
     pub fn play(&mut self) {
-        if !self.audio.is_playing() {
-            self.audio.prepare_play();
-            {
-                let app = &mut self.app.lock().unwrap();
-                app.transport.is_playing.store(true);
-            }
-            self.audio.play();
-        }
+        self.audio.prepare_play();
+        self.audio.play();
     }
     pub fn pause(&mut self) {
-        if self.audio.is_playing() {
-            self.audio.pause();
-            {
-                let app = &mut self.app.lock().unwrap();
-                app.transport.is_playing.store(false);
-            }
-        }
+        self.audio.pause();
     }
     fn ui_to_code(&mut self) {
         let app = self.app.lock().unwrap();
@@ -85,6 +70,21 @@ impl Model {
         self.code_compiled = proj;
         if let Ok(proj) = &self.code_compiled {
             app.project = Arc::clone(proj);
+        }
+    }
+    fn sync_transport(&mut self) {
+        let t = self.app.lock().unwrap().transport.clone();
+        if let Some(b) = t.ready_to_trigger() {
+            match b {
+                data::PlayOp::Play => self.play(),
+                data::PlayOp::Pause => self.pause(),
+                data::PlayOp::Halt => {
+                    self.pause();
+                    self.audio.rewind();
+                }
+            }
+        } else {
+            //do nothing
         }
     }
 }
@@ -118,30 +118,32 @@ impl eframe::App for Model {
                     self.ui.sync_state(&app.project.tracks);
                 }
             }
-        }
-        if ctx
-            .input_mut()
-            .consume_shortcut(&egui::KeyboardShortcut::new(
-                egui::Modifiers::NONE,
-                egui::Key::Space,
-            ))
-        {
-            if self.audio.is_playing() {
-                self.pause();
-            } else {
-                self.play();
+            if ctx
+                .input_mut()
+                .consume_shortcut(&egui::KeyboardShortcut::new(
+                    egui::Modifiers::NONE,
+                    egui::Key::Space,
+                ))
+            {
+                let op = if app.transport.is_playing() {
+                    data::PlayOp::Pause
+                } else {
+                    data::PlayOp::Play
+                };
+                app.transport.request_play(op);
+            }
+            if ctx
+                .input_mut()
+                .consume_shortcut(&egui::KeyboardShortcut::new(
+                    egui::Modifiers::NONE,
+                    egui::Key::ArrowLeft,
+                ))
+            {
+                app.transport.time.store(0);
+                self.audio.prepare_play();
             }
         }
-        if ctx
-            .input_mut()
-            .consume_shortcut(&egui::KeyboardShortcut::new(
-                egui::Modifiers::NONE,
-                egui::Key::ArrowLeft,
-            ))
-        {
-            self.audio.rewind();
-            self.audio.prepare_play();
-        }
+        self.sync_transport();
 
         let mut style = egui::Style::default();
         style.animation_time = 0.2;

@@ -47,17 +47,56 @@ impl AppModel {
     }
 }
 
+pub enum PlayOp {
+    Play = 0,
+    Pause = 1,
+    Halt = 2,
+}
+
+impl From<u8> for PlayOp {
+    fn from(p: u8) -> Self {
+        match p {
+            0 => Self::Play,
+            1 => Self::Pause,
+            2 => Self::Halt,
+            _ => panic!("invalid operation"),
+        }
+    }
+}
+
 #[serde_as]
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Transport {
-    pub is_playing: atomic::Bool,
+    is_playing: atomic::U8,
     pub time: Arc<atomic::U64>, //in sample
+    playing_history: atomic::U8,
 }
+
 impl Transport {
     pub fn new() -> Self {
         Self {
-            is_playing: atomic::Bool::from(false),
+            is_playing: atomic::U8::from(2),
             time: Arc::new(atomic::U64::from(0)),
+            playing_history: atomic::U8::from(2),
+        }
+    }
+    pub fn request_play(&self, p: PlayOp) {
+        self.playing_history.store(self.is_playing.load());
+        self.is_playing.store(p as u8);
+    }
+    pub fn is_playing(&self) -> bool {
+        match PlayOp::from(self.is_playing.load()) {
+            PlayOp::Play => true,
+            PlayOp::Pause | PlayOp::Halt => false,
+        }
+    }
+    pub fn ready_to_trigger(&self) -> Option<PlayOp> {
+        if self.is_playing.load() != self.playing_history.load() {
+            let res = Some(PlayOp::from(self.is_playing.load()));
+            self.playing_history.store(self.is_playing.load() as u8);
+            res
+        } else {
+            None
         }
     }
 }

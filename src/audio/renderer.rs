@@ -63,8 +63,6 @@ where
 
         let odevice = host.default_output_device();
         let (oconfig, ostream) = if let Some(device) = odevice.as_ref() {
-  
-
             let oconfig_builder = device
                 .supported_output_configs()
                 .unwrap()
@@ -114,13 +112,11 @@ where
         }
     }
     fn pause_audio(&mut self) {
-        if self.is_playing() {
-            if let Some(is) = self.get_instream() {
-                is.pause().unwrap();
-            }
-            if let Some(os) = self.get_outstream() {
-                os.pause().unwrap();
-            }
+        if let Some(is) = self.get_instream() {
+            is.pause().unwrap();
+        }
+        if let Some(os) = self.get_outstream() {
+            os.pause().unwrap();
         }
     }
     fn toggle_play(&mut self) {
@@ -190,6 +186,7 @@ where
     E: Component + Send + Sync + 'static,
 {
     pub host: cpal::Host,
+    /// Do not mutate transport from the audio renderer side. it just subscribes states changed by GUI.
     transport: Arc<data::Transport>,
     istream: Option<Stream>,
     ostream: Option<Stream>,
@@ -226,7 +223,7 @@ where
         &self.ostream
     }
     fn is_playing(&self) -> bool {
-        self.transport.is_playing.load()
+        self.transport.is_playing()
     }
     fn get_samplerate(&self) -> u32 {
         self.oconfig.as_ref().unwrap().sample_rate.0
@@ -234,12 +231,10 @@ where
 
     fn play(&mut self) {
         self.play_audio();
-        self.transport.is_playing.store(true);
     }
 
     fn pause(&mut self) {
         self.pause_audio();
-        self.transport.is_playing.store(false);
     }
 
     fn get_shared_current_time_in_sample(&self) -> Arc<atomic::U64> {
