@@ -103,7 +103,7 @@ impl eframe::App for Model {
             {
                 if app.can_undo() {
                     app.undo();
-                    self.ui.sync_state();
+                    self.ui.sync_state(&app.project.tracks);
                 }
             }
             if ctx
@@ -115,7 +115,7 @@ impl eframe::App for Model {
             {
                 if app.can_redo() {
                     app.redo();
-                    self.ui.sync_state();
+                    self.ui.sync_state(&app.project.tracks);
                 }
             }
         }

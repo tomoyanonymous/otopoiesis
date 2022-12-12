@@ -1,4 +1,5 @@
 use crate::data;
+use crate::data::SharedVec;
 use crate::gui;
 
 use std::sync::{Arc, Mutex, MutexGuard};
@@ -27,8 +28,8 @@ impl Model {
     fn get_transport(&self) -> Arc<data::Transport> {
         self.get_model_mut().transport.clone()
     }
-    pub fn sync_state(&mut self) {
-        self.timeline.sync_state()
+    pub fn sync_state(&mut self,track_p: &SharedVec<data::Track>) {
+        self.timeline.sync_state(track_p)
     }
     pub fn show_ui(&mut self, ctx: &egui::Context) {
         let is_mac = ctx.os() == egui::os::OperatingSystem::Mac;

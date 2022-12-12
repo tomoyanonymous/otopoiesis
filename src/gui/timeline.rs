@@ -63,17 +63,17 @@ impl Model {
         );
     }
     fn add_track(&mut self) {
-        if let Ok(mut app) = self.app.lock() {
+        let new_track = if let Ok(mut app) = self.app.lock() {
             let _res = action::add_track(&mut app, data::Track::new());
-        }
-        if let Ok(app) = self.app.lock() {
-            let ts = app.project.tracks.clone();
-            self.track = param_to_track(&ts, self.app.clone()).unwrap();
-        }
+            param_to_track(&app.project.tracks, self.app.clone())
+        } else {
+            None
+        };
+        self.track = new_track.expect("no new tracks");
     }
-    pub fn sync_state(&self) {
-        if let Ok(app) = self.app.try_lock() {
-            param_to_track(&app.project.tracks, self.app.clone());
+    pub fn sync_state(&mut self, track_p: &SharedVec<data::Track>) {
+        if let Some(new_tracks) = param_to_track(track_p, self.app.clone()) {
+            self.track = new_tracks;
         }
     }
 }
