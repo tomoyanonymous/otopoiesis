@@ -1,12 +1,17 @@
 //! The main data format like project file, track, region and etc. Can be (de)serialized to/from json with serde.
 
 use crate::action;
-use crate::parameter::{FloatParameter, Parameter};
 use crate::utils::{atomic, AtomicRange};
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 use std::sync::{Arc, Mutex};
 use undo;
+
+pub mod generator;
+pub mod region;
+
+pub use generator::*;
+pub use region::*;
 
 // #[derive(Serialize, Deserialize, Clone)]
 pub struct AppModel {
@@ -135,94 +140,4 @@ impl std::fmt::Display for Track {
         // write!(f, "track {}", self.label)
         write!(f, "track")
     }
-}
-
-/// Data structure for region.
-/// The region has certain start time and end time, and one generator (including an audio file).
-
-#[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct Region {
-    /// range stores a real time, not in sample.
-    pub range: AtomicRange,
-    pub max_size: atomic::U64,
-    pub generator: Arc<Generator>,
-    pub label: String,
-}
-
-impl Region {
-    /// Utility function that converts a raw region into the region with fadein/out transformer.
-    ///
-    pub fn with_fade(origin: Arc<Self>) -> Arc<Self> {
-        Arc::new(Self {
-            range: origin.range.clone(),
-            max_size: origin.max_size.clone(),
-            generator: Arc::new(Generator::Transformer(RegionTransformer {
-                filter: Arc::new(RegionFilter::FadeInOut(Arc::new(FadeParam {
-                    time_in: 0.1.into(),
-                    time_out: 0.1.into(),
-                }))),
-                origin: Arc::clone(&origin),
-            })),
-            label: origin.label.clone(),
-        })
-    }
-}
-
-impl std::default::Default for Region {
-    fn default() -> Self {
-        Self {
-            range: AtomicRange::new(0, 0),
-            max_size: atomic::U64::from(0),
-            generator: Arc::new(Generator::Oscillator(Arc::new(OscillatorParam::default()))),
-            label: "".to_string(),
-        }
-    }
-}
-
-impl std::fmt::Display for Region {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "region {}", self.label)
-    }
-}
-
-/// Utility Parameter for oscillator with some default values.
-
-#[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct OscillatorParam {
-    pub amp: FloatParameter,
-    pub freq: FloatParameter,
-    pub phase: FloatParameter,
-}
-impl Default for OscillatorParam {
-    fn default() -> Self {
-        Self {
-            amp: FloatParameter::new(0.8, 0.0..=1.0, "amp"),
-            freq: FloatParameter::new(440.0, 20.0..=20000.0, "freq"),
-            phase: FloatParameter::new(0.0, 0.0..=std::f32::consts::PI * 2.0, "phase"),
-        }
-    }
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug)]
-pub enum Generator {
-    Oscillator(Arc<OscillatorParam>),
-    Transformer(RegionTransformer),
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct RegionTransformer {
-    pub filter: Arc<RegionFilter>,
-    pub origin: Arc<Region>,
-}
-
-#[derive(Serialize, Deserialize, Clone, Default, Debug)]
-pub struct FadeParam {
-    pub time_in: atomic::F32,
-    pub time_out: atomic::F32,
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug)]
-pub enum RegionFilter {
-    Gain,
-    FadeInOut(Arc<FadeParam>),
 }

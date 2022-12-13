@@ -60,7 +60,7 @@ impl Model {
             .iter()
             .map(|region| {
                 let mut model = super::region::Model::new(Arc::clone(&region), channels);
-                model.render_offline(info);
+                model.render_offline(info.sample_rate, info.channels);
                 model
             })
             .collect::<Vec<_>>();
@@ -82,16 +82,21 @@ impl Component for Model {
     fn render(&mut self, input: &[f32], output: &mut [f32], info: &PlaybackInfo) {
         //後に入ってるリージョンで基本は上書きする
         //channel is tekitou
+        let chs = 2;
         output.fill(0.0);
-        for (count, out_per_channel) in output.chunks_mut(2 as usize).enumerate() {
+        for (count, out_per_channel) in output.chunks_mut(chs as usize).enumerate() {
             let now = (info.current_time + count) as u64;
             out_per_channel.iter_mut().enumerate().for_each(|(ch, s)| {
                 //順にリージョンを読んでいくので、重なってる場合は後の要素のやつが上書きする形になる
                 for region in self.regions.iter() {
                     if region.params.range.contains(now) {
-                        let read_point = ((now - region.params.range.start()) * 2) as usize;
-                        let out = region.interleaved_samples_cache[read_point + ch];
-                        *s = out;
+                        let read_point = ((now - region.params.range.start()) * chs) as usize;
+                        // 再生中にRangeを変更すると範囲外アクセスの可能性はあるので対応
+                        let out = region
+                            .interleaved_samples_cache
+                            .get(read_point + ch)
+                            .unwrap_or(&0.0);
+                        *s = *out;
                     }
                 }
             });

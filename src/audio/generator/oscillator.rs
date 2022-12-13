@@ -1,6 +1,7 @@
 use super::GeneratorComponent;
 use crate::audio::PlaybackInfo;
 use crate::data::OscillatorParam;
+use crate::utils::atomic;
 use crate::{data, parameter::Parameter};
 use std::f32::consts::PI;
 use std::sync::Arc;
@@ -93,16 +94,18 @@ impl Oscillator for GenericOscillator {
 pub fn sinewave(params: Arc<data::OscillatorParam>) -> GenericOscillator {
     GenericOscillator::new(params, move |phase: f32| phase.sin())
 }
-pub fn saw(params: Arc<data::OscillatorParam>, direction: bool) -> GenericOscillator {
+pub fn saw(params: Arc<data::OscillatorParam>, direction: Arc<atomic::Bool>) -> GenericOscillator {
+    let direction = direction.clone();
     GenericOscillator::new(params, move |phase: f32| {
-        (phase * 2.0 - 1.0) * if direction { 1.0 } else { -1.0 }
+        (phase * 2.0 - 1.0) * if direction.load() { 1.0 } else { -1.0 }
     })
 }
-pub fn rect(params: Arc<data::OscillatorParam>, duty: f32) -> GenericOscillator {
+pub fn rect(params: Arc<data::OscillatorParam>, duty: Arc<atomic::F32>) -> GenericOscillator {
+    let duty = duty.clone();
     GenericOscillator::new(
         params,
         move |phase: f32| {
-            if phase > duty {
+            if phase > duty.load() {
                 1.0
             } else {
                 -1.0

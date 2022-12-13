@@ -13,6 +13,17 @@ pub struct Model {
     editor_open: bool,
 }
 
+fn new_renderer(app: &data::AppModel) -> Renderer<audio::timeline::Model> {
+    let timeline =
+        audio::timeline::Model::new(Arc::clone(&app.project), Arc::clone(&app.transport));
+    audio::renderer::create_renderer(
+        timeline,
+        Some(44100),
+        Some(audio::DEFAULT_BUFFER_LEN),
+        Arc::clone(&app.transport),
+    )
+}
+
 impl Model {
     pub fn new(_cc: &eframe::CreationContext<'_>) -> Self {
         let sample_rate = 44100 as u64;
@@ -31,13 +42,8 @@ impl Model {
 
         let json = serde_json::to_string_pretty(&project);
         let json_str = json.unwrap_or("failed to parse".to_string());
-        let timeline = audio::timeline::Model::new(Arc::clone(&project), Arc::clone(&transport));
-        let mut renderer = audio::renderer::create_renderer(
-            timeline,
-            Some(44100),
-            Some(audio::DEFAULT_BUFFER_LEN),
-            Arc::clone(&transport),
-        );
+        let mut renderer = new_renderer(&app.lock().unwrap());
+
         renderer.prepare_play();
         renderer.pause();
 
@@ -65,12 +71,20 @@ impl Model {
         self.project_str = json_str;
     }
     fn code_to_ui(&mut self) {
-        let mut app = self.app.lock().unwrap();
-        let proj = serde_json::from_str::<Arc<data::Project>>(&self.project_str);
-        self.code_compiled = proj;
-        if let Ok(proj) = &self.code_compiled {
-            app.project = Arc::clone(proj);
+        if let Ok(mut app) = self.app.lock() {
+            let proj = serde_json::from_str::<Arc<data::Project>>(&self.project_str);
+            self.code_compiled = proj;
+            if let Ok(proj) = &self.code_compiled {
+                app.project = Arc::clone(proj);
+                self.ui.sync_state(&proj.tracks);
+            }
         }
+        self.refresh_audio();
+    }
+    fn refresh_audio(&mut self) {
+        self.audio = new_renderer(&self.app.lock().unwrap());
+        self.audio.prepare_play();
+        self.audio.pause();
     }
     fn sync_transport(&mut self) {
         let t = self.app.lock().unwrap().transport.clone();
@@ -157,7 +171,7 @@ impl eframe::App for Model {
         }
 
         let _panel = egui::panel::SidePanel::right("JSON viewer")
-            .default_width(300.)
+            .default_width(400.)
             .max_width(1920.)
             .resizable(true)
             .show_animated(&ctx, self.editor_open, |ui| {

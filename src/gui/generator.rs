@@ -1,18 +1,18 @@
 use crate::{data, gui, utils::AtomicRange};
 
 use egui;
-use std::sync::Arc;
-struct FadeHandle {
+use std::{ops::RangeInclusive, sync::Arc};
+pub struct FadeHandle {
     param: Arc<data::FadeParam>,
-    range: AtomicRange,
+    pub range: RangeInclusive<u64>,
     start_tmp: f32,
     end_tmp: f32,
 }
 impl FadeHandle {
-    pub fn new(param: Arc<data::FadeParam>, range: AtomicRange) -> Self {
+    pub fn new(param: Arc<data::FadeParam>, range: &AtomicRange) -> Self {
         Self {
             param: param,
-            range: range.clone(),
+            range: range.start()..=range.end(),
             start_tmp: 0.0,
             end_tmp: 0.0,
         }
@@ -56,7 +56,7 @@ impl egui::Widget for &mut FadeHandle {
 
             ui_handle.on_hover_cursor(egui::CursorIcon::PointingHand)
         };
-        let range = self.range.getrange() as f32 / gui::SAMPLES_PER_PIXEL_DEFAULT;
+        let range = (self.range.end() - self.range.start()) as f32 / gui::SAMPLES_PER_PIXEL_DEFAULT;
         let scale = move |sec| sec * 44100.0 / gui::SAMPLES_PER_PIXEL_DEFAULT;
         let descale = move |pix| pix * gui::SAMPLES_PER_PIXEL_DEFAULT / 44100.0;
         let in_width = scale(self.param.time_in.load());
@@ -92,21 +92,27 @@ impl egui::Widget for &mut FadeHandle {
 }
 
 pub struct TransformerModel {
-    filter: FadeHandle,
-    origin: Box<super::region::Model>,
+    pub filter: FadeHandle,
+    pub origin: Box<super::region::Model>,
 }
 
 impl TransformerModel {
-    pub fn new(transformer: &data::RegionTransformer) -> Self {
-        let origin = transformer.origin.clone();
-        let range = origin.range.clone();
-        let filter = match transformer.filter.as_ref() {
-            data::RegionFilter::Gain => todo!(),
-            data::RegionFilter::FadeInOut(p) => FadeHandle::new(p.clone(), range),
-        };
-        Self {
-            filter: filter,
-            origin: Box::new(super::region::Model::new(Arc::clone(&origin), "filter1")),
+    pub fn from(region: Arc<data::Region>) -> Self {
+        let range = region.range.clone();
+            match &region.content {
+            data::Content::Generator(_) | data::Content::AudioFile(_) => todo!(),
+            data::Content::Transformer(filter, origin) => {
+                let filter = match filter.as_ref() {
+                    data::RegionFilter::Gain => todo!(),
+                    data::RegionFilter::Reverse => todo!(),
+                    // do not use "origin.range" at here
+                    data::RegionFilter::FadeInOut(p) => FadeHandle::new(p.clone(), &range),
+                };
+                Self {
+                    filter: filter,
+                    origin: Box::new(super::region::Model::new(Arc::clone(&origin), "filter1")),
+                }
+            }
         }
     }
 }
@@ -114,6 +120,11 @@ impl TransformerModel {
 impl egui::Widget for &mut TransformerModel {
     fn ui(self, ui: &mut egui::Ui) -> egui::Response {
         let mut wave = ui.add(self.origin.as_mut());
+        // self.origin.params.range.0.store(self.filter.range.0.load());
+        // self.origin.params.range.1.store(self.filter.range.1.load());
+
+        self.filter.range = self.origin.params.range.0.load()..=self.origin.params.range.1.load();
+
         wave.rect
             .set_bottom(wave.rect.bottom().min(wave.rect.top() + 100.0));
         wave.rect = wave.rect.shrink2(egui::vec2(10.0, 0.0));

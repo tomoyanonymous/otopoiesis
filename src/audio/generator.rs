@@ -1,6 +1,5 @@
 use super::*;
 use crate::data;
-use std::sync::Arc;
 pub mod oscillator;
 
 pub trait GeneratorComponent {
@@ -41,96 +40,16 @@ where
     }
 }
 
-#[derive(Debug)]
-pub struct FadeModel {
-    pub param: Arc<data::FadeParam>,
-    pub origin: super::region::Model,
-    buffer: Vec<f32>,
-}
-
-impl FadeModel {
-    pub fn new(transformer: &data::RegionTransformer) -> Self {
-        let param = match transformer.filter.as_ref() {
-            data::RegionFilter::Gain => todo!(),
-            data::RegionFilter::FadeInOut(p) => p,
-        };
-        Self {
-            param: param.clone(),
-            origin: super::region::Model::new(transformer.origin.clone(), 2),
-            buffer: vec![],
-        }
-    }
-    fn render_offline(&mut self, info: &PlaybackInfo) {
-        self.buffer
-            .resize(self.origin.interleaved_samples_cache.len(), 0.0);
-        self.origin.render_offline(info);
-        let chs = self.get_output_channels() as usize;
-        self.origin
-            .interleaved_samples_cache
-            .chunks(chs)
-            .zip(self.buffer.chunks_mut(chs))
-            .enumerate()
-            .for_each(|(count, (v_per_channel, o_per_channel))| {
-                let in_time = self.param.time_in.load() as f64 * info.sample_rate as f64;
-                let out_time = self.param.time_out.load() as f64 * info.sample_rate as f64;
-                let now = count as f64;
-
-                let len = self.origin.params.range.getrange() as f64;
-                let mut gain = 1.0;
-                if (0.0..=in_time).contains(&now) {
-                    gain = (now as f64 / in_time).clamp(0.0, 1.0);
-                }
-
-                if (len - out_time..=len).contains(&now) {
-                    gain = ((len - now) as f64 / out_time).clamp(0.0, 1.0);
-                }
-                if now > len {
-                    gain = 0.0;
-                }
-
-                v_per_channel
-                    .iter()
-                    .map(|s| s * gain as f32)
-                    .zip(o_per_channel.iter_mut())
-                    .for_each(|(v, o)| {
-                        *o = v;
-                    });
-            });
-    }
-}
-
-impl Component for FadeModel {
-    fn get_input_channels(&self) -> u64 {
-        0
-    }
-    fn get_output_channels(&self) -> u64 {
-        2
-    }
-    fn prepare_play(&mut self, info: &PlaybackInfo) {
-        self.render_offline(info);
-    }
-    fn render(&mut self, _input: &[f32], output: &mut [f32], info: &PlaybackInfo) {
-        let range = &self.origin.params.range;
-        let chs = info.channels as usize;
-        for (count, out_per_channel) in output.chunks_mut(chs).enumerate() {
-            let now = (info.current_time + count) as u64;
-            if now < range.getrange() {
-                let read_point = now as usize * chs;
-                out_per_channel
-                    .iter_mut()
-                    .enumerate()
-                    .for_each(|(ch, s)| *s = self.buffer[read_point + ch]);
-            }
-        }
-    }
-}
-
 pub fn get_component_for_generator(kind: &data::Generator) -> Box<dyn Component + Send + Sync> {
-    match kind {
-        data::Generator::Oscillator(osc) => Box::new(oscillator::sinewave(Arc::clone(osc))),
-        data::Generator::Transformer(t) => {
-            let t = FadeModel::new(t);
-            Box::new(t)
-        }
+     match kind {
+        data::Generator::Oscillator(fun, param) => Box::new(match fun {
+            data::OscillatorFun::SineWave => oscillator::sinewave(param.clone()),
+            data::OscillatorFun::SawTooth(dir) => oscillator::saw(param.clone(), dir.clone()),
+            data::OscillatorFun::Rectanglular(duty) => {
+                oscillator::rect(param.clone(), duty.clone())
+            }
+            data::OscillatorFun::Triangular => oscillator::triangle(param.clone()),
+        }),
+        data::Generator::Noise() => todo!(),
     }
 }

@@ -38,17 +38,14 @@ impl Model {
             .iter()
             .fold(0u64, |acc, region| acc.max(region.params.range.end()));
         let label = format!("region{}", self.regions.len() + 1).to_string();
-        let region_param = Arc::new(data::Region {
-            range: AtomicRange::new(x_rightmost, x_rightmost + 49000),
-            max_size: atomic::U64::from(60000),
-            generator: Arc::new(data::Generator::Oscillator(Arc::new(
-                data::OscillatorParam::default(),
-            ))),
+        let region_param = Arc::new(data::Region::new(
+            AtomicRange::from(x_rightmost..x_rightmost + 49000),
+            data::Content::Generator(data::Generator::default()),
             label,
-        });
+        ));
         let faderegion_p = data::Region::with_fade(region_param);
         {
-            let mut app = self.app.lock().unwrap();
+            let mut app = self.app.try_lock().unwrap();
             match &self.param {
                 data::Track::Regions(regions) => {
                     let _res = action::add_region(&mut app, regions.clone(), faderegion_p);
@@ -88,17 +85,16 @@ impl egui::Widget for &mut Model {
                         {
                             for region in self.regions.iter_mut() {
                                 let top = ui.available_rect_before_wrap().top();
-                                let x_start = region.params.range.start() as f32
-                                    / gui::SAMPLES_PER_PIXEL_DEFAULT;
-                                let x_end = region.params.range.end() as f32
-                                    / gui::SAMPLES_PER_PIXEL_DEFAULT;
+                                let range = region.params.range.clone();
+                                let x_start = range.start() as f32 / gui::SAMPLES_PER_PIXEL_DEFAULT;
+                                let x_end = range.end() as f32 / gui::SAMPLES_PER_PIXEL_DEFAULT;
                                 let rect = egui::Rect::from_points(&[
                                     [x_start, top].into(),
                                     [x_end, top + gui::TRACK_HEIGHT].into(),
                                 ]);
                                 ui.spacing_mut().item_spacing = egui::vec2(0.0, 0.0);
-
                                 ui.put(rect, region);
+
                             }
                         } //first lock drops here
                     });

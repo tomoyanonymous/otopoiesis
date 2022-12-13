@@ -85,21 +85,22 @@ impl Model {
     pub fn update_samples(&mut self) {
         // let mut phase = 0.0f32;
         let len = self.samples.len();
-        let gen = &self.params.generator;
-        match gen.as_ref() {
-            data::Generator::Oscillator(osc) => {
-                let mut phase_gui = 0.0f32;
-                for s in self.samples.iter_mut() {
-                    *s = phase_gui.sin() * osc.amp.get();
-                    let twopi = std::f32::consts::PI * 2.0;
-                    //とりあえず、440Hzで1周期分ということで
-                    let ratio = osc.freq.get() / 440.0;
-                    let increment = ratio * twopi / len as f32;
-                    phase_gui = (phase_gui + increment) % twopi;
+        if let data::Content::Generator(gen) = &self.params.content {
+            match gen {
+                data::Generator::Oscillator(_kind, osc) => {
+                    let mut phase_gui = 0.0f32;
+                    for s in self.samples.iter_mut() {
+                        *s = phase_gui.sin() * osc.amp.get();
+                        let twopi = std::f32::consts::PI * 2.0;
+                        //とりあえず、440Hzで1周期分ということで
+                        let ratio = osc.freq.get() / 440.0;
+                        let increment = ratio * twopi / len as f32;
+                        phase_gui = (phase_gui + increment) % twopi;
+                    }
                 }
-            }
-            data::Generator::Transformer(_t) => {
-                // t.origin.up
+                data::Generator::Noise() => {
+                    unimplemented!()
+                }
             }
         }
     }
@@ -110,9 +111,11 @@ impl Model {
         let label = labeltext.to_string();
         let handle_left = UiBar::new(params.range.0.clone(), HandleMode::Start);
         let handle_right = UiBar::new(params.range.1.clone(), HandleMode::End);
-        let transformer = match params.generator.as_ref() {
-            data::Generator::Oscillator(_) => None,
-            data::Generator::Transformer(t) => Some(super::generator::TransformerModel::new(t)),
+        let transformer = match &params.content {
+            data::Content::Generator(_) | data::Content::AudioFile(_) => None,
+            data::Content::Transformer(filter, origin) => {
+                Some(super::generator::TransformerModel::from(params.clone()))
+            }
         };
         let mut res = Self {
             samples,
@@ -179,70 +182,80 @@ impl egui::Widget for &mut Model {
         let width = self.params.range.getrange() as f32 / scaling_factor;
         let height = gui::TRACK_HEIGHT;
         let region_size = egui::vec2(width, height);
-        if let Some(t) = &mut self.transformer {
-            ui.add_sized(region_size, t)
-        } else {
-            let bar_width = 5.;
+        match &mut self.transformer {
+            Some(t) => {
+                let range = t.filter.range.end() - t.filter.range.start();
+                let width = range as f32 / scaling_factor;
+                let height = gui::TRACK_HEIGHT;
+                let region_size = egui::vec2(width, height);
+                self.params.range.0.store(t.origin.params.range.0.load());
+                self.params.range.1.store(t.origin.params.range.1.load());
 
-            let start = self.params.range.start();
-            let end = self.params.range.end();
-            let maxsize = self.params.max_size.load();
-            let min_start = (end as i64 - maxsize as i64).max(0) as u64;
-            let max_end = start + maxsize;
+                ui.add_sized(region_size, t)
+            }
+            None => {
+                let bar_width = 5.;
+                let start = self.params.range.start();
+                let end = self.params.range.end();
+                let min_start = 0u64;
+                let max_end = std::u64::MAX;
 
-            self.range_handles[0].set_limit(min_start..=end);
-            self.range_handles[1].set_limit(start..=max_end);
-            let response = ui
-                .vertical(|ui| {
-                    let res = ui.horizontal(|ui| {
-                        ui.spacing_mut().item_spacing = egui::vec2(0., 0.);
+                self.range_handles[0].set_limit(min_start..=end);
+                self.range_handles[1].set_limit(start..=max_end);
+                let response = ui
+                    .vertical(|ui| {
+                        let res = ui.horizontal(|ui| {
+                            ui.spacing_mut().item_spacing = egui::vec2(0., 0.);
 
-                        let bar_size = egui::vec2(bar_width, height);
+                            let bar_size = egui::vec2(bar_width, height);
 
-                        let mut graph = {
-                            ui.add_sized(bar_size, &mut self.range_handles[0]);
-                            let graph = self.make_graph_sized(ui, region_size);
-                            ui.add_sized(bar_size, &mut self.range_handles[1]);
-                            graph
-                        };
-                        if graph.drag_started() {
-                            self.offset_saved = self.params.range.start() as i64;
-                        }
-                        if graph.dragged() {
-                            let offset =
-                                (graph.drag_delta().x * gui::SAMPLES_PER_PIXEL_DEFAULT) as i64;
-                            self.params.range.shift_bounded(offset);
-                            graph = graph.on_hover_cursor(egui::CursorIcon::Grabbing)
-                        }
-                        if graph.drag_released() {
-                            self.offset_saved = 0;
-                        }
-                    });
-                    let _ = match self.params.generator.as_ref() {
-                        data::Generator::Oscillator(osc) => {
-                            let range = &osc.freq.range;
-                            let slider = ui.add(
-                                egui::Slider::from_get_set(
-                                    *range.start() as f64..=*range.end() as f64,
-                                    |v: Option<f64>| {
-                                        if let Some(n) = v {
-                                            osc.freq.set(n as f32);
-                                        }
-                                        osc.freq.get() as f64
-                                    },
-                                )
-                                .logarithmic(true),
-                            );
-                            if slider.changed() {
-                                self.update_samples();
+                            let mut graph = {
+                                ui.add_sized(bar_size, &mut self.range_handles[0]);
+                                let graph = self.make_graph_sized(ui, region_size);
+                                ui.add_sized(bar_size, &mut self.range_handles[1]);
+                                graph
+                            };
+                            if graph.drag_started() {
+                                self.offset_saved = self.params.range.start() as i64;
                             }
+                            if graph.dragged() {
+                                let offset =
+                                    (graph.drag_delta().x * gui::SAMPLES_PER_PIXEL_DEFAULT) as i64;
+                                self.params.range.shift_bounded(offset);
+                                graph = graph.on_hover_cursor(egui::CursorIcon::Grabbing)
+                            }
+                            if graph.drag_released() {
+                                self.offset_saved = 0;
+                            }
+                        });
+                        if let data::Content::Generator(gen) = &self.params.content {
+                            match gen {
+                                data::Generator::Oscillator(_fun, osc) => {
+                                    let range = &osc.freq.range;
+                                    let slider = ui.add(
+                                        egui::Slider::from_get_set(
+                                            *range.start() as f64..=*range.end() as f64,
+                                            |v: Option<f64>| {
+                                                if let Some(n) = v {
+                                                    osc.freq.set(n as f32);
+                                                }
+                                                osc.freq.get() as f64
+                                            },
+                                        )
+                                        .logarithmic(true),
+                                    );
+                                    if slider.changed() {
+                                        self.update_samples();
+                                    }
+                                }
+                                _ => unimplemented!(),
+                            };
                         }
-                        _ => {}
-                    };
-                    res
-                })
-                .response;
-            response
+                        res
+                    })
+                    .response;
+                response
+            }
         }
     }
 }

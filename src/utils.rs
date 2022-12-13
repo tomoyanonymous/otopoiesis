@@ -18,6 +18,7 @@ impl AtomicRange {
             Arc::new(atomic::U64::from(end)),
         )
     }
+
     pub fn get_pair(&self) -> (u64, u64) {
         (self.start(), self.end())
     }
@@ -73,5 +74,10 @@ impl AtomicRange {
 impl Clone for AtomicRange {
     fn clone(&self) -> Self {
         Self(Arc::clone(&self.0), Arc::clone(&self.1))
+    }
+}
+impl From<std::ops::Range<u64>> for AtomicRange{
+    fn from(t: std::ops::Range<u64>) -> Self {
+        Self::new(t.start,t.end)
     }
 }

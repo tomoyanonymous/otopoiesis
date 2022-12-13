@@ -2,50 +2,168 @@ use crate::audio::{Component, PlaybackInfo};
 
 // use crate::parameter::UIntParameter
 use crate::data;
+use crate::utils::AtomicRange;
 use std::ops::RangeInclusive;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 // 基本はオフラインレンダリング
+
+/// Interface for offline rendering.
+pub trait RangedComponent: std::fmt::Debug {
+    fn get_range(&self) -> RangeInclusive<u64>;
+    fn get_output_channels(&self) -> u64;
+    fn render_offline(&mut self, dest: &mut Vec<f32>, sample_rate: u32, channels: u64);
+}
+
+#[derive(Debug)]
+pub struct FadeModel {
+    pub param: Arc<data::FadeParam>,
+    pub origin: Box<Model>,
+}
+impl FadeModel {
+    fn new(p: Arc<data::FadeParam>, origin: Arc<data::Region>) -> Self {
+        Self {
+            param: p.clone(),
+            origin: Box::new(Model::new(origin.clone(), 2)),
+        }
+    }
+}
+
+impl RangedComponent for FadeModel {
+    fn get_range(&self) -> RangeInclusive<u64> {
+        let (start, end) = self.origin.params.range.get_pair();
+        start..=end
+    }
+    fn get_output_channels(&self) -> u64 {
+        2
+    }
+    fn render_offline(&mut self, dest: &mut Vec<f32>, sample_rate: u32, channels: u64) {
+        dest.resize(self.origin.interleaved_samples_cache.len(), 0.0);
+        self.origin.render_offline(sample_rate, channels);
+        let chs = self.get_output_channels() as usize;
+        self.origin
+            .interleaved_samples_cache
+            .chunks(chs)
+            .zip(dest.chunks_mut(chs))
+            .enumerate()
+            .for_each(|(count, (v_per_channel, o_per_channel))| {
+                let in_time = self.param.time_in.load() as f64 * sample_rate as f64;
+                let out_time = self.param.time_out.load() as f64 * sample_rate as f64;
+                let now = count as f64;
+
+                let len = self.origin.params.range.getrange() as f64;
+                let mut gain = 1.0;
+                if (0.0..=in_time).contains(&now) {
+                    gain = (now as f64 / in_time).clamp(0.0, 1.0);
+                }
+
+                if (len - out_time..=len).contains(&now) {
+                    gain = ((len - now) as f64 / out_time).clamp(0.0, 1.0);
+                }
+                if now > len {
+                    gain = 0.0;
+                }
+
+                v_per_channel
+                    .iter()
+                    .map(|s| s * gain as f32)
+                    .zip(o_per_channel.iter_mut())
+                    .for_each(|(v, o)| {
+                        *o = v;
+                    });
+            });
+    }
+}
+
+#[derive(Debug)]
+pub struct RangedComponentDyn {
+    generator: Box<dyn Component + Sync + Send>,
+    range: Arc<AtomicRange>,
+    buffer: Vec<f32>,
+}
+impl RangedComponentDyn {
+    pub fn new(generator: Box<dyn Component + Sync + Send>, range: Arc<AtomicRange>) -> Self {
+        Self {
+            generator: generator,
+            range: range.clone(),
+            buffer: vec![],
+        }
+    }
+}
+
+impl RangedComponent for RangedComponentDyn {
+    fn get_range(&self) -> RangeInclusive<u64> {
+        let (start, end) = self.range.get_pair();
+        start..=end
+    }
+
+    fn get_output_channels(&self) -> u64 {
+        self.generator.get_output_channels()
+    }
+
+    fn render_offline(&mut self, dest: &mut Vec<f32>, sample_rate: u32, channels: u64) {
+        let info_local = PlaybackInfo {
+            sample_rate: sample_rate,
+            current_time: 0,
+            frame_per_buffer: dest.len() as u64 / channels,
+            channels,
+        };
+        self.buffer.resize(self.range.getrange() as usize, 0.0);
+        let input_dummy = vec![0.0f32; 1];
+        self.generator.render(&input_dummy, dest, &info_local)
+    }
+}
+
+#[derive(Debug)]
+pub struct TransformerModel(Box<dyn RangedComponent + Send + Sync>);
+
+impl TransformerModel {
+    fn new(filter: &data::RegionFilter, origin: Arc<data::Region>) -> Self {
+        let component = match filter {
+            data::RegionFilter::Gain => todo!(),
+            data::RegionFilter::FadeInOut(param) => {
+                Box::new(FadeModel::new(param.clone(), origin.clone()))
+            }
+            data::RegionFilter::Reverse => todo!(),
+        };
+        Self(component)
+    }
+}
 
 #[derive(Debug)]
 pub struct Model {
     pub params: Arc<data::Region>,
     channels: u64,
     pub interleaved_samples_cache: Vec<f32>,
-    pub generator: Box<dyn Component + Send + Sync>,
+    pub content: Box<dyn RangedComponent + Send + Sync>,
     cache_completed: bool,
 }
-
-// pub trait EditableRegion {
-//     fn set_start(newv: u64) {}
-// }
 
 impl Model {
     pub fn new(params: Arc<data::Region>, channels: u64) -> Self {
         // assert!(params.range.getrange() < params.max_size);
         let buf_size = channels as u64 * 60000; //todo!
-        let generator = super::generator::get_component_for_generator(&params.generator);
+        let content: Box<dyn RangedComponent + Send + Sync> = match &params.content {
+            data::Content::Generator(g) => {
+                let c = super::generator::get_component_for_generator(&g);
+                let ranged_component = RangedComponentDyn::new(c, params.range.clone());
+                Box::new(ranged_component)
+            }
+            data::Content::AudioFile(_) => todo!(),
+            data::Content::Transformer(filter, origin) => {
+                TransformerModel::new(filter.as_ref(), origin.clone()).0
+            }
+        };
         Self {
             params,
             channels,
             interleaved_samples_cache: vec![0.0; buf_size as usize],
-            generator,
+            content,
             cache_completed: false,
         }
     }
-    pub fn render_offline(&mut self, info: &PlaybackInfo) {
-        let info_local = PlaybackInfo {
-            sample_rate: info.sample_rate,
-            current_time: 0,
-            frame_per_buffer: self.interleaved_samples_cache.len() as u64 / info.channels,
-            channels: info.channels,
-        };
-        let dummy_input = [0.0];
-        self.generator.prepare_play(&info_local);
-        self.generator.render(
-            &dummy_input,
-            self.interleaved_samples_cache.as_mut_slice(),
-            &info_local,
-        );
+    pub fn render_offline(&mut self, sample_rate: u32, channels: u64) {
+        self.content
+            .render_offline(&mut self.interleaved_samples_cache, sample_rate, channels);
         self.cache_completed = true;
     }
     pub fn contains_samples(&self, range: RangeInclusive<u64>) -> bool {
@@ -70,18 +188,12 @@ pub fn render_region_offline_async(
         .name(name.clone())
         .spawn(move || {
             let mut r = region;
-            let info_local = PlaybackInfo {
-                sample_rate: info.sample_rate,
-                current_time: 0,
-                frame_per_buffer: r.interleaved_samples_cache.len() as u64 / info.channels,
-                channels: info.channels,
-            };
-            let dummy_input = [0.0];
+
             // make a temporary local copy to prevent from double-mutable borrowing
             let mut dest = r.interleaved_samples_cache.clone();
-            r.generator.prepare_play(&info_local);
-            r.generator
-                .render(&dummy_input, dest.as_mut_slice(), &info_local);
+            r.content
+                .render_offline(&mut dest, info.sample_rate, info.channels);
+
             r.cache_completed = true;
             r.interleaved_samples_cache.copy_from_slice(dest.as_slice());
 
@@ -90,32 +202,4 @@ pub fn render_region_offline_async(
         .expect("failed to launch thread");
 
     res
-}
-
-impl Component for Model {
-    fn get_input_channels(&self) -> u64 {
-        0
-    }
-    fn get_output_channels(&self) -> u64 {
-        self.channels
-    }
-    //info.current_time contains exact sample from the beggining at a head of the buffer.
-    fn prepare_play(&mut self, info: &PlaybackInfo) {
-        self.render_offline(info);
-    }
-    fn render(&mut self, input: &[f32], output: &mut [f32], info: &PlaybackInfo) {
-        output.fill(0.0);
-        for (count, out_per_channel) in output.chunks_mut(self.channels as usize).enumerate() {
-            let now = (info.current_time + count) as u64;
-            let in_range = self.params.range.contains(now);
-            let has_cache = self.cache_completed;
-            if in_range && has_cache {
-                let read_point = ((now - self.params.range.start()) * 2) as usize;
-                out_per_channel
-                    .iter_mut()
-                    .enumerate()
-                    .for_each(|(ch, s)| *s = self.interleaved_samples_cache[read_point + ch]);
-            }
-        }
-    }
 }

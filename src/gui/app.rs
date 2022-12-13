@@ -18,7 +18,7 @@ impl Model {
         let transport = &parameter.transport;
         Self {
             param: p.clone(),
-            timeline: gui::timeline::Model::new(proj, p.clone(),transport.time.clone()),
+            timeline: gui::timeline::Model::new(proj, p.clone(), transport.time.clone()),
             transport: gui::transport::Model::new(Arc::clone(transport), sr),
         }
     }
@@ -33,7 +33,14 @@ impl Model {
             ui.vertical(|ui| {
                 ui.label("otopoiesis");
                 ui.horizontal(|ui| {
-                    ui.menu_button("File", |_ui| {});
+                    ui.menu_button("File", |ui| {
+                        #[cfg(debug_assertions)]
+                        if ui.button("Force Sync Ui State").clicked() {
+                            if let Ok(app) = self.param.try_lock() {
+                                self.timeline.sync_state(&app.project.tracks);
+                            }
+                        }
+                    });
                     ui.menu_button("Edit", |ui| {
                         if let Ok(mut app) = self.param.try_lock() {
                             let undo_sk =
