@@ -58,6 +58,10 @@ impl Model {
     }
 
     pub fn play(&mut self) {
+        /// Todo: on web platform, we need to re-create renderer each time.
+        #[cfg(target_arch="wasm32")]
+        self.refresh_audio();
+
         self.audio.prepare_play();
         self.audio.play();
     }
