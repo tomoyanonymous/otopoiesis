@@ -66,7 +66,7 @@ impl egui::Widget for &mut UiBar {
         self.react(&response);
         let rect_x = ui.min_rect().left();
         let _text = response.hover_pos().map_or("none".to_string(), |p| {
-            format!("{:?}/offset:{}", p, rect_x).to_string()
+            format!("{:?}/offset:{}", p, rect_x)
         });
         response
     }
@@ -113,7 +113,7 @@ impl Model {
         let handle_right = UiBar::new(params.range.1.clone(), HandleMode::End);
         let transformer = match &params.content {
             data::Content::Generator(_) | data::Content::AudioFile(_) => None,
-            data::Content::Transformer(filter, origin) => {
+            data::Content::Transformer(_filter, _origin) => {
                 Some(super::generator::TransformerModel::from(params.clone()))
             }
         };
@@ -150,7 +150,8 @@ impl Model {
                 [x, y as f64]
             })
             .collect::<Vec<_>>();
-        let graph = egui::plot::Plot::new(ui.auto_id_with(self.params.label.clone()))
+        
+        egui::plot::Plot::new(ui.auto_id_with(self.params.label.clone()))
             .allow_drag(false)
             .allow_zoom(false)
             .allow_boxed_zoom(false)
@@ -165,8 +166,7 @@ impl Model {
             .show(ui, |plot_ui| plot_ui.line(egui::plot::Line::new(points)))
             .response
             .on_hover_cursor(egui::CursorIcon::Grab)
-            .interact(egui::Sense::click_and_drag());
-        graph
+            .interact(egui::Sense::click_and_drag())
     }
 }
 
@@ -202,7 +202,8 @@ impl egui::Widget for &mut Model {
 
                 self.range_handles[0].set_limit(min_start..=end);
                 self.range_handles[1].set_limit(start..=max_end);
-                let response = ui
+                
+                ui
                     .vertical(|ui| {
                         let res = ui.horizontal(|ui| {
                             ui.spacing_mut().item_spacing = egui::vec2(0., 0.);
@@ -253,8 +254,7 @@ impl egui::Widget for &mut Model {
                         }
                         res
                     })
-                    .response;
-                response
+                    .response
             }
         }
     }

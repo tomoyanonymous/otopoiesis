@@ -1,6 +1,6 @@
 use crate::audio::{Component, PlaybackInfo};
 use crate::data;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 #[derive(Debug)]
 pub struct Model {
@@ -27,7 +27,7 @@ impl Model {
             .lock()
             .unwrap()
             .iter()
-            .map(|region| super::region::Model::new(Arc::clone(&region), channels))
+            .map(|region| super::region::Model::new(Arc::clone(region), channels))
             .collect::<Vec<_>>()
     }
     fn renew_regions(&mut self, info: &PlaybackInfo) {
@@ -36,19 +36,15 @@ impl Model {
         let channels = info.channels;
         #[cfg(not(target_arch = "wasm32"))]
         let res = {
-            let handles = self
-                .param
+            self.param
                 .lock()
                 .unwrap()
                 .iter()
                 .map(|region| {
                     //temporary moves value to
-                    let model = super::region::Model::new(Arc::clone(&region), channels);
+                    let model = super::region::Model::new(Arc::clone(region), channels);
                     super::region::render_region_offline_async(model, info)
                 })
-                .collect::<Vec<_>>();
-            handles
-                .into_iter()
                 .map(move |h| h.join().expect("hoge"))
                 .collect::<Vec<super::region::Model>>()
         };
@@ -79,7 +75,7 @@ impl Component for Model {
     fn prepare_play(&mut self, info: &PlaybackInfo) {
         self.renew_regions(info);
     }
-    fn render(&mut self, input: &[f32], output: &mut [f32], info: &PlaybackInfo) {
+    fn render(&mut self, _input: &[f32], output: &mut [f32], info: &PlaybackInfo) {
         //後に入ってるリージョンで基本は上書きする
         //channel is tekitou
         let chs = 2;

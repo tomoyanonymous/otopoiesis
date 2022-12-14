@@ -95,13 +95,11 @@ pub fn sinewave(params: Arc<data::OscillatorParam>) -> GenericOscillator {
     GenericOscillator::new(params, move |phase: f32| phase.sin())
 }
 pub fn saw(params: Arc<data::OscillatorParam>, direction: Arc<atomic::Bool>) -> GenericOscillator {
-    let direction = direction.clone();
     GenericOscillator::new(params, move |phase: f32| {
         (phase * 2.0 - 1.0) * if direction.load() { 1.0 } else { -1.0 }
     })
 }
 pub fn rect(params: Arc<data::OscillatorParam>, duty: Arc<atomic::F32>) -> GenericOscillator {
-    let duty = duty.clone();
     GenericOscillator::new(
         params,
         move |phase: f32| {

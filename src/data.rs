@@ -79,11 +79,7 @@ pub struct Transport {
 
 impl Transport {
     pub fn new() -> Self {
-        Self {
-            is_playing: atomic::U8::from(2),
-            time: Arc::new(atomic::U64::from(0)),
-            playing_history: atomic::U8::from(2),
-        }
+        Self::default()
     }
     pub fn request_play(&self, p: PlayOp) {
         self.playing_history.store(self.is_playing.load());
@@ -102,6 +98,16 @@ impl Transport {
             res
         } else {
             None
+        }
+    }
+}
+
+impl Default for Transport {
+    fn default() -> Self {
+        Self {
+            is_playing: atomic::U8::from(2),
+            time: Arc::new(atomic::U64::from(0)),
+            playing_history: atomic::U8::from(2),
         }
     }
 }
@@ -132,6 +138,12 @@ pub enum Track {
 
 impl Track {
     pub fn new() -> Self {
+        Self::default()
+    }
+}
+
+impl Default for Track {
+    fn default() -> Self {
         Track::Regions(Arc::new(Mutex::new(vec![])))
     }
 }

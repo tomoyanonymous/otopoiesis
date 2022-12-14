@@ -103,7 +103,10 @@ where
         write!(
             f,
             "Add {}",
-            self.0.elem_to_add.as_ref().map_or("".to_string(), |v| v.to_string())
+            self.0
+                .elem_to_add
+                .as_ref()
+                .map_or("".to_string(), |v| v.to_string())
         )
     }
 }
@@ -115,7 +118,10 @@ where
         write!(
             f,
             "Remove {}",
-            self.0.elem_to_add.as_ref().map_or("".to_string(), |v| v.to_string())
+            self.0
+                .elem_to_add
+                .as_ref()
+                .map_or("".to_string(), |v| v.to_string())
         )
     }
 }
@@ -159,7 +165,7 @@ impl std::fmt::Display for Action {
     }
 }
 
-fn make_action_dyn<'a>(
+fn make_action_dyn(
     a: impl DisplayableAction<Target = (), Output = (), Error = OpsContainerError> + 'static,
 ) -> Action {
     Action(Box::new(a))
@@ -174,11 +180,10 @@ pub fn add_region(
     app.history.apply(
         &mut (),
         make_action_dyn(AddtoContainer::<Arc<data::Region>>(OpsContainer {
-            container: track.clone(),
+            container: track,
             elem_to_add: Some(region),
         })),
     )
-
 }
 pub fn add_track(app: &mut data::AppModel, track: data::Track) -> Result<(), OpsContainerError> {
     app.history.apply(

@@ -66,8 +66,7 @@ where
             let oconfig_builder = device
                 .supported_output_configs()
                 .unwrap()
-                .filter(|c| c.channels() == 2)
-                .next()
+                .find(|c| c.channels() >= 2)
                 .expect("no supported config?!");
             let mut oconfig = if let Some(sr) = sample_rate {
                 oconfig_builder
@@ -130,7 +129,7 @@ where
     fn get_current_time_in_sample(&self) -> u64;
     fn get_current_time(&self) -> std::time::Duration {
         let now = self.get_current_time_in_sample();
-        let now_f64 = self.get_outstream().as_ref().map_or(0., |os| {
+        let now_f64 = self.get_outstream().as_ref().map_or(0., |_os| {
             let sr = self.get_samplerate();
             now as f64 / sr as f64
         });
@@ -149,7 +148,7 @@ pub struct OutputModel<E: Component + Sync + Send> {
     pub current_time: Arc<atomic::U64>,
 }
 
-fn pass_in(model: Arc<Mutex<InputModel>>, buffer: &[f32], info: cpal::StreamConfig) {
+fn pass_in(model: Arc<Mutex<InputModel>>, buffer: &[f32], _info: cpal::StreamConfig) {
     if let Ok(mut m) = model.try_lock() {
         let _num = m.producer.push_slice(buffer);
     }
@@ -170,7 +169,7 @@ fn pass_out(
         let _num = model.consumer.pop_slice(&mut buf);
 
         let info = PlaybackInfo {
-            sample_rate: info.sample_rate.0.into(),
+            sample_rate: info.sample_rate.0,
             current_time: t as usize,
             channels: info.channels as u64,
             frame_per_buffer,
@@ -257,7 +256,7 @@ where
 
         if let Ok(mut model) = self.omodel.lock() {
             let info = PlaybackInfo {
-                sample_rate: config.sample_rate.0.into(),
+                sample_rate: config.sample_rate.0,
                 current_time: 0,
                 frame_per_buffer: buffer_size as u64,
                 channels: config.channels as u64,

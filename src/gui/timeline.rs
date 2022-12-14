@@ -25,10 +25,10 @@ fn param_to_track(
 impl Model {
     pub fn new(param: Arc<data::Project>, app: Arc<Mutex<data::AppModel>>,time:Arc<atomic::U64>) -> Self {
 
-        let track = param_to_track(&param.clone().tracks, app.clone()).unwrap();
+        let track = param_to_track(&param.tracks, app.clone()).unwrap();
         Self {
             app: Arc::clone(&app),
-            time:time.clone(),
+            time,
             track,
         }
     }

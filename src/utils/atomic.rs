@@ -1,6 +1,6 @@
 //! Generic atomic data structures that can be easily converted from/into inner data types.
 //! The ordering of store/load is fixed to [ `std::sync::atomic` ].
-//! 
+//!
 
 use atomic_float;
 use serde::{Deserialize, Serialize};
@@ -49,9 +49,9 @@ macro_rules! impl_simple_atomic {
                 self.v.store(v, Self::ORDER)
             }
         }
-        impl Into<$p> for Primitive<$p, $a> {
-            fn into(self) -> $p {
-                self.load()
+        impl From<Primitive<$p, $a>> for $p {
+            fn from(v: Primitive<$p, $a>) -> Self {
+                v.load()
             }
         }
         impl Clone for Primitive<$p, $a> {
@@ -68,11 +68,12 @@ macro_rules! impl_simple_atomic {
                 $name(Primitive::<$p, $a>::from(v))
             }
         }
-        impl Into<$p> for $name {
-            fn into(self) -> $p {
-                self.0.load()
+        impl From<$name> for $p {
+            fn from(v: $name) -> Self {
+                v.0.load()
             }
         }
+
         impl $name {
             pub fn load(&self) -> $p {
                 self.0.load()
@@ -118,12 +119,12 @@ mod test {
     fn boolean() {
         let t = Bool::from(true);
         let v: bool = t.into();
-        assert_eq!(v, true);
+        assert!(v);
     }
     #[test]
     fn serialize() {
         let t = U64::from(42);
         let json = serde_json::to_string_pretty(&t).unwrap();
-        assert_eq!(json.to_string(), "42".to_string())
+        assert_eq!(json, "42".to_string())
     }
 }

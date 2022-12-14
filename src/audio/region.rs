@@ -22,8 +22,8 @@ pub struct FadeModel {
 impl FadeModel {
     fn new(p: Arc<data::FadeParam>, origin: Arc<data::Region>) -> Self {
         Self {
-            param: p.clone(),
-            origin: Box::new(Model::new(origin.clone(), 2)),
+            param: p,
+            origin: Box::new(Model::new(origin, 2)),
         }
     }
 }
@@ -83,8 +83,8 @@ pub struct RangedComponentDyn {
 impl RangedComponentDyn {
     pub fn new(generator: Box<dyn Component + Sync + Send>, range: Arc<AtomicRange>) -> Self {
         Self {
-            generator: generator,
-            range: range.clone(),
+            generator,
+            range,
             buffer: vec![],
         }
     }
@@ -102,7 +102,7 @@ impl RangedComponent for RangedComponentDyn {
 
     fn render_offline(&mut self, dest: &mut Vec<f32>, sample_rate: u32, channels: u64) {
         let info_local = PlaybackInfo {
-            sample_rate: sample_rate,
+            sample_rate,
             current_time: 0,
             frame_per_buffer: dest.len() as u64 / channels,
             channels,
@@ -120,9 +120,7 @@ impl TransformerModel {
     fn new(filter: &data::RegionFilter, origin: Arc<data::Region>) -> Self {
         let component = match filter {
             data::RegionFilter::Gain => todo!(),
-            data::RegionFilter::FadeInOut(param) => {
-                Box::new(FadeModel::new(param.clone(), origin.clone()))
-            }
+            data::RegionFilter::FadeInOut(param) => Box::new(FadeModel::new(param.clone(), origin)),
             data::RegionFilter::Reverse => todo!(),
         };
         Self(component)
@@ -144,7 +142,7 @@ impl Model {
         let buf_size = channels as u64 * 60000; //todo!
         let content: Box<dyn RangedComponent + Send + Sync> = match &params.content {
             data::Content::Generator(g) => {
-                let c = super::generator::get_component_for_generator(&g);
+                let c = super::generator::get_component_for_generator(g);
                 let ranged_component = RangedComponentDyn::new(c, params.range.clone());
                 Box::new(ranged_component)
             }
@@ -184,8 +182,8 @@ pub fn render_region_offline_async(
     let name = region.params.label.clone();
     let info = info.clone();
 
-    let res = std::thread::Builder::new()
-        .name(name.clone())
+    std::thread::Builder::new()
+        .name(name)
         .spawn(move || {
             let mut r = region;
 
@@ -196,10 +194,7 @@ pub fn render_region_offline_async(
 
             r.cache_completed = true;
             r.interleaved_samples_cache.copy_from_slice(dest.as_slice());
-
-            return r;
+            r
         })
-        .expect("failed to launch thread");
-
-    res
+        .expect("failed to launch thread")
 }

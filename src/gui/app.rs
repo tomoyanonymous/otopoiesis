@@ -18,7 +18,7 @@ impl Model {
         let transport = &parameter.transport;
         Self {
             param: p.clone(),
-            timeline: gui::timeline::Model::new(proj, p.clone(), transport.time.clone()),
+            timeline: gui::timeline::Model::new(proj, p, transport.time.clone()),
             transport: gui::transport::Model::new(Arc::clone(transport), sr),
         }
     }
@@ -29,7 +29,7 @@ impl Model {
     pub fn show_ui(&mut self, ctx: &egui::Context) {
         let is_mac = ctx.os() == egui::os::OperatingSystem::Mac;
 
-        egui::panel::TopBottomPanel::top("header").show(&ctx, |ui| {
+        egui::panel::TopBottomPanel::top("header").show(ctx, |ui| {
             ui.vertical(|ui| {
                 ui.label("otopoiesis");
                 ui.horizontal(|ui| {
@@ -81,11 +81,11 @@ impl Model {
                 })
             });
         });
-        egui::CentralPanel::default().show(&ctx, |ui| {
+        egui::CentralPanel::default().show(ctx, |ui| {
             egui::ScrollArea::both().show(ui, |ui| {
                 ui.add(&mut self.timeline);
                 egui::panel::TopBottomPanel::bottom("footer")
-                    .show(&ctx, |ui| ui.add(&mut self.transport));
+                    .show(ctx, |ui| ui.add(&mut self.transport));
             });
         });
     }

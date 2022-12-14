@@ -11,7 +11,7 @@ pub struct FadeHandle {
 impl FadeHandle {
     pub fn new(param: Arc<data::FadeParam>, range: &AtomicRange) -> Self {
         Self {
-            param: param,
+            param,
             range: range.start()..=range.end(),
             start_tmp: 0.0,
             end_tmp: 0.0,
@@ -99,7 +99,7 @@ pub struct TransformerModel {
 impl TransformerModel {
     pub fn from(region: Arc<data::Region>) -> Self {
         let range = region.range.clone();
-            match &region.content {
+        match &region.content {
             data::Content::Generator(_) | data::Content::AudioFile(_) => todo!(),
             data::Content::Transformer(filter, origin) => {
                 let filter = match filter.as_ref() {
@@ -109,8 +109,8 @@ impl TransformerModel {
                     data::RegionFilter::FadeInOut(p) => FadeHandle::new(p.clone(), &range),
                 };
                 Self {
-                    filter: filter,
-                    origin: Box::new(super::region::Model::new(Arc::clone(&origin), "filter1")),
+                    filter,
+                    origin: Box::new(super::region::Model::new(Arc::clone(origin), "filter1")),
                 }
             }
         }

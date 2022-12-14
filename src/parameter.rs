@@ -36,7 +36,7 @@ impl Parameter<f32> for FloatParameter {
     fn set(&self, v: f32) {
         self.value
             .0
-            .store(v.max(*self.range.start()).min(*self.range.end()).into());
+            .store(v.max(*self.range.start()).min(*self.range.end()));
     }
 }
 

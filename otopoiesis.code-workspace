@@ -6,6 +6,7 @@
 	],
 	"settings": {
 		"evenBetterToml.semanticTokens": true,
+		"rust-analyzer.checkOnSave.command": "clippy"
 		// Uncomment when debugging wasm target!
 		// "rust-analyzer.cargo.target": "wasm32-unknown-unknown",
 		// "rust-analyzer.cargo.features": [

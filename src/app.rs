@@ -26,7 +26,7 @@ fn new_renderer(app: &data::AppModel) -> Renderer<audio::timeline::Model> {
 
 impl Model {
     pub fn new(_cc: &eframe::CreationContext<'_>) -> Self {
-        let sample_rate = 44100 as u64;
+        let sample_rate = 44100;
 
         let project = Arc::new(data::Project {
             sample_rate: atomic::U64::from(sample_rate),
@@ -41,7 +41,10 @@ impl Model {
         let ui = gui::app::Model::new(Arc::clone(&app));
 
         let json = serde_json::to_string_pretty(&project);
-        let json_str = json.unwrap_or("failed to parse".to_string());
+        let json_str = json.unwrap_or_else(|e| {
+            println!("{}", e);
+            "failed to print".to_string()
+        });
         let mut renderer = new_renderer(&app.lock().unwrap());
 
         renderer.prepare_play();
@@ -59,7 +62,7 @@ impl Model {
 
     pub fn play(&mut self) {
         /// Todo: on web platform, we need to re-create renderer each time.
-        #[cfg(target_arch="wasm32")]
+        #[cfg(target_arch = "wasm32")]
         self.refresh_audio();
 
         self.audio.prepare_play();
@@ -71,7 +74,10 @@ impl Model {
     fn ui_to_code(&mut self) {
         let app = self.app.lock().unwrap();
         let json = serde_json::to_string_pretty(&app.project);
-        let json_str = json.unwrap_or("failed to parse".to_string());
+        let json_str = json.unwrap_or_else(|e| {
+            println!("{}", e);
+            "failed to print".to_string()
+        });
         self.project_str = json_str;
     }
     fn code_to_ui(&mut self) {
@@ -118,11 +124,10 @@ impl eframe::App for Model {
                     egui::Modifiers::COMMAND,
                     egui::Key::Z,
                 ))
+                && app.can_undo()
             {
-                if app.can_undo() {
-                    app.undo();
-                    self.ui.sync_state(&app.project.tracks);
-                }
+                app.undo();
+                self.ui.sync_state(&app.project.tracks);
             }
             if ctx
                 .input_mut()
@@ -130,11 +135,10 @@ impl eframe::App for Model {
                     egui::Modifiers::COMMAND.plus(egui::Modifiers::SHIFT),
                     egui::Key::Z,
                 ))
+                && app.can_redo()
             {
-                if app.can_redo() {
-                    app.redo();
-                    self.ui.sync_state(&app.project.tracks);
-                }
+                app.redo();
+                self.ui.sync_state(&app.project.tracks);
             }
             if ctx
                 .input_mut()
@@ -163,11 +167,13 @@ impl eframe::App for Model {
         }
         self.sync_transport();
 
-        let mut style = egui::Style::default();
-        style.animation_time = 0.2;
+        let style = egui::Style {
+            animation_time: 0.2,
+            ..Default::default()
+        };
         ctx.set_style(style);
 
-        self.ui.show_ui(&ctx);
+        self.ui.show_ui(ctx);
 
         if self.audio.is_playing() {
             //needs constant update while playing
@@ -178,7 +184,7 @@ impl eframe::App for Model {
             .default_width(400.)
             .max_width(1920.)
             .resizable(true)
-            .show_animated(&ctx, self.editor_open, |ui| {
+            .show_animated(ctx, self.editor_open, |ui| {
                 egui::ScrollArea::vertical().show(ui, |ui| {
                     let editor = ui.add_sized(
                         ui.available_size(),
@@ -195,7 +201,7 @@ impl eframe::App for Model {
                     if let Err(err) = &self.code_compiled {
                         ui.colored_label(
                             egui::Color32::RED,
-                            format!("failed to evaluate json:{}", err.to_string()),
+                            format!("failed to evaluate json:{}", err),
                         );
                     }
                 });
@@ -203,7 +209,7 @@ impl eframe::App for Model {
         egui::panel::SidePanel::right("toggle")
             .min_width(30.)
             .resizable(false)
-            .show(&ctx, |ui| {
+            .show(ctx, |ui| {
                 let text = if self.editor_open { "[>]" } else { "[<]" };
                 ui.vertical(|ui| {
                     let button = ui.button(text);

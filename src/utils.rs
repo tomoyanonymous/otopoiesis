@@ -5,7 +5,6 @@ use serde::{Deserialize, Serialize};
 
 use std::sync::Arc;
 
-
 #[derive(Serialize, Deserialize, Debug)]
 pub struct AtomicRange(pub Arc<atomic::U64>, pub Arc<atomic::U64>);
 
@@ -29,7 +28,7 @@ impl AtomicRange {
         self.1.load()
     }
     pub fn getrange(&self) -> u64 {
-        &self.1.load() - &self.0.load()
+        self.1.load() - self.0.load()
     }
     pub fn contains(&self, v: u64) -> bool {
         let (min, max) = self.get_pair();
@@ -57,8 +56,7 @@ impl AtomicRange {
             if let Some(v) = f {
                 self.set_start((v * scaling_factor) as u64);
             }
-            let res = self.get_pair().0 as f64 / scaling_factor;
-            res
+            self.get_pair().0 as f64 / scaling_factor
         })
     }
     pub fn egui_get_set_end(&self, scaling_factor: f64) -> EguiGetSet {
@@ -66,8 +64,7 @@ impl AtomicRange {
             if let Some(v) = f {
                 self.set_end((v * scaling_factor) as u64);
             }
-            let res = self.get_pair().1 as f64 / scaling_factor;
-            res
+            self.get_pair().1 as f64 / scaling_factor
         })
     }
 }
@@ -76,8 +73,8 @@ impl Clone for AtomicRange {
         Self(Arc::clone(&self.0), Arc::clone(&self.1))
     }
 }
-impl From<std::ops::Range<u64>> for AtomicRange{
+impl From<std::ops::Range<u64>> for AtomicRange {
     fn from(t: std::ops::Range<u64>) -> Self {
-        Self::new(t.start,t.end)
+        Self::new(t.start, t.end)
     }
 }

@@ -1,5 +1,4 @@
 use crate::data;
-use crate::utils::atomic;
 use std::sync::Arc;
 struct Toggle {
     transport: Arc<data::Transport>,
@@ -8,7 +7,7 @@ struct Toggle {
 impl Toggle {
     fn new(t: Arc<data::Transport>) -> Self {
         Self {
-            transport: t.clone(),
+            transport: t,
         }
     }
 }
@@ -42,7 +41,7 @@ impl Model {
         Self {
             param: param.clone(),
             sample_rate,
-            playbutton: Toggle::new(param.clone()),
+            playbutton: Toggle::new(param),
             // play_button,
         }
     }
