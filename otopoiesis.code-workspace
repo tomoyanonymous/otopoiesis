@@ -12,5 +12,12 @@
 		// "rust-analyzer.cargo.features": [
 		// 	"web"
 		// ]
+	},
+	"extensions": {
+		"recommendations": [
+			"rust-lang.rust-analyzer",
+			"tamasfe.even-better-toml",
+			"vadimcn.vscode-lldb"
+		]
 	}
 }
