@@ -41,7 +41,7 @@ module.exports = {
 
     new webpack.LoaderOptionsPlugin({
       options: {
-        exprimnet: {
+        experiments: {
           asyncWebAssembly: true
         }
       }
