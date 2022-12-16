@@ -78,3 +78,14 @@ impl From<std::ops::Range<u64>> for AtomicRange {
         Self::new(t.start, t.end)
     }
 }
+
+impl From<std::ops::RangeInclusive<u64>> for AtomicRange {
+    fn from(t: std::ops::RangeInclusive<u64>) -> Self {
+        Self::new(*t.start(), *t.end())
+    }
+}
+impl From<&AtomicRange> for std::ops::RangeInclusive<u64> {
+    fn from(t: &AtomicRange) -> Self {
+        t.start()..=t.end()
+    }
+}

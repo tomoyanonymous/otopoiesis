@@ -16,6 +16,11 @@ pub struct FadeParam {
     pub time_out: atomic::F32,
 }
 
+#[derive(Serialize, Deserialize, Clone, Default, Debug)]
+pub struct ReplicateParam {
+    pub count: atomic::U32,
+}
+
 /// Region filter transforms another region.
 /// Maybe the region after transformation has different range from the origin.
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -23,11 +28,12 @@ pub enum RegionFilter {
     Gain,
     FadeInOut(Arc<FadeParam>),
     Reverse,
+    Replicate(Arc<ReplicateParam>),
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub enum Content {
-    Generator(Generator),
+    Generator(Arc<Generator>),
     AudioFile(AudioFile),
     Transformer(Arc<RegionFilter>, Arc<Region>),
 }
@@ -47,8 +53,6 @@ impl Region {
     /// Utility function that converts a raw region into the region with fadein/out transformer.
     ///
     pub fn new(range: AtomicRange, content: Content, label: impl Into<String>) -> Self {
-
-
         Self {
             range: Arc::new(range),
             content,
@@ -74,7 +78,7 @@ impl std::default::Default for Region {
     fn default() -> Self {
         Self {
             range: Arc::new(AtomicRange::new(0, 0)),
-            content: Content::Generator(Generator::default()),
+            content: Content::Generator(Arc::new(Generator::default())),
             label: "".to_string(),
         }
     }

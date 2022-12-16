@@ -1,10 +1,10 @@
 use crate::data;
 use crate::gui;
-use crate::parameter::Parameter;
 
 use crate::utils::atomic;
 use std::ops::RangeInclusive;
 use std::sync::Arc;
+pub mod regionfilter;
 
 enum HandleMode {
     Start,
@@ -65,108 +65,75 @@ impl egui::Widget for &mut UiBar {
 
         self.react(&response);
         let rect_x = ui.min_rect().left();
-        let _text = response.hover_pos().map_or("none".to_string(), |p| {
-            format!("{:?}/offset:{}", p, rect_x)
-        });
+        let _text = response
+            .hover_pos()
+            .map_or("none".to_string(), |p| format!("{:?}/offset:{}", p, rect_x));
         response
+    }
+}
+
+pub enum ContentModel {
+    RegionFilter(regionfilter::RegionFilter),
+    Generator(super::generator::Generator),
+}
+
+impl egui::Widget for &mut ContentModel {
+    fn ui(self, ui: &mut egui::Ui) -> egui::Response {
+        match self {
+            ContentModel::RegionFilter(p) => p.ui(ui),
+            ContentModel::Generator(g) => g.ui(ui),
+        }
     }
 }
 
 pub struct Model {
     pub params: Arc<data::Region>,
     pub label: String,
-    pub transformer: Option<super::generator::TransformerModel>,
-    samples: Vec<f32>,
+    content: ContentModel,
     range_handles: [UiBar; 2], // pub osc_params: Arc<oscillator::SharedParams>,
     offset_saved: i64,
 }
 
 impl Model {
-    pub fn update_samples(&mut self) {
-        // let mut phase = 0.0f32;
-        let len = self.samples.len();
-        if let data::Content::Generator(gen) = &self.params.content {
-            match gen {
-                data::Generator::Oscillator(_kind, osc) => {
-                    let mut phase_gui = 0.0f32;
-                    for s in self.samples.iter_mut() {
-                        *s = phase_gui.sin() * osc.amp.get();
-                        let twopi = std::f32::consts::PI * 2.0;
-                        //とりあえず、440Hzで1周期分ということで
-                        let ratio = osc.freq.get() / 440.0;
-                        let increment = ratio * twopi / len as f32;
-                        phase_gui = (phase_gui + increment) % twopi;
-                    }
-                }
-                data::Generator::Noise() => {
-                    unimplemented!()
-                }
-            }
-        }
-    }
-
     pub fn new(params: Arc<data::Region>, labeltext: impl ToString) -> Self {
-        let size = 512;
-        let samples = vec![0f32; size];
         let label = labeltext.to_string();
         let handle_left = UiBar::new(params.range.0.clone(), HandleMode::Start);
         let handle_right = UiBar::new(params.range.1.clone(), HandleMode::End);
-        let transformer = match &params.content {
-            data::Content::Generator(_) | data::Content::AudioFile(_) => None,
-            data::Content::Transformer(_filter, _origin) => {
-                Some(super::generator::TransformerModel::from(params.clone()))
+        let content = match &params.content {
+            data::Content::Generator(param) => {
+                ContentModel::Generator(super::generator::Generator::new(param.clone()))
             }
+            data::Content::AudioFile(_) => todo!(),
+            data::Content::Transformer(filter, origin) => ContentModel::RegionFilter(
+                regionfilter::RegionFilter::new(filter.clone(), origin.clone()),
+            ),
         };
-        let mut res = Self {
-            samples,
+        Self {
             label,
+            content,
             params,
-            transformer,
             range_handles: [handle_left, handle_right],
             offset_saved: 0,
-        };
-        res.update_samples();
-        res
+        }
     }
     pub fn get_current_amp(&self) -> f32 {
         // self.osc_params.amp.get().abs()
         1.0
     }
-    fn make_graph_sized(&mut self, ui: &mut egui::Ui, size: egui::Vec2) -> egui::Response {
-        let width = size.x;
-        let height = size.y;
-        let points = self
-            .samples
-            .iter()
-            .enumerate()
-            .map(|(i, s)| {
-                let x = egui::emath::remap(
-                    i as f64,
-                    0.0..=self.samples.len() as f64,
-                    0.0..=width as f64,
-                );
-
-                let y = *s * height * self.get_current_amp();
-                [x, y as f64]
-            })
-            .collect::<Vec<_>>();
-        
-        egui::plot::Plot::new(ui.auto_id_with(self.params.label.clone()))
-            .allow_drag(false)
-            .allow_zoom(false)
-            .allow_boxed_zoom(false)
-            .allow_scroll(false)
-            .allow_double_click_reset(false)
-            .width(width)
-            .height(height)
-            .show_x(false)
-            .show_y(false)
-            .show_axes([false, true])
-            .min_size(egui::vec2(0., 0.))
-            .show(ui, |plot_ui| plot_ui.line(egui::plot::Line::new(points)))
-            .response
-            .on_hover_cursor(egui::CursorIcon::Grab)
-            .interact(egui::Sense::click_and_drag())
+    fn draw_main(&mut self, ui: &mut egui::Ui, is_interactive: bool) -> egui::Response {
+        let mut main = ui.add(&mut self.content);
+        if is_interactive && main.drag_started() {
+            self.offset_saved = self.params.range.start() as i64;
+        }
+        if is_interactive && main.dragged() {
+            let offset = (main.drag_delta().x * gui::SAMPLES_PER_PIXEL_DEFAULT) as i64;
+            self.params.range.shift_bounded(offset);
+            main = main.on_hover_cursor(egui::CursorIcon::Grabbing)
+        }
+        if is_interactive && main.drag_released() {
+            self.offset_saved = 0;
+        }
+        main
     }
 }
 
@@ -178,84 +145,39 @@ impl std::hash::Hash for Model {
 
 impl egui::Widget for &mut Model {
     fn ui(self, ui: &mut egui::Ui) -> egui::Response {
-        let scaling_factor = super::SAMPLES_PER_PIXEL_DEFAULT;
-        let width = self.params.range.getrange() as f32 / scaling_factor;
         let height = gui::TRACK_HEIGHT;
-        let region_size = egui::vec2(width, height);
-        match &mut self.transformer {
-            Some(t) => {
-                let range = t.filter.range.end() - t.filter.range.start();
-                let width = range as f32 / scaling_factor;
-                let height = gui::TRACK_HEIGHT;
-                let region_size = egui::vec2(width, height);
-                self.params.range.0.store(t.origin.params.range.0.load());
-                self.params.range.1.store(t.origin.params.range.1.load());
 
-                ui.add_sized(region_size, t)
-            }
-            None => {
-                let bar_width = 5.;
-                let start = self.params.range.start();
-                let end = self.params.range.end();
-                let min_start = 0u64;
-                let max_end = std::u64::MAX;
+        let bar_width = 5.;
+        let start = self.params.range.start();
+        let end = self.params.range.end();
+        let min_start = 0u64;
+        let max_end = std::u64::MAX;
+        self.range_handles[0].set_limit(min_start..=end);
+        self.range_handles[1].set_limit(start..=max_end);
+        ui.spacing_mut().item_spacing = egui::vec2(0., 0.);
 
-                self.range_handles[0].set_limit(min_start..=end);
-                self.range_handles[1].set_limit(start..=max_end);
-                
-                ui
-                    .vertical(|ui| {
-                        let res = ui.horizontal(|ui| {
-                            ui.spacing_mut().item_spacing = egui::vec2(0., 0.);
+        ui.horizontal(|ui| {
+            let bar_size = egui::vec2(bar_width, height);
 
-                            let bar_size = egui::vec2(bar_width, height);
-
-                            let mut graph = {
-                                ui.add_sized(bar_size, &mut self.range_handles[0]);
-                                let graph = self.make_graph_sized(ui, region_size);
-                                ui.add_sized(bar_size, &mut self.range_handles[1]);
-                                graph
-                            };
-                            if graph.drag_started() {
-                                self.offset_saved = self.params.range.start() as i64;
-                            }
-                            if graph.dragged() {
-                                let offset =
-                                    (graph.drag_delta().x * gui::SAMPLES_PER_PIXEL_DEFAULT) as i64;
-                                self.params.range.shift_bounded(offset);
-                                graph = graph.on_hover_cursor(egui::CursorIcon::Grabbing)
-                            }
-                            if graph.drag_released() {
-                                self.offset_saved = 0;
-                            }
-                        });
-                        if let data::Content::Generator(gen) = &self.params.content {
-                            match gen {
-                                data::Generator::Oscillator(_fun, osc) => {
-                                    let range = &osc.freq.range;
-                                    let slider = ui.add(
-                                        egui::Slider::from_get_set(
-                                            *range.start() as f64..=*range.end() as f64,
-                                            |v: Option<f64>| {
-                                                if let Some(n) = v {
-                                                    osc.freq.set(n as f32);
-                                                }
-                                                osc.freq.get() as f64
-                                            },
-                                        )
-                                        .logarithmic(true),
-                                    );
-                                    if slider.changed() {
-                                        self.update_samples();
-                                    }
-                                }
-                                _ => unimplemented!(),
-                            };
+            match &self.content {
+                ContentModel::RegionFilter(f) => {
+                    match f {
+                        regionfilter::RegionFilter::FadeInOut(f) => {
+                            self.params.range.set_start(f.range.start());
+                            self.params.range.set_end(f.range.end());
                         }
-                        res
-                    })
-                    .response
+                        regionfilter::RegionFilter::Replicate(_) => todo!(),
+                    };
+                    self.draw_main(ui, false)
+                }
+                ContentModel::Generator(_) => {
+                    ui.add_sized(bar_size, &mut self.range_handles[0]);
+                    let main = self.draw_main(ui, true);
+                    ui.add_sized(bar_size, &mut self.range_handles[1]);
+                    main
+                }
             }
-        }
+        })
+        .response
     }
 }

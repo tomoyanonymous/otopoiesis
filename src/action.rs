@@ -1,4 +1,7 @@
 //! The definitions of un/redo-able actions for applications.
+//! Todo: fix an inconsistensy after code-app translation because serializing/deserializing refreshes Arc references.
+
+
 
 use crate::data::{self, SharedVec};
 use std::sync::{Arc, MutexGuard, PoisonError};

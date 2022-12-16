@@ -122,6 +122,7 @@ impl TransformerModel {
             data::RegionFilter::Gain => todo!(),
             data::RegionFilter::FadeInOut(param) => Box::new(FadeModel::new(param.clone(), origin)),
             data::RegionFilter::Reverse => todo!(),
+            data::RegionFilter::Replicate(_) => todo!(),
         };
         Self(component)
     }
