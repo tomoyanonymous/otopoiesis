@@ -66,6 +66,7 @@ impl egui::Widget for &mut Model {
         let res = ui.allocate_ui(egui::vec2(ui.available_size().x, height), |ui| {
             let area = ui.available_rect_before_wrap();
             let left_top = area.left_top();
+            let top = area.top() - height / 2.;
             let res = ui.group(|ui| {
                 self.regions
                     .iter_mut()
@@ -74,8 +75,8 @@ impl egui::Widget for &mut Model {
                         let x_start = range.start() as f32 / gui::SAMPLES_PER_PIXEL_DEFAULT;
                         let x_end = range.end() as f32 / gui::SAMPLES_PER_PIXEL_DEFAULT;
                         let rect = egui::Rect::from_points(&[
-                            [x_start, 0.0].into(),
-                            [x_end, height].into(),
+                            [x_start, top].into(),
+                            [x_end, top + height].into(),
                         ]);
                         ui.put(rect, region)
                     })

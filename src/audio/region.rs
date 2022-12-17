@@ -1,7 +1,7 @@
 use crate::audio::{Component, PlaybackInfo};
 
 // use crate::parameter::UIntParameter
-use crate::data;
+use crate::data::{self, Region};
 use crate::utils::AtomicRange;
 use std::ops::RangeInclusive;
 use std::sync::Arc;
@@ -11,7 +11,7 @@ use std::sync::Arc;
 pub trait RangedComponent: std::fmt::Debug {
     fn get_range(&self) -> RangeInclusive<u64>;
     fn get_output_channels(&self) -> u64;
-    fn render_offline(&mut self, dest: &mut Vec<f32>, sample_rate: u32, channels: u64);
+    fn render_offline(&mut self, dest: &mut [f32], sample_rate: u32, channels: u64);
 }
 
 #[derive(Debug)]
@@ -36,8 +36,9 @@ impl RangedComponent for FadeModel {
     fn get_output_channels(&self) -> u64 {
         2
     }
-    fn render_offline(&mut self, dest: &mut Vec<f32>, sample_rate: u32, channels: u64) {
-        dest.resize(self.origin.interleaved_samples_cache.len(), 0.0);
+    fn render_offline(&mut self, dest: &mut [f32], sample_rate: u32, channels: u64) {
+        // resize should be the caller.
+        // dest.resize(self.origin.interleaved_samples_cache.len(), 0.0);
         self.origin.render_offline(sample_rate, channels);
         let chs = self.get_output_channels() as usize;
         self.origin
@@ -75,6 +76,46 @@ impl RangedComponent for FadeModel {
 }
 
 #[derive(Debug)]
+pub struct RegionArray(Vec<Model>);
+impl RegionArray {
+    pub fn new(param: &[Arc<Region>]) -> Self {
+        Self(param.iter().map(|p| Model::new(p.clone(), 2)).collect())
+    }
+}
+
+impl RangedComponent for RegionArray {
+    /// panics  if the end is earlier than the start.
+    ///
+    fn get_range(&self) -> RangeInclusive<u64> {
+        if !self.0.is_empty() {
+            let start = self.0[0].params.range.start();
+            let end = self.0.last().unwrap().params.range.end();
+            assert!(end >= start);
+            start..=end
+        } else {
+            0..=0
+        }
+    }
+
+    fn get_output_channels(&self) -> u64 {
+        2
+    }
+
+    fn render_offline(&mut self, dest: &mut [f32], sample_rate: u32, channels: u64) {
+        //todo: asynchrounous render
+        self.0.iter_mut().for_each(|region| {
+            let range = &region.params.range;
+            let dest = &mut dest[(range.start() as usize)..(range.end() as usize)];
+            region
+                .interleaved_samples_cache
+                .resize((range.getrange() * channels) as usize, 0.0);
+            region.render_offline(sample_rate, channels);
+            dest.copy_from_slice(&region.interleaved_samples_cache);
+        });
+    }
+}
+
+#[derive(Debug)]
 pub struct RangedComponentDyn {
     generator: Box<dyn Component + Sync + Send>,
     range: Arc<AtomicRange>,
@@ -100,7 +141,7 @@ impl RangedComponent for RangedComponentDyn {
         self.generator.get_output_channels()
     }
 
-    fn render_offline(&mut self, dest: &mut Vec<f32>, sample_rate: u32, channels: u64) {
+    fn render_offline(&mut self, dest: &mut [f32], sample_rate: u32, channels: u64) {
         let info_local = PlaybackInfo {
             sample_rate,
             current_time: 0,
@@ -151,6 +192,7 @@ impl Model {
             data::Content::Transformer(filter, origin) => {
                 TransformerModel::new(filter.as_ref(), origin.clone()).0
             }
+            data::Content::Array(vec) => Box::new(RegionArray::new(vec)),
         };
         Self {
             params,
@@ -161,6 +203,8 @@ impl Model {
         }
     }
     pub fn render_offline(&mut self, sample_rate: u32, channels: u64) {
+        self.interleaved_samples_cache
+            .resize((self.params.range.getrange() * channels) as usize, 0.0);
         self.content
             .render_offline(&mut self.interleaved_samples_cache, sample_rate, channels);
         self.cache_completed = true;

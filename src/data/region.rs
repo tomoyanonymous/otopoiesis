@@ -36,6 +36,7 @@ pub enum Content {
     Generator(Arc<Generator>),
     AudioFile(AudioFile),
     Transformer(Arc<RegionFilter>, Arc<Region>),
+    Array(Vec<Arc<Region>>),
 }
 
 /// Data structure for region.
@@ -71,6 +72,45 @@ impl Region {
             ),
             origin.label.clone(),
         ))
+    }
+    pub fn interpret(&self) -> Self {
+        match &self.content {
+            Content::Transformer(p, origin) if matches!(p.as_ref(), RegionFilter::Replicate(_)) => {
+                if let RegionFilter::Replicate(param) = p.as_ref() {
+                    let mut range = origin.range.clone();
+                    let mut len = 0;
+                    let mut last = 0;
+                    let arr = Content::Array(
+                        (0..param.count.load())
+                            .into_iter()
+                            .map(|_| {
+                                //とりあえず位置をずらして複製
+                                len = range.getrange();
+                                last = range.end();
+                                range = Arc::new(AtomicRange::new(last, last + len));
+                                range.clone()
+                            })
+                            .enumerate()
+                            .map(|(i, range)| {
+                                Arc::new(Region::new(
+                                    range.as_ref().clone(),
+                                    origin.content.clone(),
+                                    format!("{}_rep_{}", origin.label, i),
+                                ))
+                            })
+                            .collect(),
+                    );
+                    Self::new(
+                        AtomicRange::new(origin.range.start(), last),
+                        arr,
+                        format!("{}_arr", origin.label),
+                    )
+                } else {
+                    unreachable!()
+                }
+            }
+            _ => self.clone(),
+        }
     }
 }
 

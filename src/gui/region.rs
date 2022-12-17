@@ -1,3 +1,5 @@
+use egui::Widget;
+
 use crate::data;
 use crate::gui;
 
@@ -75,6 +77,23 @@ impl egui::Widget for &mut UiBar {
 pub enum ContentModel {
     RegionFilter(regionfilter::RegionFilter),
     Generator(super::generator::Generator),
+    Array(Vec<Model>),
+}
+
+fn ui_vec<'a, T>(vec: &'a mut Vec<T>, ui: &mut egui::Ui) -> egui::Response
+where
+    T: 'a,
+    &'a mut T: egui::Widget,
+{
+    vec.iter_mut()
+        .map(|r| r.ui(ui))
+        .fold(None, |acc: Option<egui::Response>, response| {
+            acc.map_or_else(
+                || Some(response.clone()),
+                |a| Some(response.union(a.clone())),
+            )
+        })
+        .unwrap_or(ui.group(|_| {}).response)
 }
 
 impl egui::Widget for &mut ContentModel {
@@ -82,6 +101,7 @@ impl egui::Widget for &mut ContentModel {
         match self {
             ContentModel::RegionFilter(p) => p.ui(ui),
             ContentModel::Generator(g) => g.ui(ui),
+            ContentModel::Array(vec) => ui_vec(vec, ui),
         }
     }
 }
@@ -106,6 +126,11 @@ impl Model {
             data::Content::AudioFile(_) => todo!(),
             data::Content::Transformer(filter, origin) => ContentModel::RegionFilter(
                 regionfilter::RegionFilter::new(filter.clone(), origin.clone()),
+            ),
+            data::Content::Array(vec) => ContentModel::Array(
+                vec.iter()
+                    .map(|region| Self::new(region.clone(), region.label.clone()))
+                    .collect(),
             ),
         };
         Self {
@@ -160,13 +185,16 @@ impl egui::Widget for &mut Model {
             let bar_size = egui::vec2(bar_width, height);
 
             match &self.content {
+                // you should not call ui.add(&mut self.content) directly here.
                 ContentModel::RegionFilter(f) => {
                     match f {
                         regionfilter::RegionFilter::FadeInOut(f) => {
                             self.params.range.set_start(f.range.start());
                             self.params.range.set_end(f.range.end());
                         }
-                        regionfilter::RegionFilter::Replicate(_) => todo!(),
+                        regionfilter::RegionFilter::Replicate(_) => unreachable!(
+                            "\"Replicate\" operation must be interpreted before ui evaluation."
+                        ),
                     };
                     self.draw_main(ui, false)
                 }
@@ -176,6 +204,7 @@ impl egui::Widget for &mut Model {
                     ui.add_sized(bar_size, &mut self.range_handles[1]);
                     main
                 }
+                ContentModel::Array(_) => self.draw_main(ui, false),
             }
         })
         .response
