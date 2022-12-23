@@ -186,6 +186,7 @@ impl eframe::App for Model {
             .resizable(true)
             .show_animated(ctx, self.editor_open, |ui| {
                 egui::ScrollArea::vertical().show(ui, |ui| {
+                    let _ = ui.label("Code Editor");
                     let editor = ui.add_sized(
                         ui.available_size(),
                         egui::TextEdit::multiline(&mut self.project_str).code_editor(),
@@ -207,11 +208,11 @@ impl eframe::App for Model {
                 });
             });
         egui::panel::SidePanel::right("toggle")
-            .min_width(30.)
+            .min_width(0.)
             .resizable(false)
             .show(ctx, |ui| {
-                let text = if self.editor_open { "[>]" } else { "[<]" };
-                ui.vertical(|ui| {
+                ui.horizontal_centered(|ui| {
+                    let text = if self.editor_open { "📕" } else { "📖" };
                     let button = ui.button(text);
                     if button.clicked() {
                         self.editor_open = !self.editor_open;
