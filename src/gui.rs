@@ -8,6 +8,6 @@ pub mod generator;
 pub mod app;
 pub mod transport;
 
-pub const SAMPLES_PER_PIXEL_DEFAULT:f32= 100.0;
+pub(crate) const SAMPLES_PER_PIXEL_DEFAULT:f32= 100.0;
 
-pub const TRACK_HEIGHT:f32= 100.0;
+pub(crate) const TRACK_HEIGHT:f32= 100.0;
