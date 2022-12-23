@@ -72,8 +72,8 @@ impl egui::Widget for &mut Model {
                     .iter_mut()
                     .map(|region| {
                         let range = region.params.range.clone();
-                        let x_start = range.start() as f32 / gui::SAMPLES_PER_PIXEL_DEFAULT;
-                        let x_end = range.end() as f32 / gui::SAMPLES_PER_PIXEL_DEFAULT;
+                        let x_start = area.left() + range.start() as f32 / gui::SAMPLES_PER_PIXEL_DEFAULT;
+                        let x_end = area.left() + range.end() as f32 / gui::SAMPLES_PER_PIXEL_DEFAULT;
                         let rect = egui::Rect::from_points(&[
                             [x_start, top].into(),
                             [x_end, top + height].into(),
