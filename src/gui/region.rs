@@ -80,20 +80,20 @@ pub enum ContentModel {
     Array(Vec<Model>),
 }
 
-fn ui_vec<'a, T>(vec: &'a mut Vec<T>, ui: &mut egui::Ui) -> egui::Response
+fn ui_vec<'a, T>(vec: &'a mut [T], ui: &mut egui::Ui) -> egui::Response
 where
     T: 'a,
     &'a mut T: egui::Widget,
 {
-    vec.iter_mut()
-        .map(|r| r.ui(ui))
-        .fold(None, |acc: Option<egui::Response>, response| {
-            acc.map_or_else(
-                || Some(response.clone()),
-                |a| Some(response.union(a.clone())),
-            )
-        })
-        .unwrap_or(ui.group(|_| {}).response)
+    ui.group(|ui| {
+        vec.iter_mut()
+            .map(|r| r.ui(ui))
+            .fold(None, |acc: Option<egui::Response>, response| {
+                acc.map_or_else(|| Some(response.clone()), |a| Some(response.union(a)))
+            })
+            .unwrap_or(ui.group(|_| {}).response)
+    })
+    .inner
 }
 
 impl egui::Widget for &mut ContentModel {
@@ -127,11 +127,15 @@ impl Model {
             data::Content::Transformer(filter, origin) => ContentModel::RegionFilter(
                 regionfilter::RegionFilter::new(filter.clone(), origin.clone()),
             ),
-            data::Content::Array(vec) => ContentModel::Array(
-                vec.iter()
-                    .map(|region| Self::new(region.clone(), region.label.clone()))
-                    .collect(),
-            ),
+            // data::Content::Array(vec) => ContentModel::Array(
+            //     vec.iter()
+            //         .enumerate()
+            //         .map(|(i, region)| {
+            //             Self::new(region.clone(), format!("{}_{}", region.label.clone(), i))
+            //         })
+            //         .collect(),
+            // ),
+            _ => todo!(),
         };
         Self {
             label,
@@ -145,8 +149,8 @@ impl Model {
         // self.osc_params.amp.get().abs()
         1.0
     }
-    fn draw_main(&mut self, ui: &mut egui::Ui, is_interactive: bool) -> egui::Response {
-        let mut main = ui.add(&mut self.content);
+    fn interact_main(&mut self, main: &egui::Response, is_interactive: bool) -> egui::Response {
+        let mut main = main.clone();
         if is_interactive && main.drag_started() {
             self.offset_saved = self.params.range.start() as i64;
         }
@@ -184,29 +188,64 @@ impl egui::Widget for &mut Model {
         ui.horizontal(|ui| {
             let bar_size = egui::vec2(bar_width, height);
 
-            match &self.content {
-                // you should not call ui.add(&mut self.content) directly here.
+            let (main, is_interactive) = match &self.content {
                 ContentModel::RegionFilter(f) => {
                     match f {
                         regionfilter::RegionFilter::FadeInOut(f) => {
                             self.params.range.set_start(f.range.start());
                             self.params.range.set_end(f.range.end());
                         }
-                        regionfilter::RegionFilter::Replicate(_) => unreachable!(
-                            "\"Replicate\" operation must be interpreted before ui evaluation."
-                        ),
+                        regionfilter::RegionFilter::Replicate(_) => {}
                     };
-                    self.draw_main(ui, false)
+                    (ui.add(&mut self.content), false)
                 }
                 ContentModel::Generator(_) => {
                     ui.add_sized(bar_size, &mut self.range_handles[0]);
-                    let main = self.draw_main(ui, true);
+                    let main = ui.add(&mut self.content);
                     ui.add_sized(bar_size, &mut self.range_handles[1]);
-                    main
+                    (main, true)
                 }
-                ContentModel::Array(_) => self.draw_main(ui, false),
-            }
+                ContentModel::Array(_) => (ui.add(&mut self.content), false),
+            };
+            self.interact_main(&main, is_interactive)
         })
         .response
+    }
+}
+
+/// UI model that is used only for display element.
+/// it is mostly for displaying information for replicating regions.
+/// Any data are not shared between audio thread.
+pub(crate) struct ReadOnlyModel {
+    // params: data::Region,
+    content: ContentModel,
+}
+impl ReadOnlyModel {
+    pub fn new(origin: &data::Region) -> Self {
+        // let params = data::Region::new(
+        //     AtomicRange::new(origin.range.start(), origin.range.end()),
+        //     origin.content.clone(),
+        //     "dummy",
+        // );
+        match &origin.content {
+            data::Content::Generator(g) => Self {
+                // params,
+                content: ContentModel::Generator(gui::generator::Generator::new(g.clone())),
+            },
+            data::Content::AudioFile(_) => todo!(),
+            data::Content::Transformer(filter, origin) => Self {
+                content: ContentModel::RegionFilter(regionfilter::RegionFilter::new(
+                    filter.clone(),
+                    origin.clone(),
+                )),
+            },
+            data::Content::Array(_) => todo!(),
+        }
+    }
+}
+
+impl egui::Widget for &mut ReadOnlyModel {
+    fn ui(self, ui: &mut egui::Ui) -> egui::Response {
+        ui.add(&mut self.content)
     }
 }

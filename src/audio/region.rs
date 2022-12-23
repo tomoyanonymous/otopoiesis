@@ -110,6 +110,7 @@ impl RangedComponent for RegionArray {
                 .interleaved_samples_cache
                 .resize((range.getrange() * channels) as usize, 0.0);
             region.render_offline(sample_rate, channels);
+            assert_eq!(region.interleaved_samples_cache.len(),dest.len());
             dest.copy_from_slice(&region.interleaved_samples_cache);
         });
     }
@@ -121,6 +122,7 @@ pub struct RangedComponentDyn {
     range: Arc<AtomicRange>,
     buffer: Vec<f32>,
 }
+
 impl RangedComponentDyn {
     pub fn new(generator: Box<dyn Component + Sync + Send>, range: Arc<AtomicRange>) -> Self {
         Self {
@@ -159,11 +161,16 @@ pub struct TransformerModel(Box<dyn RangedComponent + Send + Sync>);
 
 impl TransformerModel {
     fn new(filter: &data::RegionFilter, origin: Arc<data::Region>) -> Self {
-        let component = match filter {
+        let component:Box<dyn RangedComponent + Send + Sync> = match filter {
             data::RegionFilter::Gain => todo!(),
             data::RegionFilter::FadeInOut(param) => Box::new(FadeModel::new(param.clone(), origin)),
             data::RegionFilter::Reverse => todo!(),
-            data::RegionFilter::Replicate(_) => todo!(),
+            data::RegionFilter::Replicate(c) => Box::new(RegionArray(
+                (0..c.count.load())
+                    .into_iter()
+                    .map(|i| Model::new(origin.clone(), 2))
+                    .collect::<Vec<_>>(),
+            )),
         };
         Self(component)
     }

@@ -9,6 +9,7 @@ pub struct Model {
     pub param: data::Track,
     app: Arc<Mutex<data::AppModel>>,
     regions: Vec<gui::region::Model>,
+    new_array_count: u32,
 }
 fn get_region_from_param(track: &data::Track) -> Vec<gui::region::Model> {
     match track {
@@ -30,30 +31,56 @@ impl Model {
             param,
             app,
             regions,
+            new_array_count: 5,
+        }
+    }
+    fn get_position_to_add(&self) -> u64 {
+        self.regions
+            .iter()
+            .fold(0u64, |acc, region| acc.max(region.params.range.end()))
+    }
+    fn add_region_to_app(&self, region: Arc<data::Region>) {
+        let mut app = self.app.try_lock().unwrap();
+        match &self.param {
+            data::Track::Regions(regions) => {
+                let _res =
+                    action::add_region(&mut app, regions.clone(), region);
+            }
+            data::Track::Generator(_) => todo!(),
+            data::Track::Transformer() => todo!(),
         }
     }
     fn add_region(&mut self) {
-        let x_rightmost = self
-            .regions
-            .iter()
-            .fold(0u64, |acc, region| acc.max(region.params.range.end()));
+        let pos = self.get_position_to_add();
         let label = format!("region{}", self.regions.len() + 1);
         let region_param = Arc::new(data::Region::new(
-            AtomicRange::from(x_rightmost..x_rightmost + 49000),
+            AtomicRange::from(pos..pos + 49000),
             data::Content::Generator(Arc::new(data::Generator::default())),
             label,
         ));
         let faderegion_p = data::Region::with_fade(region_param);
-        {
-            let mut app = self.app.try_lock().unwrap();
-            match &self.param {
-                data::Track::Regions(regions) => {
-                    let _res = action::add_region(&mut app, regions.clone(), faderegion_p);
-                }
-                data::Track::Generator(_) => todo!(),
-                data::Track::Transformer() => todo!(),
-            }
-        }
+        self.add_region_to_app(faderegion_p);
+        self.regions = get_region_from_param(&self.param);
+    }
+    fn add_region_array(&mut self, count: u32) {
+        let pos = self.get_position_to_add();
+        let label = format!("region{}", self.regions.len() + 1);
+
+        let region_elem = Arc::new(data::Region::new(
+            AtomicRange::from(pos..pos + 4000),
+            data::Content::Generator(Arc::new(data::Generator::default())),
+            label.clone(),
+        ));
+
+        let region_array = Arc::new(data::Region::new(
+            AtomicRange::from(pos..pos + 49000),
+            data::Content::Transformer(
+                Arc::new(data::RegionFilter::Replicate(Arc::new(count.into()))),
+                data::Region::with_fade(region_elem),
+            ),
+            label,
+        ));
+        self.add_region_to_app(region_array);
         self.regions = get_region_from_param(&self.param);
     }
 }
@@ -82,7 +109,7 @@ impl egui::Widget for &mut Model {
                     })
                     .last()
             });
-            let button_w = 30.0;
+            let button_w = 40.0;
             let rect_right = res.inner.map_or_else(
                 || {
                     egui::Rect::from_center_size(
@@ -93,13 +120,22 @@ impl egui::Widget for &mut Model {
                 |inner| inner.rect,
             );
             let new_rect = egui::Rect::from_center_size(
-                rect_right.right_center(),
+                rect_right.right_center() + egui::vec2(10.0, 0.0),
                 egui::vec2(button_w, gui::TRACK_HEIGHT),
             );
-            let button = ui.put(new_rect, egui::Button::new("+"));
-            if button.clicked() {
-                self.add_region();
-            }
+            let _buttons = ui.allocate_ui_at_rect(new_rect, |ui| {
+                ui.vertical_centered(|ui| {
+                    if ui.button("+").clicked() {
+                        self.add_region();
+                    }
+                    ui.horizontal_centered(|ui| {
+                        if ui.button("+…").clicked() {
+                            self.add_region_array(self.new_array_count);
+                        }
+                        let _ = ui.add(egui::DragValue::new(&mut self.new_array_count));
+                    })
+                })
+            });
         });
 
         res.response

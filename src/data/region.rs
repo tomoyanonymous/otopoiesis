@@ -20,6 +20,11 @@ pub struct FadeParam {
 pub struct ReplicateParam {
     pub count: atomic::U32,
 }
+impl From<u32> for ReplicateParam {
+    fn from(v: u32) -> Self {
+        Self { count: v.into() }
+    }
+}
 
 /// Region filter transforms another region.
 /// Maybe the region after transformation has different range from the origin.
@@ -78,22 +83,22 @@ impl Region {
             Content::Transformer(p, origin) if matches!(p.as_ref(), RegionFilter::Replicate(_)) => {
                 if let RegionFilter::Replicate(param) = p.as_ref() {
                     let mut range = origin.range.clone();
-                    let mut len = 0;
+                    let mut len = range.getrange();
                     let mut last = 0;
                     let arr = Content::Array(
                         (0..param.count.load())
                             .into_iter()
                             .map(|_| {
                                 //とりあえず位置をずらして複製
+                                range = Arc::new(AtomicRange::new(last, last + len));
                                 len = range.getrange();
                                 last = range.end();
-                                range = Arc::new(AtomicRange::new(last, last + len));
                                 range.clone()
                             })
                             .enumerate()
-                            .map(|(i, range)| {
+                            .map(|(i, newrange)| {
                                 Arc::new(Region::new(
-                                    range.as_ref().clone(),
+                                    newrange.as_ref().clone(),
                                     origin.content.clone(),
                                     format!("{}_rep_{}", origin.label, i),
                                 ))

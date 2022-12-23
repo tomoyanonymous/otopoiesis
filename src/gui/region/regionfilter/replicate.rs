@@ -1,10 +1,23 @@
 use crate::data;
 
 use std::sync::Arc;
+enum RegionContent {
+    Editable(super::region::Model),
+    NonEditable(super::region::ReadOnlyModel),
+}
+impl egui::Widget for &mut RegionContent {
+    fn ui(self, ui: &mut egui::Ui) -> egui::Response {
+        match self {
+            RegionContent::Editable(m) => m.ui(ui),
+            RegionContent::NonEditable(m) => m.ui(ui),
+        }
+    }
+}
+
 pub struct Replicate {
     pub param: Arc<data::ReplicateParam>,
     pub origin: Arc<data::Region>,
-    regions: Vec<super::region::Model>,
+    regions: Vec<RegionContent>,
 }
 
 impl Replicate {
@@ -12,9 +25,16 @@ impl Replicate {
         let regions = (0..param.count.load())
             .into_iter()
             .map(|i| {
-                super::region::Model::new(origin.clone(), format!("{}_rep_{}", origin.label, i))
+                if i == 0 {
+                    RegionContent::Editable(super::region::Model::new(
+                        origin.clone(),
+                        origin.label.clone(),
+                    ))
+                } else {
+                    RegionContent::NonEditable(super::region::ReadOnlyModel::new(origin.as_ref()))
+                }
             })
-            .collect::<Vec<_>>();
+            .collect::<Vec<RegionContent>>();
         Self {
             param,
             origin,

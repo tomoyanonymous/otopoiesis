@@ -21,7 +21,9 @@ impl RegionFilter {
             data::RegionFilter::FadeInOut(p) => {
                 Self::FadeInOut(FadeHandle::new(p.clone(), Arc::clone(&origin), &range))
             }
-            data::RegionFilter::Replicate(_) => todo!(),
+            data::RegionFilter::Replicate(r) => {
+                Self::Replicate(Replicate::new(r.clone(), Arc::clone(&origin)))
+            }
         }
     }
 }
