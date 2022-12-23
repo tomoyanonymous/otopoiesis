@@ -1,13 +1,12 @@
 use crate::{data, parameter::Parameter};
-use std::sync::Arc;
 
 pub struct Generator {
-    param: Arc<data::Generator>,
+    param: data::Generator,
     samples: Vec<f32>,
 }
 
 impl Generator {
-    pub fn new(param: Arc<data::Generator>) -> Self {
+    pub fn new(param: data::Generator) -> Self {
         let size = 512;
         let mut res = Self {
             param,
@@ -20,7 +19,7 @@ impl Generator {
         // let mut phase = 0.0f32;
         let len = self.samples.len();
 
-        match self.param.as_ref() {
+        match &self.param {
             data::Generator::Oscillator(_kind, osc) => {
                 let mut phase_gui = 0.0f32;
                 for s in self.samples.iter_mut() {
@@ -79,7 +78,7 @@ impl egui::Widget for &mut Generator {
     fn ui(self, ui: &mut egui::Ui) -> egui::Response {
         ui.vertical(|ui| {
             let res = self.make_graph_sized(ui, ui.available_size());
-            let _controller = match self.param.as_ref() {
+            let _controller = match &self.param {
                 data::Generator::Oscillator(_kind, osc) => {
                     let range = &osc.freq.range;
                     let slider = ui.add(

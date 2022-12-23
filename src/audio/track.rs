@@ -1,33 +1,30 @@
 use crate::audio::{Component, PlaybackInfo};
 use crate::data;
-use std::sync::Arc;
 
 #[derive(Debug)]
 pub struct Model {
-    param: data::SharedVec<Arc<data::Region>>,
+    param: Vec<data::Region>,
     channels: u64,
     regions: Vec<super::region::Model>,
 }
 
 impl Model {
-    pub fn new(param: data::SharedVec<Arc<data::Region>>, channels: u64) -> Self {
+    pub fn new(param: Vec<data::Region>, channels: u64) -> Self {
         let regions = Self::get_new_regions(&param, channels);
 
         Self {
-            param: Arc::clone(&param),
+            param,
             channels,
             regions,
         }
     }
     fn get_new_regions(
-        param: &data::SharedVec<Arc<data::Region>>,
+        param: &[data::Region],
         channels: u64,
     ) -> Vec<super::region::Model> {
         param
-            .lock()
-            .unwrap()
             .iter()
-            .map(|region| super::region::Model::new(Arc::clone(region), channels))
+            .map(|region| super::region::Model::new(region.clone(), channels))
             .collect::<Vec<_>>()
     }
     fn renew_regions(&mut self, info: &PlaybackInfo) {
@@ -37,12 +34,10 @@ impl Model {
         #[cfg(not(target_arch = "wasm32"))]
         let res = {
             self.param
-                .lock()
-                .unwrap()
                 .iter()
                 .map(|region| {
                     //temporary moves value to
-                    let model = super::region::Model::new(Arc::clone(region), channels);
+                    let model = super::region::Model::new(region.clone(), channels);
                     super::region::render_region_offline_async(model, info)
                 })
                 .map(move |h| h.join().expect("hoge"))
@@ -51,8 +46,6 @@ impl Model {
         #[cfg(target_arch = "wasm32")]
         let res = self
             .param
-            .lock()
-            .unwrap()
             .iter()
             .map(|region| {
                 let mut model = super::region::Model::new(Arc::clone(&region), channels);

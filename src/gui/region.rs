@@ -107,7 +107,7 @@ impl egui::Widget for &mut ContentModel {
 }
 
 pub struct Model {
-    pub params: Arc<data::Region>,
+    pub params: data::Region,
     pub label: String,
     content: ContentModel,
     range_handles: [UiBar; 2], // pub osc_params: Arc<oscillator::SharedParams>,
@@ -115,7 +115,7 @@ pub struct Model {
 }
 
 impl Model {
-    pub fn new(params: Arc<data::Region>, labeltext: impl ToString) -> Self {
+    pub fn new(params: data::Region, labeltext: impl ToString) -> Self {
         let label = labeltext.to_string();
         let handle_left = UiBar::new(params.range.0.clone(), HandleMode::Start);
         let handle_right = UiBar::new(params.range.1.clone(), HandleMode::End);
@@ -125,7 +125,7 @@ impl Model {
             }
             data::Content::AudioFile(_) => todo!(),
             data::Content::Transformer(filter, origin) => ContentModel::RegionFilter(
-                regionfilter::RegionFilter::new(filter.clone(), origin.clone()),
+                regionfilter::RegionFilter::new(filter.clone(), *origin.clone()),
             ),
             // data::Content::Array(vec) => ContentModel::Array(
             //     vec.iter()
@@ -135,7 +135,7 @@ impl Model {
             //         })
             //         .collect(),
             // ),
-            _ => todo!(),
+            // _ => todo!(),
         };
         Self {
             label,
@@ -236,10 +236,10 @@ impl ReadOnlyModel {
             data::Content::Transformer(filter, origin) => Self {
                 content: ContentModel::RegionFilter(regionfilter::RegionFilter::new(
                     filter.clone(),
-                    origin.clone(),
+                    *origin.clone(),
                 )),
             },
-            data::Content::Array(_) => todo!(),
+            // data::Content::Array(_) => todo!(),
         }
     }
 }

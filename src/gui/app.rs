@@ -1,5 +1,4 @@
 use crate::data;
-use crate::data::SharedVec;
 use crate::gui;
 
 use std::sync::{Arc, Mutex};
@@ -23,7 +22,7 @@ impl Model {
         }
     }
 
-    pub fn sync_state(&mut self, track_p: &SharedVec<data::Track>) {
+    pub fn sync_state(&mut self, track_p: &[data::Track]) {
         self.timeline.sync_state(track_p)
     }
     pub fn show_ui(&mut self, ctx: &egui::Context) {

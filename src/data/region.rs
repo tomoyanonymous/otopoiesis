@@ -33,15 +33,15 @@ pub enum RegionFilter {
     Gain,
     FadeInOut(Arc<FadeParam>),
     Reverse,
-    Replicate(Arc<ReplicateParam>),
+    Replicate(ReplicateParam),
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub enum Content {
-    Generator(Arc<Generator>),
+    Generator(Generator),
     AudioFile(AudioFile),
-    Transformer(Arc<RegionFilter>, Arc<Region>),
-    Array(Vec<Arc<Region>>),
+    Transformer(RegionFilter, Box<Region>),
+    // Array(Vec<Arc<Region>>),
 }
 
 /// Data structure for region.
@@ -65,65 +65,66 @@ impl Region {
             label: label.into(),
         }
     }
-    pub fn with_fade(origin: Arc<Self>) -> Arc<Self> {
-        Arc::new(Self::new(
+    pub fn with_fade(origin: Self) -> Self {
+        Self::new(
             AtomicRange::new(origin.range.start(), origin.range.end()),
             Content::Transformer(
-                Arc::new(RegionFilter::FadeInOut(Arc::new(FadeParam {
+                RegionFilter::FadeInOut(Arc::new(FadeParam {
                     time_in: 0.1.into(),
                     time_out: 0.1.into(),
-                }))),
-                Arc::clone(&origin),
+                })),
+                Box::new(origin.clone()),
             ),
             origin.label.clone(),
-        ))
+        )
     }
-    pub fn interpret(&self) -> Self {
-        match &self.content {
-            Content::Transformer(p, origin) if matches!(p.as_ref(), RegionFilter::Replicate(_)) => {
-                if let RegionFilter::Replicate(param) = p.as_ref() {
-                    let mut range = origin.range.clone();
-                    let mut len = range.getrange();
-                    let mut last = 0;
-                    let arr = Content::Array(
-                        (0..param.count.load())
-                            .into_iter()
-                            .map(|_| {
-                                //とりあえず位置をずらして複製
-                                range = Arc::new(AtomicRange::new(last, last + len));
-                                len = range.getrange();
-                                last = range.end();
-                                range.clone()
-                            })
-                            .enumerate()
-                            .map(|(i, newrange)| {
-                                Arc::new(Region::new(
-                                    newrange.as_ref().clone(),
-                                    origin.content.clone(),
-                                    format!("{}_rep_{}", origin.label, i),
-                                ))
-                            })
-                            .collect(),
-                    );
-                    Self::new(
-                        AtomicRange::new(origin.range.start(), last),
-                        arr,
-                        format!("{}_arr", origin.label),
-                    )
-                } else {
-                    unreachable!()
-                }
-            }
-            _ => self.clone(),
-        }
-    }
+    // pub fn interpret(&self) -> Self {
+    //     match &self.content {
+    //         Content::Transformer(p, origin) if matches!(p, RegionFilter::Replicate(_)) => {
+    //             if let RegionFilter::Replicate(param) = p {
+    //                 let mut range = origin.range.clone();
+    //                 let mut len = range.getrange();
+    //                 let mut last = 0;
+    //                 todo!()
+    //                 // let arr = Content::Array(
+    //                 //     (0..param.count.load())
+    //                 //         .into_iter()
+    //                 //         .map(|_| {
+    //                 //             //とりあえず位置をずらして複製
+    //                 //             range = Arc::new(AtomicRange::new(last, last + len));
+    //                 //             len = range.getrange();
+    //                 //             last = range.end();
+    //                 //             range.clone()
+    //                 //         })
+    //                 //         .enumerate()
+    //                 //         .map(|(i, newrange)| {
+    //                 //             Arc::new(Region::new(
+    //                 //                 newrange.as_ref().clone(),
+    //                 //                 origin.content.clone(),
+    //                 //                 format!("{}_rep_{}", origin.label, i),
+    //                 //             ))
+    //                 //         })
+    //                 //         .collect(),
+    //                 // );
+    //                 Self::new(
+    //                     AtomicRange::new(origin.range.start(), last),
+    //                     arr,
+    //                     format!("{}_arr", origin.label),
+    //                 )
+    //             } else {
+    //                 unreachable!()
+    //             }
+    //         }
+    //         _ => self.clone(),
+    //     }
+    // }
 }
 
 impl std::default::Default for Region {
     fn default() -> Self {
         Self {
             range: Arc::new(AtomicRange::new(0, 0)),
-            content: Content::Generator(Arc::new(Generator::default())),
+            content: Content::Generator(Generator::default()),
             label: "".to_string(),
         }
     }

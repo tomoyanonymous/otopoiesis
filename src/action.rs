@@ -1,10 +1,8 @@
 //! The definitions of un/redo-able actions for applications.
 //! Todo: fix an inconsistensy after code-app translation because serializing/deserializing refreshes Arc references.
 
-
-
-use crate::data::{self, SharedVec};
-use std::sync::{Arc, MutexGuard, PoisonError};
+use crate::data::{self};
+use std::sync::{ MutexGuard, PoisonError};
 use undo;
 
 #[derive(Debug)]
@@ -31,134 +29,33 @@ impl<T> From<FailedToLockError<'_, Vec<T>>> for OpsContainerError {
     }
 }
 
-// pub struct AddtoContainer<T: Clone>{
-//     elem_to_add:T,
-//     container:Vec<T>
-// };
-// trait ApptoContainer<T> {
-//     fn get_target_container_from_app(&self, app: Arc<Mutex<data::AppModel>>) -> MutexGuard<Vec<T>>;
-// }
-pub struct OpsContainer<T: Clone> {
-    container: SharedVec<T>,
-    elem_to_add: Option<T>,
-}
-impl<T: Clone> OpsContainer<T> {
-    fn add(&self) -> Result<(), OpsContainerError> {
-        let mut c = self.container.lock().unwrap();
-        match &self.elem_to_add {
-            Some(e) => {
-                c.push(e.clone());
-                Ok(())
-            }
-            None => Err(OpsContainerError::NothingToBeAdded),
-        }
-    }
-    fn remove(&mut self, memory: bool) -> Result<(), OpsContainerError> {
-        let mut c = self.container.lock().unwrap();
-        match c.pop() {
-            Some(e) => {
-                if memory {
-                    self.elem_to_add = Some(e);
-                }
-                Ok(())
-            }
-            None => Err(OpsContainerError::ContainerEmpty),
-        }
-    }
-}
-struct AddtoContainer<T: Clone>(OpsContainer<T>);
-struct RemovefromContainer<T: Clone>(OpsContainer<T>);
-
-impl<T> undo::Action for AddtoContainer<T>
-where
-    T: Clone + std::fmt::Display,
-{
-    type Target = (); //target will be managed on action side
-    type Output = ();
-    type Error = OpsContainerError;
-    fn apply(&mut self, _target: &mut Self::Target) -> undo::Result<Self> {
-        self.0.add()
-    }
-    fn undo(&mut self, _target: &mut Self::Target) -> undo::Result<Self> {
-        self.0.remove(false)
-    }
-}
-
-impl<T> undo::Action for RemovefromContainer<T>
-where
-    T: Clone + std::fmt::Display,
-{
-    type Target = ();
-    type Output = ();
-    type Error = OpsContainerError;
-    fn apply(&mut self, _target: &mut Self::Target) -> undo::Result<Self> {
-        self.0.remove(true)
-    }
-    fn undo(&mut self, _target: &mut Self::Target) -> undo::Result<Self> {
-        self.0.add()
-    }
-}
-impl<T> std::fmt::Display for AddtoContainer<T>
-where
-    T: Clone + std::fmt::Display,
-{
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "Add {}",
-            self.0
-                .elem_to_add
-                .as_ref()
-                .map_or("".to_string(), |v| v.to_string())
-        )
-    }
-}
-impl<T> std::fmt::Display for RemovefromContainer<T>
-where
-    T: Clone + std::fmt::Display,
-{
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "Remove {}",
-            self.0
-                .elem_to_add
-                .as_ref()
-                .map_or("".to_string(), |v| v.to_string())
-        )
-    }
-}
 trait DisplayableAction: undo::Action + std::fmt::Display {}
-impl<T> DisplayableAction for AddtoContainer<T>
+
+pub struct Action(Box<dyn DisplayableAction<Target = data::Project, Output = (), Error = ()>>);
+
+impl<T> From<T> for Action
 where
-    T: Clone,
-    AddtoContainer<T>: undo::Action + std::fmt::Display,
+    T: DisplayableAction<Target = data::Project, Output = (), Error = ()> + 'static,
 {
-}
-impl<T> DisplayableAction for RemovefromContainer<T>
-where
-    T: Clone,
-    RemovefromContainer<T>: undo::Action + std::fmt::Display,
-{
+    fn from(v: T) -> Self {
+        Self(Box::new(v))
+    }
 }
 
-pub struct Action(
-    Box<dyn DisplayableAction<Target = (), Output = (), Error = OpsContainerError> + 'static>,
-);
 pub enum Target {
     Tracks(data::Project),
-    Regions(SharedVec<Arc<data::Region>>),
+    Regions(Vec<data::Region>),
 }
 
 impl undo::Action for Action {
-    type Target = ();
+    type Target = data::Project;
     type Output = ();
-    type Error = OpsContainerError;
-    fn apply(&mut self, _target: &mut ()) -> undo::Result<Self> {
-        self.0.apply(_target)
+    type Error = ();
+    fn apply(&mut self, target: &mut data::Project) -> undo::Result<Self> {
+        self.0.apply(target)
     }
-    fn undo(&mut self, _target: &mut ()) -> undo::Result<Self> {
-        self.0.undo(_target)
+    fn undo(&mut self, target: &mut data::Project) -> undo::Result<Self> {
+        self.0.undo(target)
     }
 }
 
@@ -168,32 +65,112 @@ impl std::fmt::Display for Action {
     }
 }
 
-fn make_action_dyn(
-    a: impl DisplayableAction<Target = (), Output = (), Error = OpsContainerError> + 'static,
-) -> Action {
-    Action(Box::new(a))
+// fn make_action_dyn(
+//     a: impl DisplayableAction<Target = (), Output = (), Error = OpsContainerError> + 'static,
+// ) -> Action {
+//     Action(Box::new(a))
+// }
+
+#[derive(Debug)]
+struct AddRegion {
+    elem: data::Region,
+    track_num: usize,
+    pos: usize,
 }
+impl AddRegion {
+    pub fn new(elem: data::Region, track_num: usize) -> Self {
+        Self {
+            elem,
+            track_num,
+            pos: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for AddRegion {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "add region")
+    }
+}
+
+impl undo::Action for AddRegion {
+    type Target = data::Project;
+
+    type Output = ();
+
+    type Error = ();
+
+    fn apply(&mut self, target: &mut Self::Target) -> undo::Result<Self> {
+        match target.tracks.get_mut(self.track_num).unwrap() {
+            data::Track::Regions(regions) => {
+                regions.push(self.elem.clone());
+                self.pos = regions.len();
+            }
+            data::Track::Generator(_) => todo!(),
+            data::Track::Transformer() => todo!(),
+        }
+        Ok(())
+    }
+
+    fn undo(&mut self, target: &mut Self::Target) -> undo::Result<Self> {
+        match target.tracks.get_mut(self.track_num).unwrap() {
+            data::Track::Regions(regions) => {
+                regions.remove(self.pos);
+            }
+            data::Track::Generator(_) => todo!(),
+            data::Track::Transformer() => todo!(),
+        }
+        Ok(())
+    }
+}
+
+impl DisplayableAction for AddRegion {}
+struct AddTrack {
+    elem: data::Track,
+    pos: usize,
+}
+
+impl AddTrack {
+    fn new(elem: data::Track) -> Self {
+        Self { elem, pos: 0 }
+    }
+}
+impl undo::Action for AddTrack {
+    type Target = data::Project;
+
+    type Output = ();
+
+    type Error = ();
+
+    fn apply(&mut self, target: &mut Self::Target) -> undo::Result<Self> {
+        target.tracks.push(self.elem.clone());
+        self.pos = target.tracks.len();
+        Ok(())
+    }
+
+    fn undo(&mut self, target: &mut Self::Target) -> undo::Result<Self> {
+        target.tracks.remove(self.pos);
+        Ok(())
+    }
+}
+impl std::fmt::Display for AddTrack {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Add track")
+    }
+}
+impl DisplayableAction for AddTrack {}
 
 pub fn add_region(
     app: &mut data::AppModel,
-    track: SharedVec<Arc<data::Region>>,
-    region: Arc<data::Region>,
-) -> Result<(), OpsContainerError> {
-    // let action = AddtoContainer::<Arc<data::Region>>(region.clone())
+    track_num: usize,
+    region: data::Region,
+) -> Result<(), ()> {
     app.history.apply(
-        &mut (),
-        make_action_dyn(AddtoContainer::<Arc<data::Region>>(OpsContainer {
-            container: track,
-            elem_to_add: Some(region),
-        })),
+        &mut app.project,
+        Action::from(AddRegion::new(region, track_num)),
     )
 }
-pub fn add_track(app: &mut data::AppModel, track: data::Track) -> Result<(), OpsContainerError> {
-    app.history.apply(
-        &mut (),
-        make_action_dyn(AddtoContainer::<data::Track>(OpsContainer {
-            container: Arc::clone(&app.project.tracks),
-            elem_to_add: Some(track),
-        })),
-    )
+pub fn add_track(app: &mut data::AppModel, track: data::Track) -> Result<(), ()> {
+    app.history
+        .apply(&mut app.project, Action::from(AddTrack::new(track)))
 }

@@ -4,7 +4,6 @@ use crate::data;
 use crate::gui::region;
 use fadeinout::FadeHandle;
 use replicate::Replicate;
-use std::sync::Arc;
 
 pub enum RegionFilter {
     FadeInOut(FadeHandle),
@@ -12,18 +11,14 @@ pub enum RegionFilter {
 }
 
 impl RegionFilter {
-    pub fn new(filter: Arc<data::RegionFilter>, origin: Arc<data::Region>) -> Self {
+    pub fn new(filter: data::RegionFilter, origin: data::Region) -> Self {
         let range = origin.range.clone();
 
-        match filter.as_ref() {
+        match filter {
             data::RegionFilter::Gain => todo!(),
             data::RegionFilter::Reverse => todo!(),
-            data::RegionFilter::FadeInOut(p) => {
-                Self::FadeInOut(FadeHandle::new(p.clone(), Arc::clone(&origin), &range))
-            }
-            data::RegionFilter::Replicate(r) => {
-                Self::Replicate(Replicate::new(r.clone(), Arc::clone(&origin)))
-            }
+            data::RegionFilter::FadeInOut(p) => Self::FadeInOut(FadeHandle::new(p, origin, &range)),
+            data::RegionFilter::Replicate(r) => Self::Replicate(Replicate::new(r, origin)),
         }
     }
 }

@@ -16,17 +16,14 @@ pub use region::*;
 // #[derive(Serialize, Deserialize, Clone)]
 pub struct AppModel {
     pub transport: Arc<Transport>,
-    pub global_setting: Arc<GlobalSetting>,
-    pub project: Arc<Project>,
+    pub global_setting: GlobalSetting,
+    pub project: Project,
     pub history: undo::Record<action::Action>,
 }
 
 impl AppModel {
-    pub fn new(
-        transport: Arc<Transport>,
-        global_setting: Arc<GlobalSetting>,
-        project: Arc<Project>,
-    ) -> Self {
+    pub fn new(transport: Transport, global_setting: GlobalSetting, project: Project) -> Self {
+        let transport = Arc::new(transport);
         Self {
             transport,
             global_setting,
@@ -40,7 +37,7 @@ impl AppModel {
     }
     pub fn undo(&mut self) {
         let history = &mut self.history;
-        let _ = history.undo(&mut ()).unwrap();
+        let _ = history.undo(&mut self.project).unwrap();
     }
     pub fn can_redo(&self) -> bool {
         let history = &self.history;
@@ -48,7 +45,7 @@ impl AppModel {
     }
     pub fn redo(&mut self) {
         let history = &mut self.history;
-        let _ = history.redo(&mut ()).unwrap();
+        let _ = history.redo(&mut self.project).unwrap();
     }
 }
 
@@ -116,10 +113,10 @@ impl Default for Transport {
 pub struct GlobalSetting;
 
 /// A main project data. It should be imported/exported via serde.
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Project {
     pub sample_rate: atomic::U64,
-    pub tracks: SharedVec<Track>,
+    pub tracks: Vec<Track>,
 }
 
 pub type SharedVec<T> = Arc<Mutex<Vec<T>>>;
@@ -129,9 +126,10 @@ pub type SharedVec<T> = Arc<Mutex<Vec<T>>>;
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub enum Track {
     ///Contains Multiple Regions.
-    Regions(SharedVec<Arc<Region>>),
+    /// TODO:Change container for this to be HashedSet for the more efficient implmentation of Undo Action.
+    Regions(Vec<Region>),
     ///Contains one audio generator(0 input).
-    Generator(Arc<Generator>),
+    Generator(Generator),
     ///Take another track and transform it (like filter).
     Transformer(),
 }
@@ -144,7 +142,7 @@ impl Track {
 
 impl Default for Track {
     fn default() -> Self {
-        Track::Regions(Arc::new(Mutex::new(vec![])))
+        Track::Regions(vec![])
     }
 }
 impl std::fmt::Display for Track {

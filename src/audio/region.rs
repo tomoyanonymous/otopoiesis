@@ -20,7 +20,7 @@ pub struct FadeModel {
     pub origin: Box<Model>,
 }
 impl FadeModel {
-    fn new(p: Arc<data::FadeParam>, origin: Arc<data::Region>) -> Self {
+    fn new(p: Arc<data::FadeParam>, origin: data::Region) -> Self {
         Self {
             param: p,
             origin: Box::new(Model::new(origin, 2)),
@@ -78,7 +78,7 @@ impl RangedComponent for FadeModel {
 #[derive(Debug)]
 pub struct RegionArray(Vec<Model>);
 impl RegionArray {
-    pub fn new(param: &[Arc<Region>]) -> Self {
+    pub fn new(param: &[Region]) -> Self {
         Self(param.iter().map(|p| Model::new(p.clone(), 2)).collect())
     }
 }
@@ -160,7 +160,7 @@ impl RangedComponent for RangedComponentDyn {
 pub struct TransformerModel(Box<dyn RangedComponent + Send + Sync>);
 
 impl TransformerModel {
-    fn new(filter: &data::RegionFilter, origin: Arc<data::Region>) -> Self {
+    fn new(filter: &data::RegionFilter, origin: data::Region) -> Self {
         let component:Box<dyn RangedComponent + Send + Sync> = match filter {
             data::RegionFilter::Gain => todo!(),
             data::RegionFilter::FadeInOut(param) => Box::new(FadeModel::new(param.clone(), origin)),
@@ -168,7 +168,7 @@ impl TransformerModel {
             data::RegionFilter::Replicate(c) => Box::new(RegionArray(
                 (0..c.count.load())
                     .into_iter()
-                    .map(|i| Model::new(origin.clone(), 2))
+                    .map(|_| Model::new(origin.clone(), 2))
                     .collect::<Vec<_>>(),
             )),
         };
@@ -178,7 +178,7 @@ impl TransformerModel {
 
 #[derive(Debug)]
 pub struct Model {
-    pub params: Arc<data::Region>,
+    pub params: data::Region,
     channels: u64,
     pub interleaved_samples_cache: Vec<f32>,
     pub content: Box<dyn RangedComponent + Send + Sync>,
@@ -186,7 +186,7 @@ pub struct Model {
 }
 
 impl Model {
-    pub fn new(params: Arc<data::Region>, channels: u64) -> Self {
+    pub fn new(params: data::Region, channels: u64) -> Self {
         // assert!(params.range.getrange() < params.max_size);
         let buf_size = channels as u64 * 60000; //todo!
         let content: Box<dyn RangedComponent + Send + Sync> = match &params.content {
@@ -197,9 +197,9 @@ impl Model {
             }
             data::Content::AudioFile(_) => todo!(),
             data::Content::Transformer(filter, origin) => {
-                TransformerModel::new(filter.as_ref(), origin.clone()).0
+                TransformerModel::new(filter, *origin.clone()).0
             }
-            data::Content::Array(vec) => Box::new(RegionArray::new(vec)),
+            // data::Content::Array(vec) => Box::new(RegionArray::new(vec)),
         };
         Self {
             params,
