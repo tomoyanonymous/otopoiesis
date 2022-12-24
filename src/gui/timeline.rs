@@ -1,45 +1,45 @@
 use crate::action;
 use crate::data;
 use crate::gui;
-use crate::utils::atomic;
 use std::sync::{Arc, Mutex};
 
-pub struct Model {
-    pub app: Arc<Mutex<data::AppModel>>,
-    time: Arc<atomic::U64>,
-    track: Vec<gui::track::Model>,
+pub struct State {
+    track: Vec<gui::track::State>,
+}
+impl State {
+    pub fn new(track_p: &[data::Track]) -> Self {
+        Self {
+            track: param_to_track(track_p),
+        }
+    }
+    pub fn sync_state(&mut self, track_p: &[data::Track]) {
+        self.track = param_to_track(track_p);
+    }
 }
 
-fn param_to_track(
-    track_p: &[data::Track],
-    app: Arc<Mutex<data::AppModel>>,
-) -> Vec<gui::track::Model> {
+pub struct Model<'a> {
+    pub app: Arc<Mutex<data::AppModel>>,
+    state: &'a mut State,
+}
+
+fn param_to_track(track_p: &[data::Track]) -> Vec<gui::track::State> {
     track_p
         .iter()
         .enumerate()
-        .map(|(i, t)| gui::track::Model::new(t.clone(), app.clone(), i))
+        .map(|(_i, t)| gui::track::State::new(t, 5))
         .collect::<Vec<_>>()
 }
 
-impl Model {
-    pub fn new(
-        param: data::Project,
-        app: Arc<Mutex<data::AppModel>>,
-        time: Arc<atomic::U64>,
-    ) -> Self {
-        let track = param_to_track(&param.tracks, app.clone());
-        Self {
-            app: Arc::clone(&app),
-            time,
-            track,
-        }
+impl<'a> Model<'a> {
+    pub fn new(app: Arc<Mutex<data::AppModel>>, state: &'a mut State) -> Self {
+        Self { app, state }
     }
 
     // fn get_samplerate(&self) -> u64 {
     //     self.param.sample_rate.load(Ordering::Relaxed)
     // }
     fn get_current_time_in_sample(&self) -> u64 {
-        self.time.load()
+        self.app.lock().unwrap().transport.time.load()
     }
     fn draw_frame(&mut self, painter: &egui::Painter, style: &egui::Style) {
         let rect = painter.clip_rect();
@@ -65,26 +65,20 @@ impl Model {
         );
     }
     fn add_track(&mut self) {
-        let new_track = if let Ok(mut app) = self.app.lock() {
+        if let Ok(mut app) = self.app.lock() {
             let _res = action::add_track(&mut app, data::Track::new());
-            param_to_track(&app.project.tracks, self.app.clone())
-        } else {
-            vec![]
-        };
-        self.track = new_track;
-    }
-    pub fn sync_state(&mut self, track_p: &[data::Track]) {
-        self.track = param_to_track(track_p, self.app.clone());
+            self.state.track = param_to_track(&app.project.tracks);
+        }
     }
 }
 
-impl egui::Widget for &mut Model {
-    fn ui(self, ui: &mut egui::Ui) -> egui::Response {
+impl<'a> egui::Widget for Model<'a> {
+    fn ui(mut self, ui: &mut egui::Ui) -> egui::Response {
         let main = egui::ScrollArea::horizontal().show(ui, |ui| {
             let res = ui
                 .vertical(|ui| {
-                    for track in self.track.iter_mut() {
-                        ui.add(track);
+                    for (i, state) in self.state.track.iter_mut().enumerate() {
+                        ui.add(gui::track::Model::new(i, self.app.clone(), state));
                     }
                 })
                 .response;

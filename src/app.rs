@@ -9,7 +9,7 @@ pub struct Model {
     project_str: String,
     audio: Renderer<audio::timeline::Model>,
     compile_err: Option<serde_json::Error>,
-    ui: gui::app::Model,
+    ui: gui::app::State,
     editor_open: bool,
 }
 
@@ -37,12 +37,9 @@ impl Model {
             println!("{}", e);
             "failed to print".to_string()
         });
-        let app = Arc::new(Mutex::new(data::AppModel::new(
-            data::Transport::new(),
-            data::GlobalSetting {},
-            project,
-        )));
-        let ui = gui::app::Model::new(Arc::clone(&app));
+        let appmodel = data::AppModel::new(data::Transport::new(), data::GlobalSetting {}, project);
+        let ui = gui::app::State::new(&appmodel);
+        let app = Arc::new(Mutex::new(appmodel));
 
         let mut renderer = new_renderer(&app.lock().unwrap());
 
@@ -98,6 +95,9 @@ impl Model {
         self.audio = new_renderer(&self.app.lock().unwrap());
         self.audio.prepare_play();
         self.audio.pause();
+    }
+    fn respawn_ui(&mut self) {
+        self.ui = gui::app::State::new(&self.app.lock().unwrap());
     }
     fn sync_transport(&mut self) {
         let t = self.app.lock().unwrap().transport.clone();
@@ -168,6 +168,8 @@ impl eframe::App for Model {
                 self.audio.prepare_play();
             }
         }
+        let mut mainui = gui::app::Model::new(self.app.clone(), &mut self.ui);
+        mainui.show_ui(ctx);
         self.sync_transport();
 
         let style = egui::Style {
@@ -175,8 +177,6 @@ impl eframe::App for Model {
             ..Default::default()
         };
         ctx.set_style(style);
-
-        self.ui.show_ui(ctx);
 
         if self.audio.is_playing() {
             //needs constant update while playing

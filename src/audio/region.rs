@@ -119,15 +119,15 @@ impl RangedComponent for RegionArray {
 #[derive(Debug)]
 pub struct RangedComponentDyn {
     generator: Box<dyn Component + Sync + Send>,
-    range: Arc<AtomicRange>,
+    range: AtomicRange,
     buffer: Vec<f32>,
 }
 
 impl RangedComponentDyn {
-    pub fn new(generator: Box<dyn Component + Sync + Send>, range: Arc<AtomicRange>) -> Self {
+    pub fn new(generator: Box<dyn Component + Sync + Send>, range: AtomicRange) -> Self {
         Self {
             generator,
-            range,
+            range:range.clone(),
             buffer: vec![],
         }
     }

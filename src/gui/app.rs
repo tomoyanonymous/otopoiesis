@@ -2,29 +2,37 @@ use crate::data;
 use crate::gui;
 
 use std::sync::{Arc, Mutex};
-pub struct Model {
-    pub param: Arc<Mutex<data::AppModel>>,
-    timeline: gui::timeline::Model,
+
+pub struct State {
+    timeline: gui::timeline::State,
     transport: gui::transport::Model,
 }
 
-impl Model {
-    pub fn new(param: Arc<Mutex<data::AppModel>>) -> Self {
-        let p = param.clone();
-        let parameter = param.lock().unwrap();
-        let proj = parameter.project.clone();
-        let sr = proj.sample_rate.load();
-        let transport = &parameter.transport;
+impl State {
+    pub fn new(param: &data::AppModel) -> Self {
+        let timeline = gui::timeline::State::new(&param.project.tracks);
+        let sr = param.project.sample_rate.load();
+        let transport = &param.transport;
+        let transport = gui::transport::Model::new(Arc::clone(transport), sr);
         Self {
-            param: p.clone(),
-            timeline: gui::timeline::Model::new(proj, p, transport.time.clone()),
-            transport: gui::transport::Model::new(Arc::clone(transport), sr),
+            timeline,
+            transport,
         }
     }
-
     pub fn sync_state(&mut self, track_p: &[data::Track]) {
         self.timeline.sync_state(track_p)
     }
+}
+pub struct Model<'a> {
+    pub app: Arc<Mutex<data::AppModel>>,
+    state: &'a mut State,
+}
+
+impl<'a> Model<'a> {
+    pub fn new(app: Arc<Mutex<data::AppModel>>, state: &'a mut State) -> Self {
+        Self { app, state }
+    }
+
     pub fn show_ui(&mut self, ctx: &egui::Context) {
         let is_mac = ctx.os() == egui::os::OperatingSystem::Mac;
 
@@ -35,13 +43,13 @@ impl Model {
                     ui.menu_button("File", |ui| {
                         #[cfg(debug_assertions)]
                         if ui.button("Force Sync Ui State").clicked() {
-                            if let Ok(app) = self.param.try_lock() {
-                                self.timeline.sync_state(&app.project.tracks);
-                            }
+                            self.state
+                                .timeline
+                                .sync_state(&self.app.lock().unwrap().project.tracks);
                         }
                     });
                     ui.menu_button("Edit", |ui| {
-                        if let Ok(mut app) = self.param.try_lock() {
+                        if let Ok(mut app) = self.app.lock() {
                             let undo_sk =
                                 egui::KeyboardShortcut::new(egui::Modifiers::COMMAND, egui::Key::Z);
                             let redo_sk = egui::KeyboardShortcut::new(
@@ -82,9 +90,12 @@ impl Model {
         });
         egui::CentralPanel::default().show(ctx, |ui| {
             egui::ScrollArea::both().show(ui, |ui| {
-                ui.add(&mut self.timeline);
+                ui.add(super::timeline::Model::new(
+                    self.app.clone(),
+                    &mut self.state.timeline,
+                ));
                 egui::panel::TopBottomPanel::bottom("footer")
-                    .show(ctx, |ui| ui.add(&mut self.transport));
+                    .show(ctx, |ui| ui.add(&mut self.state.transport));
             });
         });
     }
