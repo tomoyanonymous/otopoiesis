@@ -6,24 +6,26 @@ use std::sync::{MutexGuard, PoisonError};
 use undo;
 
 #[derive(Debug)]
-pub enum OpsContainerError {
+pub enum Error {
     FailToLock(String),
     ContainerEmpty,
+    InvalidTrackType,
     NothingToBeAdded, // _Never(PhantomData<T>),
 }
 pub type FailedToLockError<'a, T> = PoisonError<MutexGuard<'a, T>>;
 
-impl std::fmt::Display for OpsContainerError {
+impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::ContainerEmpty => write!(f, "tried to remove container that was empty"),
             Self::NothingToBeAdded => write!(f, "Nothing to be Added"),
             Self::FailToLock(msg) => write!(f, "{msg}"),
+            Self::InvalidTrackType => write!(f, "Track type was not an array of regions"),
         }
     }
 }
 
-impl<T> From<FailedToLockError<'_, Vec<T>>> for OpsContainerError {
+impl<T> From<FailedToLockError<'_, Vec<T>>> for Error {
     fn from(e: FailedToLockError<'_, Vec<T>>) -> Self {
         Self::FailToLock(e.to_string())
     }
@@ -31,13 +33,11 @@ impl<T> From<FailedToLockError<'_, Vec<T>>> for OpsContainerError {
 
 trait DisplayableAction: undo::Action + std::fmt::Display {}
 
-pub struct Action(
-    Box<dyn DisplayableAction<Target = data::Project, Output = (), Error = OpsContainerError>>,
-);
+pub struct Action(Box<dyn DisplayableAction<Target = data::Project, Output = (), Error = Error>>);
 
 impl<T> From<T> for Action
 where
-    T: DisplayableAction<Target = data::Project, Output = (), Error = OpsContainerError> + 'static,
+    T: DisplayableAction<Target = data::Project, Output = (), Error = Error> + 'static,
 {
     fn from(v: T) -> Self {
         Self(Box::new(v))
@@ -52,7 +52,7 @@ pub enum Target {
 impl undo::Action for Action {
     type Target = data::Project;
     type Output = ();
-    type Error = OpsContainerError;
+    type Error = Error;
     fn apply(&mut self, target: &mut data::Project) -> undo::Result<Self> {
         self.0.apply(target)
     }
@@ -68,7 +68,7 @@ impl std::fmt::Display for Action {
 }
 
 // fn make_action_dyn(
-//     a: impl DisplayableAction<Target = (), Output = (), Error = OpsContainerError> + 'static,
+//     a: impl DisplayableAction<Target = (), Output = (), Error = Error> + 'static,
 // ) -> Action {
 //     Action(Box::new(a))
 // }
@@ -100,32 +100,30 @@ impl undo::Action for AddRegion {
 
     type Output = ();
 
-    type Error = OpsContainerError;
+    type Error = Error;
 
     fn apply(&mut self, target: &mut Self::Target) -> undo::Result<Self> {
         match target.tracks.get_mut(self.track_num).unwrap() {
             data::Track::Regions(regions) => {
                 regions.push(self.elem.clone());
                 self.pos = regions.len();
+                Ok(())
             }
-            data::Track::Generator(_) => todo!(),
-            data::Track::Transformer() => todo!(),
+            _ => Err(Error::InvalidTrackType),
         }
-        Ok(())
     }
 
     fn undo(&mut self, target: &mut Self::Target) -> undo::Result<Self> {
         match target.tracks.get_mut(self.track_num).unwrap() {
             data::Track::Regions(regions) => {
                 if regions.is_empty() {
-                    Err(OpsContainerError::ContainerEmpty)
+                    Err(Error::ContainerEmpty)
                 } else {
                     regions.remove(self.pos);
                     Ok(())
                 }
             }
-            data::Track::Generator(_) => todo!(),
-            data::Track::Transformer() => todo!(),
+            _ => Err(Error::InvalidTrackType),
         }
     }
 }
@@ -146,7 +144,7 @@ impl undo::Action for AddTrack {
 
     type Output = ();
 
-    type Error = OpsContainerError;
+    type Error = Error;
 
     fn apply(&mut self, target: &mut Self::Target) -> undo::Result<Self> {
         target.tracks.push(self.elem.clone());
@@ -156,7 +154,7 @@ impl undo::Action for AddTrack {
 
     fn undo(&mut self, target: &mut Self::Target) -> undo::Result<Self> {
         if target.tracks.is_empty() {
-            Err(OpsContainerError::ContainerEmpty)
+            Err(Error::ContainerEmpty)
         } else {
             target.tracks.remove(self.pos);
             Ok(())
@@ -174,13 +172,13 @@ pub fn add_region(
     app: &mut data::AppModel,
     track_num: usize,
     region: data::Region,
-) -> Result<(), OpsContainerError> {
+) -> Result<(), Error> {
     app.history.apply(
         &mut app.project,
         Action::from(AddRegion::new(region, track_num)),
     )
 }
-pub fn add_track(app: &mut data::AppModel, track: data::Track) -> Result<(), OpsContainerError> {
+pub fn add_track(app: &mut data::AppModel, track: data::Track) -> Result<(), Error> {
     app.history
         .apply(&mut app.project, Action::from(AddTrack::new(track)))
 }
