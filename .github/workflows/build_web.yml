@@ -23,4 +23,4 @@ jobs:
       - uses: ./.github/actions/cache_cargo
       - run: sudo apt-get install -y libasound2-dev
       - name: test
-        run: cargo test --all -- --nocapture --target wasm32-unknown-unknown --features "web"
+        run: cargo test --target wasm32-unknown-unknown --features "web" --all -- --nocapture 
