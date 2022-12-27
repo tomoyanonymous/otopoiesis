@@ -7,7 +7,7 @@ use std::sync::Arc;
 pub struct AudioFile {
     file: String,
     length: usize,
-    trim_range: AtomicRange,
+    trim_range: AtomicRange<i64>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Default, Debug)]
@@ -50,7 +50,7 @@ pub enum Content {
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Region {
     /// range stores a real time, not in sample.
-    pub range: AtomicRange,
+    pub range: AtomicRange<i64>,
     pub content: Content,
     pub label: String,
 }
@@ -58,16 +58,16 @@ pub struct Region {
 impl Region {
     /// Utility function that converts a raw region into the region with fadein/out transformer.
     ///
-    pub fn new(range: AtomicRange, content: Content, label: impl Into<String>) -> Self {
+    pub fn new(range: AtomicRange<i64>, content: Content, label: impl Into<String>) -> Self {
         Self {
-            range: range,
+            range,
             content,
             label: label.into(),
         }
     }
     pub fn with_fade(origin: Self) -> Self {
         Self::new(
-            AtomicRange::new(origin.range.start(), origin.range.end()),
+            AtomicRange::<i64>::new(origin.range.start(), origin.range.end()),
             Content::Transformer(
                 RegionFilter::FadeInOut(Arc::new(FadeParam {
                     time_in: 0.1.into(),
@@ -91,7 +91,7 @@ impl Region {
     //                 //         .into_iter()
     //                 //         .map(|_| {
     //                 //             //とりあえず位置をずらして複製
-    //                 //             range = Arc::new(AtomicRange::new(last, last + len));
+    //                 //             range = Arc::new(AtomicRange<i64>::new(last, last + len));
     //                 //             len = range.getrange();
     //                 //             last = range.end();
     //                 //             range.clone()
@@ -107,7 +107,7 @@ impl Region {
     //                 //         .collect(),
     //                 // );
     //                 Self::new(
-    //                     AtomicRange::new(origin.range.start(), last),
+    //                     AtomicRange<i64>::new(origin.range.start(), last),
     //                     arr,
     //                     format!("{}_arr", origin.label),
     //                 )
@@ -123,7 +123,7 @@ impl Region {
 impl std::default::Default for Region {
     fn default() -> Self {
         Self {
-            range: AtomicRange::new(0, 0),
+            range: AtomicRange::<i64>::new(0, 0),
             content: Content::Generator(Generator::default()),
             label: "".to_string(),
         }

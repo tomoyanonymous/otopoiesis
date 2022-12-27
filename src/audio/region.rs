@@ -2,14 +2,14 @@ use crate::audio::{Component, PlaybackInfo};
 
 // use crate::parameter::UIntParameter
 use crate::data::{self, Region};
-use crate::utils::AtomicRange;
+use crate::utils::{AtomicRange, SimpleAtomic};
 use std::ops::RangeInclusive;
 use std::sync::Arc;
 // 基本はオフラインレンダリング
 
 /// Interface for offline rendering.
 pub trait RangedComponent: std::fmt::Debug {
-    fn get_range(&self) -> RangeInclusive<u64>;
+    fn get_range(&self) -> RangeInclusive<i64>;
     fn get_output_channels(&self) -> u64;
     fn render_offline(&mut self, dest: &mut [f32], sample_rate: u32, channels: u64);
 }
@@ -29,7 +29,7 @@ impl FadeModel {
 }
 
 impl RangedComponent for FadeModel {
-    fn get_range(&self) -> RangeInclusive<u64> {
+    fn get_range(&self) -> RangeInclusive<i64> {
         let (start, end) = self.origin.params.range.get_pair();
         start..=end
     }
@@ -86,7 +86,7 @@ impl RegionArray {
 impl RangedComponent for RegionArray {
     /// panics  if the end is earlier than the start.
     ///
-    fn get_range(&self) -> RangeInclusive<u64> {
+    fn get_range(&self) -> RangeInclusive<i64> {
         if !self.0.is_empty() {
             let start = self.0[0].params.range.start();
             let end = self.0.last().unwrap().params.range.end();
@@ -108,9 +108,9 @@ impl RangedComponent for RegionArray {
             let dest = &mut dest[(range.start() as usize)..(range.end() as usize)];
             region
                 .interleaved_samples_cache
-                .resize((range.getrange() * channels) as usize, 0.0);
+                .resize((range.getrange() as u64 * channels) as usize, 0.0);
             region.render_offline(sample_rate, channels);
-            assert_eq!(region.interleaved_samples_cache.len(),dest.len());
+            assert_eq!(region.interleaved_samples_cache.len(), dest.len());
             dest.copy_from_slice(&region.interleaved_samples_cache);
         });
     }
@@ -119,22 +119,22 @@ impl RangedComponent for RegionArray {
 #[derive(Debug)]
 pub struct RangedComponentDyn {
     generator: Box<dyn Component + Sync + Send>,
-    range: AtomicRange,
+    range: AtomicRange<i64>,
     buffer: Vec<f32>,
 }
 
 impl RangedComponentDyn {
-    pub fn new(generator: Box<dyn Component + Sync + Send>, range: AtomicRange) -> Self {
+    pub fn new(generator: Box<dyn Component + Sync + Send>, range: AtomicRange<i64>) -> Self {
         Self {
             generator,
-            range:range.clone(),
+            range,
             buffer: vec![],
         }
     }
 }
 
 impl RangedComponent for RangedComponentDyn {
-    fn get_range(&self) -> RangeInclusive<u64> {
+    fn get_range(&self) -> RangeInclusive<i64> {
         let (start, end) = self.range.get_pair();
         start..=end
     }
@@ -161,7 +161,7 @@ pub struct TransformerModel(Box<dyn RangedComponent + Send + Sync>);
 
 impl TransformerModel {
     fn new(filter: &data::RegionFilter, origin: data::Region) -> Self {
-        let component:Box<dyn RangedComponent + Send + Sync> = match filter {
+        let component: Box<dyn RangedComponent + Send + Sync> = match filter {
             data::RegionFilter::Gain => todo!(),
             data::RegionFilter::FadeInOut(param) => Box::new(FadeModel::new(param.clone(), origin)),
             data::RegionFilter::Reverse => todo!(),
@@ -198,8 +198,7 @@ impl Model {
             data::Content::AudioFile(_) => todo!(),
             data::Content::Transformer(filter, origin) => {
                 TransformerModel::new(filter, *origin.clone()).0
-            }
-            // data::Content::Array(vec) => Box::new(RegionArray::new(vec)),
+            } // data::Content::Array(vec) => Box::new(RegionArray::new(vec)),
         };
         Self {
             params,
@@ -210,13 +209,15 @@ impl Model {
         }
     }
     pub fn render_offline(&mut self, sample_rate: u32, channels: u64) {
-        self.interleaved_samples_cache
-            .resize((self.params.range.getrange() * channels) as usize, 0.0);
+        self.interleaved_samples_cache.resize(
+            (self.params.range.getrange() as u64 * channels) as usize,
+            0.0,
+        );
         self.content
             .render_offline(&mut self.interleaved_samples_cache, sample_rate, channels);
         self.cache_completed = true;
     }
-    pub fn contains_samples(&self, range: RangeInclusive<u64>) -> bool {
+    pub fn contains_samples(&self, range: RangeInclusive<i64>) -> bool {
         let t_range = &self.params.range;
         let start = t_range.start();
         let end = t_range.end();
