@@ -21,7 +21,10 @@ jobs:
     needs: build_web
     steps:
       - uses: actions/checkout@v3
-      - uses: ./.github/actions/cache_cargo
       - run: sudo apt-get install -y libasound2-dev
+      - uses: ./.github/actions/cache_cargo
+      - run: rustup target add wasm32-unknown-unknown
+      - run: rustup default stable
+      - run: cargo install wasm-pack
       - name: test
         run: npm test
