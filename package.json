@@ -5,7 +5,7 @@
   "scripts": {
     "build": "webpack",
     "start": "webpack-dev-server --open",
-    "test": "cargo test && wasm-pack test --headless"
+    "test": "wasm-pack test --headless --chrome --features='web'"
   },
   "devDependencies": {
     "@wasm-tool/wasm-pack-plugin": "^1.1.0",
