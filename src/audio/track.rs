@@ -45,7 +45,7 @@ impl Model {
             .param
             .iter()
             .map(|region| {
-                let mut model = super::region::Model::new(Arc::clone(&region), channels);
+                let mut model = super::region::Model::new(region.clone(), channels);
                 model.render_offline(info.sample_rate, info.channels);
                 model
             })
