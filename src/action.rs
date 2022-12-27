@@ -2,7 +2,7 @@
 //! Todo: fix an inconsistensy after code-app translation because serializing/deserializing refreshes Arc references.
 
 use crate::data::{self};
-use std::sync::{ MutexGuard, PoisonError};
+use std::sync::{MutexGuard, PoisonError};
 use undo;
 
 #[derive(Debug)]
@@ -31,11 +31,13 @@ impl<T> From<FailedToLockError<'_, Vec<T>>> for OpsContainerError {
 
 trait DisplayableAction: undo::Action + std::fmt::Display {}
 
-pub struct Action(Box<dyn DisplayableAction<Target = data::Project, Output = (), Error = ()>>);
+pub struct Action(
+    Box<dyn DisplayableAction<Target = data::Project, Output = (), Error = OpsContainerError>>,
+);
 
 impl<T> From<T> for Action
 where
-    T: DisplayableAction<Target = data::Project, Output = (), Error = ()> + 'static,
+    T: DisplayableAction<Target = data::Project, Output = (), Error = OpsContainerError> + 'static,
 {
     fn from(v: T) -> Self {
         Self(Box::new(v))
@@ -50,7 +52,7 @@ pub enum Target {
 impl undo::Action for Action {
     type Target = data::Project;
     type Output = ();
-    type Error = ();
+    type Error = OpsContainerError;
     fn apply(&mut self, target: &mut data::Project) -> undo::Result<Self> {
         self.0.apply(target)
     }
@@ -98,7 +100,7 @@ impl undo::Action for AddRegion {
 
     type Output = ();
 
-    type Error = ();
+    type Error = OpsContainerError;
 
     fn apply(&mut self, target: &mut Self::Target) -> undo::Result<Self> {
         match target.tracks.get_mut(self.track_num).unwrap() {
@@ -115,12 +117,16 @@ impl undo::Action for AddRegion {
     fn undo(&mut self, target: &mut Self::Target) -> undo::Result<Self> {
         match target.tracks.get_mut(self.track_num).unwrap() {
             data::Track::Regions(regions) => {
-                regions.remove(self.pos);
+                if regions.is_empty() {
+                    Err(OpsContainerError::ContainerEmpty)
+                } else {
+                    regions.remove(self.pos);
+                    Ok(())
+                }
             }
             data::Track::Generator(_) => todo!(),
             data::Track::Transformer() => todo!(),
         }
-        Ok(())
     }
 }
 
@@ -140,7 +146,7 @@ impl undo::Action for AddTrack {
 
     type Output = ();
 
-    type Error = ();
+    type Error = OpsContainerError;
 
     fn apply(&mut self, target: &mut Self::Target) -> undo::Result<Self> {
         target.tracks.push(self.elem.clone());
@@ -149,8 +155,12 @@ impl undo::Action for AddTrack {
     }
 
     fn undo(&mut self, target: &mut Self::Target) -> undo::Result<Self> {
-        target.tracks.remove(self.pos);
-        Ok(())
+        if target.tracks.is_empty() {
+            Err(OpsContainerError::ContainerEmpty)
+        } else {
+            target.tracks.remove(self.pos);
+            Ok(())
+        }
     }
 }
 impl std::fmt::Display for AddTrack {
@@ -164,13 +174,13 @@ pub fn add_region(
     app: &mut data::AppModel,
     track_num: usize,
     region: data::Region,
-) -> Result<(), ()> {
+) -> Result<(), OpsContainerError> {
     app.history.apply(
         &mut app.project,
         Action::from(AddRegion::new(region, track_num)),
     )
 }
-pub fn add_track(app: &mut data::AppModel, track: data::Track) -> Result<(), ()> {
+pub fn add_track(app: &mut data::AppModel, track: data::Track) -> Result<(), OpsContainerError> {
     app.history
         .apply(&mut app.project, Action::from(AddTrack::new(track)))
 }

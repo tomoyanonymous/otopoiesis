@@ -5,23 +5,20 @@ use std::sync::Arc;
 
 /// origin needed to be boxed to be recursive data structure.
 
-pub struct FadeHandle {
-    param: Arc<data::FadeParam>,
-    origin: Box<super::region::Model>,
+pub struct State {
+    pub origin: Box<super::region::State>,
     pub range: AtomicRange,
     start_tmp: f32,
     end_tmp: f32,
 }
-impl FadeHandle {
-    pub fn new(
-        param: Arc<data::FadeParam>,
-        origin: data::Region,
-        range: &AtomicRange,
-    ) -> Self {
+impl State {
+    pub fn new(origin: &data::Region, range: &AtomicRange) -> Self {
         let label = &origin.label.clone();
         Self {
-            param,
-            origin: Box::new(super::region::Model::new(origin, format!("{}_fade", label))),
+            origin: Box::new(super::region::State::new(
+                origin,
+                format!("{}_fade", label),
+            )),
             range: range.clone(),
             start_tmp: 0.0,
             end_tmp: 0.0,
@@ -29,9 +26,31 @@ impl FadeHandle {
     }
 }
 
-impl egui::Widget for &mut FadeHandle {
-    fn ui(self, ui: &mut egui::Ui) -> egui::Response {
-        let origin = ui.add(self.origin.as_mut());
+pub struct FadeHandle<'a> {
+    param: &'a Arc<data::FadeParam>,
+    origin_ui: &'a mut data::Region,
+    state: &'a mut State,
+}
+impl<'a> FadeHandle<'a> {
+    pub fn new(
+        param: &'a Arc<data::FadeParam>,
+        origin_ui: &'a mut data::Region,
+        state: &'a mut State,
+    ) -> Self {
+        Self {
+            param,
+            origin_ui,
+            state,
+        }
+    }
+}
+
+impl<'a> egui::Widget for FadeHandle<'a> {
+    fn ui(mut self, ui: &mut egui::Ui) -> egui::Response {
+        let origin = ui.add(super::region::Model::new(
+            self.origin_ui,
+            self.state.origin.as_mut(),
+        ));
 
         let target_rect = origin.rect;
         let _response = ui.allocate_rect(target_rect, egui::Sense::focusable_noninteractive());
@@ -69,36 +88,37 @@ impl egui::Widget for &mut FadeHandle {
 
             ui_handle.on_hover_cursor(egui::CursorIcon::PointingHand)
         };
-        let range = (self.range.end() - self.range.start()) as f32 / gui::SAMPLES_PER_PIXEL_DEFAULT;
+        let range = (self.state.range.end() - self.state.range.start()) as f32
+            / gui::SAMPLES_PER_PIXEL_DEFAULT;
         let scale = move |sec| sec * 44100.0 / gui::SAMPLES_PER_PIXEL_DEFAULT;
         let descale = move |pix| pix * gui::SAMPLES_PER_PIXEL_DEFAULT / 44100.0;
         let in_width = scale(self.param.time_in.load());
         let out_width = scale(self.param.time_out.load());
         let start = make_circle(in_width, true);
         if start.drag_started() {
-            self.start_tmp = in_width;
+            self.state.start_tmp = in_width;
         }
         if start.dragged() {
-            self.start_tmp += start.drag_delta().x;
-            let v = (self.start_tmp + start.drag_delta().x).clamp(0.0, range - out_width);
+            self.state.start_tmp += start.drag_delta().x;
+            let v = (self.state.start_tmp + start.drag_delta().x).clamp(0.0, range - out_width);
             self.param.time_in.store(descale(v));
         }
         if start.drag_released() {
-            self.start_tmp = 0.0;
+            self.state.start_tmp = 0.0;
         }
         let end = make_circle(out_width, false);
         if end.drag_started() {
-            self.end_tmp = out_width;
+            self.state.end_tmp = out_width;
         }
         if end.dragged() {
             //accumlate delta.
-            self.end_tmp -= end.drag_delta().x;
-            let v = (self.end_tmp - end.drag_delta().x).clamp(0.0, range - in_width);
+            self.state.end_tmp -= end.drag_delta().x;
+            let v = (self.state.end_tmp - end.drag_delta().x).clamp(0.0, range - in_width);
 
             self.param.time_out.store(descale(v));
         }
         if end.drag_released() {
-            self.end_tmp = 0.0;
+            self.state.end_tmp = 0.0;
         }
         start.union(end)
     }

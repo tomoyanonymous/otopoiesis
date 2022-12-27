@@ -1,28 +1,35 @@
 use crate::{data, parameter::Parameter};
-
-pub struct Generator {
-    param: data::Generator,
+pub struct State {
     samples: Vec<f32>,
 }
 
-impl Generator {
-    pub fn new(param: data::Generator) -> Self {
-        let size = 512;
-        let mut res = Self {
-            param,
+impl State {
+    pub fn new(size: usize) -> Self {
+        Self {
             samples: vec![0.0; size],
-        };
+        }
+    }
+}
+
+pub struct Generator<'a> {
+    param: &'a mut data::Generator,
+    state: &'a mut State,
+}
+
+impl<'a> Generator<'a> {
+    pub fn new(param: &'a mut data::Generator, state: &'a mut State) -> Self {
+        let mut res = Self { param, state };
         res.update_samples();
         res
     }
     pub fn update_samples(&mut self) {
         // let mut phase = 0.0f32;
-        let len = self.samples.len();
+        let len = self.state.samples.len();
 
         match &self.param {
             data::Generator::Oscillator(_kind, osc) => {
                 let mut phase_gui = 0.0f32;
-                for s in self.samples.iter_mut() {
+                for s in self.state.samples.iter_mut() {
                     *s = phase_gui.sin() * osc.amp.get();
                     let twopi = std::f32::consts::PI * 2.0;
                     //とりあえず、440Hzで1周期分ということで
@@ -40,13 +47,14 @@ impl Generator {
         let width = size.x;
         let height = size.y;
         let points = self
+            .state
             .samples
             .iter()
             .enumerate()
             .map(|(i, s)| {
                 let x = egui::emath::remap(
                     i as f64,
-                    0.0..=self.samples.len() as f64,
+                    0.0..=self.state.samples.len() as f64,
                     0.0..=width as f64,
                 );
                 let y = *s * height;
@@ -74,8 +82,8 @@ impl Generator {
     }
 }
 
-impl egui::Widget for &mut Generator {
-    fn ui(self, ui: &mut egui::Ui) -> egui::Response {
+impl<'a> egui::Widget for Generator<'a> {
+    fn ui(mut self, ui: &mut egui::Ui) -> egui::Response {
         ui.vertical(|ui| {
             let res = self.make_graph_sized(ui, ui.available_size());
             let _controller = match &self.param {

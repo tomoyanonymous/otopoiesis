@@ -50,7 +50,7 @@ pub enum Content {
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Region {
     /// range stores a real time, not in sample.
-    pub range: Arc<AtomicRange>,
+    pub range: AtomicRange,
     pub content: Content,
     pub label: String,
 }
@@ -60,7 +60,7 @@ impl Region {
     ///
     pub fn new(range: AtomicRange, content: Content, label: impl Into<String>) -> Self {
         Self {
-            range: Arc::new(range),
+            range: range,
             content,
             label: label.into(),
         }
@@ -75,7 +75,7 @@ impl Region {
                 })),
                 Box::new(origin.clone()),
             ),
-            origin.label.clone(),
+            origin.label,
         )
     }
     // pub fn interpret(&self) -> Self {
@@ -123,7 +123,7 @@ impl Region {
 impl std::default::Default for Region {
     fn default() -> Self {
         Self {
-            range: Arc::new(AtomicRange::new(0, 0)),
+            range: AtomicRange::new(0, 0),
             content: Content::Generator(Generator::default()),
             label: "".to_string(),
         }

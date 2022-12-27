@@ -5,7 +5,6 @@
 use atomic_float;
 use serde::{Deserialize, Serialize};
 use std::{marker::PhantomData, sync::atomic};
-
 #[derive(Debug)]
 pub struct Primitive<P, A>
 where
@@ -110,6 +109,8 @@ impl_simple_atomic!(F32, f32, "f32", atomic_float::AtomicF32);
 impl_simple_atomic!(I64, i64, "i64", atomic::AtomicI64);
 impl_simple_atomic!(U64, u64, "u64", atomic::AtomicU64);
 impl_simple_atomic!(F64, f64, "f64", atomic_float::AtomicF64);
+
+
 
 #[cfg(test)]
 mod test {

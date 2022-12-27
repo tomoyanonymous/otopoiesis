@@ -47,6 +47,9 @@ impl AppModel {
         let history = &mut self.history;
         let _ = history.redo(&mut self.project).unwrap();
     }
+    pub fn get_track_for_id(&mut self, id: usize) -> Option<&mut Track> {
+        self.project.tracks.get_mut(id)
+    }
 }
 
 pub enum PlayOp {
@@ -119,7 +122,6 @@ pub struct Project {
     pub tracks: Vec<Track>,
 }
 
-pub type SharedVec<T> = Arc<Mutex<Vec<T>>>;
 
 /// Data structure for track.
 /// The track has some input/output stream.
