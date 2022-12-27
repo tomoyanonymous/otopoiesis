@@ -95,7 +95,8 @@ impl Model {
         self.audio.prepare_play();
         self.audio.pause();
     }
-    fn respawn_ui(&mut self) {
+
+    fn _respawn_ui(&mut self) {
         self.ui = gui::app::State::new(&self.app.lock().unwrap());
     }
     fn sync_transport(&mut self) {

@@ -1,0 +1,18 @@
+
+# Thanks to https://zenn.dev/naokifujita/articles/c890954165c21f
+
+name: cache_cargo
+description: caching .cargo directory
+runs:
+  using: composite
+  steps:
+    - name: Cache cargo registry
+      uses: actions/cache@v2
+      with:
+        path: |
+          ~/.cargo/bin/
+          ~/.cargo/registry/index/
+          ~/.cargo/registry/cache/
+          ~/.cargo/git/db/
+        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: ${{ runner.os }}-cargo-

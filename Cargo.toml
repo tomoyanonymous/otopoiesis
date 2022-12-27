@@ -7,8 +7,7 @@ resolver = "2"
 description = "a constructive audio programming environment with timeline-based view"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-[[bin]]
-name = "otopoiesis"
+
 
 [lib]
 crate-type = ["cdylib", "rlib"]

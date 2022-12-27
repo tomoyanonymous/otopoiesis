@@ -1,0 +1,26 @@
+on: [push, pull_request]
+jobs:
+  build_web:
+    runs-on: ubuntu-latest
+    env:
+      RUSTC_FORCE_INCREMENTAL: 1
+    steps:
+      - uses: actions/checkout@v3
+      - run: rustup default stable
+      - run: sudo apt-get install -y libasound2-dev
+      - uses: ./.github/actions/cache_cargo
+      - run: cargo install wasm-pack
+      - run: npm install
+      - name: build web app
+        run: npm run build
+  test_web:
+    runs-on: ubuntu-latest
+    env:
+      RUSTC_FORCE_INCREMENTAL: 1
+    needs: build_web
+    steps:
+      - uses: actions/checkout@v3
+      - uses: ./.github/actions/cache_cargo
+      - run: sudo apt-get install -y libasound2-dev
+      - name: test
+        run: cargo test --all -- --nocapture --target wasm32-unknown-unknown --features "web"

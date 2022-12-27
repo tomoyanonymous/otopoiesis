@@ -179,7 +179,7 @@ impl TransformerModel {
 #[derive(Debug)]
 pub struct Model {
     pub params: data::Region,
-    channels: u64,
+    _channels: u64,
     pub interleaved_samples_cache: Vec<f32>,
     pub content: Box<dyn RangedComponent + Send + Sync>,
     cache_completed: bool,
@@ -202,7 +202,7 @@ impl Model {
         };
         Self {
             params,
-            channels,
+            _channels: channels,
             interleaved_samples_cache: vec![0.0; buf_size as usize],
             content,
             cache_completed: false,

@@ -4,6 +4,10 @@ A constructive audio programming environment with timeline-based view.
 
 (*Currently, very early stage of development.*)
 
+[![.github/workflows/build_web.yml](https://github.com/tomoyanonymous/otopoiesis/actions/workflows/build_web.yml/badge.svg)](https://github.com/tomoyanonymous/otopoiesis/actions/workflows/build_web.yml)
+
+[![.github/workflows/build_native.yml](https://github.com/tomoyanonymous/otopoiesis/actions/workflows/build_native.yml/badge.svg)](https://github.com/tomoyanonymous/otopoiesis/actions/workflows/build_native.yml)
+
 [![Netlify Status](https://api.netlify.com/api/v1/badges/45c6bb83-4416-4a20-8364-036931f956a8/deploy-status)](https://app.netlify.com/sites/jovial-starship-05306a/deploys)
 
 Web version demo: https://otopoiesis.matsuuratomoya.com

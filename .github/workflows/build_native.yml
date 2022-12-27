@@ -1,0 +1,54 @@
+on: [push, pull_request]
+
+jobs:
+  build_cache:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest,macos-12]
+    runs-on: ${{ matrix.os }}
+    env:
+      RUSTC_FORCE_INCREMENTAL: 1
+    steps:
+      - uses: actions/checkout@v3
+      - uses: ./.github/actions/cache_cargo
+      - if: runner.os == 'Linux'
+        run: sudo apt-get install -y libasound2-dev
+      - name: build
+        run: cargo build
+  fmt:
+    runs-on: ubuntu-latest
+    needs: build_cache
+    steps:
+      - uses: actions/checkout@v3
+      - run: rustup component add rustfmt
+      - run: sudo apt-get install -y libasound2-dev
+      - uses: ./.github/actions/cache_cargo
+      - name: fmt
+        run: cargo fmt --all -- --check
+  clippy:
+    runs-on: ubuntu-latest
+    env:
+      RUSTC_FORCE_INCREMENTAL: 1
+    needs: build_cache
+    steps:
+      - uses: actions/checkout@v3
+      - run: rustup component add clippy
+      - run: sudo apt-get install -y libasound2-dev
+      - uses: ./.github/actions/cache_cargo
+      - name: clippy
+        run: cargo clippy --all-targets --all-features -- -D warnings
+  test:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest,macos-12]
+    runs-on: ${{ matrix.os }}
+    env:
+      RUSTC_FORCE_INCREMENTAL: 1
+    needs: build_cache
+    steps:
+      - uses: actions/checkout@v3
+      - if: runner.os == 'Linux'
+        run: sudo apt-get install -y libasound2-dev
+      - uses: ./.github/actions/cache_cargo
+      - name: test
+        run: cargo test --all -- --nocapture

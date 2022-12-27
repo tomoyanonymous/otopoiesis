@@ -4,7 +4,7 @@ use std::sync::Arc;
 #[derive(Debug)]
 pub struct Model {
     param: data::Project,
-    transport: Arc<data::Transport>,
+    _transport: Arc<data::Transport>,
     tracks: Vec<super::track::Model>, // regions: Vec<audio::region::Region<>>
     tmp_buffer: Vec<f32>,
 }
@@ -15,7 +15,7 @@ impl Model {
         let tmp_buffer = vec![0.0; 3];
         Self {
             param: project,
-            transport: Arc::clone(&transport),
+            _transport: Arc::clone(&transport),
             tracks,
             tmp_buffer,
         }

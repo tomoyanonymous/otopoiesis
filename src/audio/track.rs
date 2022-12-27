@@ -4,7 +4,7 @@ use crate::data;
 #[derive(Debug)]
 pub struct Model {
     param: Vec<data::Region>,
-    channels: u64,
+    _channels: u64,
     regions: Vec<super::region::Model>,
 }
 
@@ -14,7 +14,7 @@ impl Model {
 
         Self {
             param,
-            channels,
+            _channels: channels,
             regions,
         }
     }
