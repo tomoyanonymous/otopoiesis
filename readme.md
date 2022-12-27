@@ -1,16 +1,13 @@
 # otopoiesis
 
+[![.github/workflows/build_native.yml](https://github.com/tomoyanonymous/otopoiesis/actions/workflows/build_native.yml/badge.svg)](https://github.com/tomoyanonymous/otopoiesis/actions/workflows/build_native.yml) [![.github/workflows/build_web.yml](https://github.com/tomoyanonymous/otopoiesis/actions/workflows/build_web.yml/badge.svg)](https://github.com/tomoyanonymous/otopoiesis/actions/workflows/build_web.yml) [![Netlify Status](https://api.netlify.com/api/v1/badges/45c6bb83-4416-4a20-8364-036931f956a8/deploy-status)](https://app.netlify.com/sites/jovial-starship-05306a/deploys)
+
 A constructive audio programming environment with timeline-based view.
 
 (*Currently, very early stage of development.*)
 
-[![.github/workflows/build_web.yml](https://github.com/tomoyanonymous/otopoiesis/actions/workflows/build_web.yml/badge.svg)](https://github.com/tomoyanonymous/otopoiesis/actions/workflows/build_web.yml)
 
-[![.github/workflows/build_native.yml](https://github.com/tomoyanonymous/otopoiesis/actions/workflows/build_native.yml/badge.svg)](https://github.com/tomoyanonymous/otopoiesis/actions/workflows/build_native.yml)
-
-[![Netlify Status](https://api.netlify.com/api/v1/badges/45c6bb83-4416-4a20-8364-036931f956a8/deploy-status)](https://app.netlify.com/sites/jovial-starship-05306a/deploys)
-
-Web version demo: https://otopoiesis.matsuuratomoya.com
+Web version demo: **https://otopoiesis.matsuuratomoya.com**
 
 ## Concept
 
@@ -24,25 +21,41 @@ Simply: Makeing the project file of the DAW software into a source code of progr
   
 
 
-## How to build
+## How to build by yourself
 
 ### native
+
+On linux, you need to install ALSA.
+
+```sh
+sudo apt-get install libasound2-dev
+```
+
 ```sh
 cargo run
 ```
 
 ### web
 
+Can build & debug with wasm-pack.
+
 ```sh
-cargo build --target wasm32-unknown-unknown --features "web"
+cargo install wasm-pack
+npm install
 ```
 
-Debug with wasm-pack.
+#### build
 
 ```sh
-npm install
+npm run build 
+```
+
+### debug
+
+```sh
 npm start
 ```
+
 
 # Todo
 
