@@ -4,7 +4,6 @@ use crate::utils::atomic::{self, SimpleAtomic};
 use serde::{Deserialize, Serialize};
 use std::ops::RangeInclusive;
 
-
 pub trait Parameter<T> {
     fn new(init: T, range: RangeInclusive<T>, label: impl Into<String>) -> Self;
     fn get(&self) -> T;
@@ -18,7 +17,6 @@ pub struct FloatParameter {
     label: String,
 }
 //do we need?
-
 
 impl Parameter<f32> for FloatParameter {
     fn new(init: f32, range: RangeInclusive<f32>, label: impl Into<String>) -> Self {

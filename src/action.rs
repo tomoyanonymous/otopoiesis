@@ -31,7 +31,12 @@ impl<T> From<FailedToLockError<'_, Vec<T>>> for Error {
     }
 }
 
-trait DisplayableAction: undo::Action + std::fmt::Display {}
+trait DisplayableAction:
+    undo::Action<Target = data::Project, Output = (), Error = Error>
+    + std::fmt::Display
+    + std::fmt::Debug
+{
+}
 
 pub struct Action(Box<dyn DisplayableAction<Target = data::Project, Output = (), Error = Error>>);
 
@@ -129,6 +134,8 @@ impl undo::Action for AddRegion {
 }
 
 impl DisplayableAction for AddRegion {}
+
+#[derive(Debug)]
 struct AddTrack {
     elem: data::Track,
     pos: usize,

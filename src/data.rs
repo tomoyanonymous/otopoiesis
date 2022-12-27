@@ -122,7 +122,6 @@ pub struct Project {
     pub tracks: Vec<Track>,
 }
 
-
 /// Data structure for track.
 /// The track has some input/output stream.
 #[derive(Serialize, Deserialize, Clone, Debug)]
