@@ -7,15 +7,14 @@ extern crate serde_json;
 pub struct Model {
     app: Arc<Mutex<data::AppModel>>,
     project_str: String,
-    code_compiled: serde_json::Result<Arc<data::Project>>,
     audio: Renderer<audio::timeline::Model>,
+    compile_err: Option<serde_json::Error>,
     ui: gui::app::Model,
     editor_open: bool,
 }
 
 fn new_renderer(app: &data::AppModel) -> Renderer<audio::timeline::Model> {
-    let timeline =
-        audio::timeline::Model::new(Arc::clone(&app.project), Arc::clone(&app.transport));
+    let timeline = audio::timeline::Model::new(app.project.clone(), Arc::clone(&app.transport));
     audio::renderer::create_renderer(
         timeline,
         Some(44100),
@@ -28,23 +27,23 @@ impl Model {
     pub fn new(_cc: &eframe::CreationContext<'_>) -> Self {
         let sample_rate = 44100;
 
-        let project = Arc::new(data::Project {
+        let project = data::Project {
             sample_rate: atomic::U64::from(sample_rate),
-            tracks: Arc::new(Mutex::new(vec![])),
-        });
-        let transport = Arc::new(data::Transport::new());
-        let app = Arc::new(Mutex::new(data::AppModel::new(
-            Arc::clone(&transport),
-            Arc::new(data::GlobalSetting {}),
-            Arc::clone(&project),
-        )));
-        let ui = gui::app::Model::new(Arc::clone(&app));
+            tracks: vec![],
+        };
 
         let json = serde_json::to_string_pretty(&project);
         let json_str = json.unwrap_or_else(|e| {
             println!("{}", e);
             "failed to print".to_string()
         });
+        let app = Arc::new(Mutex::new(data::AppModel::new(
+            data::Transport::new(),
+            data::GlobalSetting {},
+            project,
+        )));
+        let ui = gui::app::Model::new(Arc::clone(&app));
+
         let mut renderer = new_renderer(&app.lock().unwrap());
 
         renderer.prepare_play();
@@ -54,7 +53,7 @@ impl Model {
             audio: renderer,
             app: Arc::clone(&app),
             project_str: json_str,
-            code_compiled: Ok(project),
+            compile_err: None,
             ui,
             editor_open: false,
         }
@@ -82,11 +81,15 @@ impl Model {
     }
     fn code_to_ui(&mut self) {
         if let Ok(mut app) = self.app.lock() {
-            let proj = serde_json::from_str::<Arc<data::Project>>(&self.project_str);
-            self.code_compiled = proj;
-            if let Ok(proj) = &self.code_compiled {
-                app.project = Arc::clone(proj);
-                self.ui.sync_state(&proj.tracks);
+            match serde_json::from_str::<data::Project>(&self.project_str) {
+                Ok(proj) => {
+                    app.project = proj.clone();
+                    self.compile_err = None;
+                    self.ui.sync_state(&proj.tracks);
+                }
+                Err(err) => {
+                    self.compile_err = Some(err);
+                }
             }
         }
         self.refresh_audio();
@@ -199,7 +202,7 @@ impl eframe::App for Model {
                         self.code_to_ui();
                     }
 
-                    if let Err(err) = &self.code_compiled {
+                    if let Some(err) = &self.compile_err {
                         ui.colored_label(
                             egui::Color32::RED,
                             format!("failed to evaluate json:{}", err),

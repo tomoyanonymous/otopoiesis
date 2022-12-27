@@ -1,6 +1,5 @@
 use crate::action;
 use crate::data;
-use crate::data::SharedVec;
 use crate::gui;
 use crate::utils::atomic;
 use std::sync::{Arc, Mutex};
@@ -12,20 +11,23 @@ pub struct Model {
 }
 
 fn param_to_track(
-    track_p: &SharedVec<data::Track>,
+    track_p: &[data::Track],
     app: Arc<Mutex<data::AppModel>>,
-) -> Option<Vec<gui::track::Model>> {
-    track_p.lock().ok().map(|ts| {
-        ts.iter()
-            .map(|t| gui::track::Model::new(t.clone(), app.clone()))
-            .collect::<Vec<_>>()
-    })
+) -> Vec<gui::track::Model> {
+    track_p
+        .iter()
+        .enumerate()
+        .map(|(i, t)| gui::track::Model::new(t.clone(), app.clone(), i))
+        .collect::<Vec<_>>()
 }
 
 impl Model {
-    pub fn new(param: Arc<data::Project>, app: Arc<Mutex<data::AppModel>>,time:Arc<atomic::U64>) -> Self {
-
-        let track = param_to_track(&param.tracks, app.clone()).unwrap();
+    pub fn new(
+        param: data::Project,
+        app: Arc<Mutex<data::AppModel>>,
+        time: Arc<atomic::U64>,
+    ) -> Self {
+        let track = param_to_track(&param.tracks, app.clone());
         Self {
             app: Arc::clone(&app),
             time,
@@ -67,14 +69,12 @@ impl Model {
             let _res = action::add_track(&mut app, data::Track::new());
             param_to_track(&app.project.tracks, self.app.clone())
         } else {
-            None
+            vec![]
         };
-        self.track = new_track.expect("no new tracks");
+        self.track = new_track;
     }
-    pub fn sync_state(&mut self, track_p: &SharedVec<data::Track>) {
-        if let Some(new_tracks) = param_to_track(track_p, self.app.clone()) {
-            self.track = new_tracks;
-        }
+    pub fn sync_state(&mut self, track_p: &[data::Track]) {
+        self.track = param_to_track(track_p, self.app.clone());
     }
 }
 

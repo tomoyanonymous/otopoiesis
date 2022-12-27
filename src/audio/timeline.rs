@@ -3,18 +3,18 @@ use crate::data;
 use std::sync::Arc;
 #[derive(Debug)]
 pub struct Model {
-    param: Arc<data::Project>,
+    param: data::Project,
     transport: Arc<data::Transport>,
     tracks: Vec<super::track::Model>, // regions: Vec<audio::region::Region<>>
     tmp_buffer: Vec<f32>,
 }
 
 impl Model {
-    pub fn new(project: Arc<data::Project>, transport: Arc<data::Transport>) -> Self {
-        let tracks = Self::get_new_tracks(project.as_ref());
+    pub fn new(project: data::Project, transport: Arc<data::Transport>) -> Self {
+        let tracks = Self::get_new_tracks(&project);
         let tmp_buffer = vec![0.0; 3];
         Self {
-            param: Arc::clone(&project),
+            param: project,
             transport: Arc::clone(&transport),
             tracks,
             tmp_buffer,
@@ -23,8 +23,6 @@ impl Model {
     fn get_new_tracks(project: &data::Project) -> Vec<super::track::Model> {
         project
             .tracks
-            .lock()
-            .unwrap()
             .iter()
             .map(|t| match t {
                 data::Track::Regions(r) => super::track::Model::new(r.clone(), 2),
@@ -42,7 +40,7 @@ impl Component for Model {
         2
     }
     fn prepare_play(&mut self, info: &PlaybackInfo) {
-        self.tracks = Self::get_new_tracks(self.param.as_ref());
+        self.tracks = Self::get_new_tracks(&self.param);
         let new_len = (info.frame_per_buffer) as usize;
         self.tmp_buffer.resize(new_len, 0.0);
 

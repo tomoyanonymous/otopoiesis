@@ -7,6 +7,7 @@ use std::sync::{Arc, Mutex};
 
 pub struct Model {
     pub param: data::Track,
+    id: usize,
     app: Arc<Mutex<data::AppModel>>,
     regions: Vec<gui::region::Model>,
     new_array_count: u32,
@@ -14,8 +15,6 @@ pub struct Model {
 fn get_region_from_param(track: &data::Track) -> Vec<gui::region::Model> {
     match track {
         data::Track::Regions(regions) => regions
-            .lock()
-            .unwrap()
             .iter()
             .map(|region| gui::region::Model::new(region.clone(), region.label.clone()))
             .collect::<Vec<_>>(),
@@ -25,10 +24,11 @@ fn get_region_from_param(track: &data::Track) -> Vec<gui::region::Model> {
 }
 
 impl Model {
-    pub fn new(param: data::Track, app: Arc<Mutex<data::AppModel>>) -> Self {
+    pub fn new(param: data::Track, app: Arc<Mutex<data::AppModel>>,id:usize) -> Self {
         let regions = get_region_from_param(&param);
         Self {
             param,
+            id,
             app,
             regions,
             new_array_count: 5,
@@ -39,12 +39,11 @@ impl Model {
             .iter()
             .fold(0u64, |acc, region| acc.max(region.params.range.end()))
     }
-    fn add_region_to_app(&self, region: Arc<data::Region>) {
+    fn add_region_to_app(&mut self, region: data::Region) {
         let mut app = self.app.try_lock().unwrap();
-        match &self.param {
-            data::Track::Regions(regions) => {
-                let _res =
-                    action::add_region(&mut app, regions.clone(), region);
+        match &mut self.param {
+            data::Track::Regions(_regions) => {
+                let _res = action::add_region(&mut app,self.id,region);
             }
             data::Track::Generator(_) => todo!(),
             data::Track::Transformer() => todo!(),
@@ -53,11 +52,11 @@ impl Model {
     fn add_region(&mut self) {
         let pos = self.get_position_to_add();
         let label = format!("region{}", self.regions.len() + 1);
-        let region_param = Arc::new(data::Region::new(
+        let region_param = data::Region::new(
             AtomicRange::from(pos..pos + 49000),
-            data::Content::Generator(Arc::new(data::Generator::default())),
+            data::Content::Generator(data::Generator::default()),
             label,
-        ));
+        );
         let faderegion_p = data::Region::with_fade(region_param);
         self.add_region_to_app(faderegion_p);
         self.regions = get_region_from_param(&self.param);
@@ -66,20 +65,20 @@ impl Model {
         let pos = self.get_position_to_add();
         let label = format!("region{}", self.regions.len() + 1);
 
-        let region_elem = Arc::new(data::Region::new(
+        let region_elem = data::Region::new(
             AtomicRange::from(pos..pos + 4000),
-            data::Content::Generator(Arc::new(data::Generator::default())),
+            data::Content::Generator(data::Generator::default()),
             label.clone(),
-        ));
+        );
 
-        let region_array = Arc::new(data::Region::new(
+        let region_array = data::Region::new(
             AtomicRange::from(pos..pos + 49000),
             data::Content::Transformer(
-                Arc::new(data::RegionFilter::Replicate(Arc::new(count.into()))),
-                data::Region::with_fade(region_elem),
+                data::RegionFilter::Replicate(count.into()),
+                Box::new(data::Region::with_fade(region_elem)),
             ),
             label,
-        ));
+        );
         self.add_region_to_app(region_array);
         self.regions = get_region_from_param(&self.param);
     }
@@ -99,8 +98,10 @@ impl egui::Widget for &mut Model {
                     .iter_mut()
                     .map(|region| {
                         let range = region.params.range.clone();
-                        let x_start = area.left() + range.start() as f32 / gui::SAMPLES_PER_PIXEL_DEFAULT;
-                        let x_end = area.left() + range.end() as f32 / gui::SAMPLES_PER_PIXEL_DEFAULT;
+                        let x_start =
+                            area.left() + range.start() as f32 / gui::SAMPLES_PER_PIXEL_DEFAULT;
+                        let x_end =
+                            area.left() + range.end() as f32 / gui::SAMPLES_PER_PIXEL_DEFAULT;
                         let rect = egui::Rect::from_points(&[
                             [x_start, top].into(),
                             [x_end, top + height].into(),

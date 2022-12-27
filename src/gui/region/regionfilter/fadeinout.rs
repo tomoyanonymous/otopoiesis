@@ -15,7 +15,7 @@ pub struct FadeHandle {
 impl FadeHandle {
     pub fn new(
         param: Arc<data::FadeParam>,
-        origin: Arc<data::Region>,
+        origin: data::Region,
         range: &AtomicRange,
     ) -> Self {
         let label = &origin.label.clone();

@@ -51,9 +51,9 @@ impl Model {
     fn get_time(&self) -> f64 {
         self.get_time_in_sample() as f64 / self.sample_rate as f64
     }
-    fn is_playing(&self) -> bool {
-        self.param.is_playing()
-    }
+    // fn is_playing(&self) -> bool {
+    //     self.param.is_playing()
+    // }
 }
 
 impl egui::Widget for &mut Model {
