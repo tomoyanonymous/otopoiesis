@@ -1,4 +1,4 @@
-use crate::utils::atomic;
+use crate::utils::atomic::{self, SimpleAtomic};
 use std::ops::RangeInclusive;
 use std::sync::Arc;
 pub(super) enum HandleMode {
@@ -15,10 +15,10 @@ impl From<bool> for HandleMode {
 }
 pub(super) struct UiBarState {
     saved_state: i64,
-    range: RangeInclusive<u64>,
+    range: RangeInclusive<i64>,
 }
 impl UiBarState {
-    pub fn new(range: RangeInclusive<u64>) -> Self {
+    pub fn new(range: RangeInclusive<i64>) -> Self {
         Self {
             saved_state: 0,
             range,
@@ -27,15 +27,15 @@ impl UiBarState {
 }
 
 pub(super) struct UiBar<'a> {
-    pos: &'a Arc<atomic::U64>,
+    pos: &'a Arc<atomic::I64>,
     state: &'a mut UiBarState,
     mode: HandleMode,
 }
 impl<'a> UiBar<'a> {
-    pub fn new(pos: &'a Arc<atomic::U64>, state: &'a mut UiBarState, mode: HandleMode) -> Self {
+    pub fn new(pos: &'a Arc<atomic::I64>, state: &'a mut UiBarState, mode: HandleMode) -> Self {
         Self { pos, state, mode }
     }
-    pub fn set_limit(&mut self, range: RangeInclusive<u64>) {
+    pub fn set_limit(&mut self, range: RangeInclusive<i64>) {
         self.state.range = range;
     }
     fn react(&mut self, response: &egui::Response) {
@@ -48,7 +48,7 @@ impl<'a> UiBar<'a> {
             self.pos.store((self.state.saved_state).clamp(
                 *self.state.range.start() as i64,
                 *self.state.range.end() as i64,
-            ) as u64);
+            ) as i64);
         }
         if response.drag_released() {
             self.state.saved_state = 0

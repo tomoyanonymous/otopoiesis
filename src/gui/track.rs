@@ -45,10 +45,10 @@ impl<'a> Model<'a> {
         Self { id, app, state }
     }
 
-    fn get_position_to_add(param: &[data::Region]) -> u64 {
+    fn get_position_to_add(param: &[data::Region]) -> i64 {
         param
             .iter()
-            .fold(0u64, |acc, region| acc.max(region.range.end()))
+            .fold(0i64, |acc, region| acc.max(region.range.end()))
     }
     // fn add_region_to_app(&self, region: data::Region) {
     //     match &self.param {
@@ -64,7 +64,7 @@ impl<'a> Model<'a> {
             let pos = Self::get_position_to_add(target);
             let label = format!("region{}", id + 1);
             let region_param = data::Region::new(
-                AtomicRange::from(pos..pos + 49000),
+                AtomicRange::<i64>::from(pos..pos + 49000),
                 data::Content::Generator(data::Generator::default()),
                 label,
             );
@@ -81,13 +81,13 @@ impl<'a> Model<'a> {
             let t_count = target.len() + 1;
             let label = format!("region{}", t_count);
             let region_elem = data::Region::new(
-                AtomicRange::from(pos..pos + 4000),
+                AtomicRange::<i64>::from(pos..pos + 4000),
                 data::Content::Generator(data::Generator::default()),
                 label.clone(),
             );
 
             data::Region::new(
-                AtomicRange::from(pos..pos + 49000),
+                AtomicRange::<i64>::from(pos..pos + 49000),
                 data::Content::Transformer(
                     data::RegionFilter::Replicate(count.into()),
                     Box::new(data::Region::with_fade(region_elem)),

@@ -1,10 +1,10 @@
 //! The main data format like project file, track, region and etc. Can be (de)serialized to/from json with serde.
 
 use crate::action;
-use crate::utils::{atomic, AtomicRange};
+use crate::utils::{atomic, AtomicRange, SimpleAtomic};
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use undo;
 
 pub mod generator;

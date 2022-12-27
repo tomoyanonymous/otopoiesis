@@ -1,6 +1,6 @@
 use crate::audio::{Component, PlaybackInfo};
 use crate::data;
-use crate::utils::atomic;
+use crate::utils::{atomic, SimpleAtomic};
 
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use cpal::{self, Stream};

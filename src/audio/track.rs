@@ -18,10 +18,7 @@ impl Model {
             regions,
         }
     }
-    fn get_new_regions(
-        param: &[data::Region],
-        channels: u64,
-    ) -> Vec<super::region::Model> {
+    fn get_new_regions(param: &[data::Region], channels: u64) -> Vec<super::region::Model> {
         param
             .iter()
             .map(|region| super::region::Model::new(region.clone(), channels))
@@ -74,7 +71,7 @@ impl Component for Model {
         let chs = 2;
         output.fill(0.0);
         for (count, out_per_channel) in output.chunks_mut(chs as usize).enumerate() {
-            let now = (info.current_time + count) as u64;
+            let now = (info.current_time + count) as i64;
             out_per_channel.iter_mut().enumerate().for_each(|(ch, s)| {
                 //順にリージョンを読んでいくので、重なってる場合は後の要素のやつが上書きする形になる
                 for region in self.regions.iter() {

@@ -1,6 +1,6 @@
 use crate::data;
 use crate::gui;
-
+use crate::utils::atomic::SimpleAtomic;
 mod region_handle;
 pub mod regionfilter;
 use region_handle::{HandleMode, UiBar, UiBarState};
@@ -36,7 +36,7 @@ pub struct State {
 impl State {
     pub fn new(params: &data::Region, labeltext: impl ToString) -> Self {
         let handle_left = UiBarState::new(0..=params.range.0.load());
-        let handle_right = UiBarState::new(params.range.1.load()..=u64::MAX);
+        let handle_right = UiBarState::new(params.range.1.load()..=i64::MAX);
         let content = match &params.content {
             data::Content::Generator(param) => {
                 ContentModel::Generator(param.clone(), super::generator::State::new(512))
@@ -99,7 +99,7 @@ impl<'a> egui::Widget for Model<'a> {
         let bar_width = 5.;
         let start = self.params.range.start();
         let end = self.params.range.end();
-        let min_start = 0u64;
+        let min_start = 0;
         let max_end = end + self.params.range.getrange();
 
         ui.spacing_mut().item_spacing = egui::vec2(0., 0.);
@@ -166,7 +166,7 @@ pub(crate) struct ReadOnlyModel {
 impl ReadOnlyModel {
     pub fn new(origin: &data::Region) -> Self {
         // let params = data::Region::new(
-        //     AtomicRange::new(origin.range.start(), origin.range.end()),
+        //     AtomicRange<i64>::new(origin.range.start(), origin.range.end()),
         //     origin.content.clone(),
         //     "dummy",
         // );

@@ -1,6 +1,7 @@
 use crate::action;
 use crate::data;
 use crate::gui;
+use crate::utils::atomic::SimpleAtomic;
 use std::sync::{Arc, Mutex};
 
 pub struct State {

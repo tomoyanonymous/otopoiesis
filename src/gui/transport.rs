@@ -1,4 +1,5 @@
 use crate::data;
+use crate::utils::atomic::SimpleAtomic;
 use std::sync::Arc;
 struct Toggle {
     transport: Arc<data::Transport>,
@@ -6,9 +7,7 @@ struct Toggle {
 
 impl Toggle {
     fn new(t: Arc<data::Transport>) -> Self {
-        Self {
-            transport: t,
-        }
+        Self { transport: t }
     }
 }
 impl egui::Widget for &mut Toggle {

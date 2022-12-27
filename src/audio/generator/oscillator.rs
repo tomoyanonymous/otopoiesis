@@ -1,7 +1,7 @@
 use super::GeneratorComponent;
 use crate::audio::PlaybackInfo;
 use crate::data::OscillatorParam;
-use crate::utils::atomic;
+use crate::utils::{atomic, SimpleAtomic};
 use crate::{data, parameter::Parameter};
 use std::f32::consts::PI;
 use std::sync::Arc;

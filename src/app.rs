@@ -2,6 +2,7 @@ use std::sync::{Arc, Mutex};
 
 use crate::audio::renderer::{Renderer, RendererBase};
 use crate::{audio, data, gui, utils::atomic};
+use atomic::SimpleAtomic;
 extern crate eframe;
 extern crate serde_json;
 pub struct Model {

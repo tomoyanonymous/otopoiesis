@@ -3,98 +3,91 @@
 //!
 
 use atomic_float;
-use serde::{Deserialize, Serialize};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::{marker::PhantomData, sync::atomic};
-#[derive(Debug)]
-pub struct Primitive<P, A>
-where
-    P: Copy,
-    A: From<P>,
+pub trait SimpleAtomicTest: Copy + PartialOrd {
+    type Atomic;
+    type Composed: SimpleAtomic<Primitive = Self> + Serialize + DeserializeOwned + From<Self>;
+}
+pub trait IsAtomicNumber<T>:
+    SimpleAtomicTest + std::ops::Add<Output = T> + std::ops::Sub<Output = T> + Default
 {
-    v: A,
-    phantom_data: PhantomData<P>,
 }
 
-pub trait SimpleAtomic<T>
-where
-    T: Copy,
-{
+pub trait SimpleAtomic {
     const ORDER: atomic::Ordering = atomic::Ordering::Relaxed;
-    type Ty;
-    fn load(&self) -> T;
-    fn store(&self, v: T);
-}
-impl<P, A> From<P> for Primitive<P, A>
-where
-    P: Copy,
-    A: From<P>,
-{
-    fn from(v: P) -> Self {
-        Self {
-            v: A::from(v),
-            phantom_data: PhantomData::<P> {},
-        }
-    }
+    type Primitive: Copy + PartialOrd;
+    type Atomic;
+    fn load(&self) -> Self::Primitive;
+    fn store(&self, v: Self::Primitive);
 }
 
 macro_rules! impl_simple_atomic {
-    ($name:ident,$p:ty,$ps:literal,$a:ty) => {
-        impl SimpleAtomic<$p> for Primitive<$p, $a> {
-            type Ty = Primitive<$p, $a>;
-            fn load(&self) -> $p {
-                self.v.load(Self::ORDER)
-            }
-            fn store(&self, v: $p) {
-                self.v.store(v, Self::ORDER)
-            }
-        }
-        impl From<Primitive<$p, $a>> for $p {
-            fn from(v: Primitive<$p, $a>) -> Self {
-                v.load()
-            }
-        }
-        impl Clone for Primitive<$p, $a> {
-            fn clone(&self) -> Self {
-                Self::from(self.load())
-            }
-        }
-        #[derive(Clone, Serialize, Deserialize, Debug)]
+    ($name:ident,$p:ty,$ps:literal,$a:ty ) => {
+        #[derive(Serialize, Deserialize, Debug)]
         #[serde(from=$ps,into=$ps)]
-        pub struct $name(pub Primitive<$p, $a>);
+        pub struct $name {
+            value: $a,
+            _phantom: PhantomData<$p>,
+        }
+        impl $name {
+            pub fn new(v: $p) -> Self {
+                Self {
+                    value: <$a>::from(v),
+                    _phantom: PhantomData,
+                }
+            }
+        }
 
         impl From<$p> for $name {
             fn from(v: $p) -> Self {
-                $name(Primitive::<$p, $a>::from(v))
+                $name::new(v)
+            }
+        }
+
+        impl SimpleAtomic for $name {
+            type Primitive = $p;
+            type Atomic = $a;
+            fn load(&self) -> $p {
+                self.value.load(Self::ORDER)
+            }
+            fn store(&self, v: $p) {
+                self.value.store(v, Self::ORDER)
             }
         }
         impl From<$name> for $p {
             fn from(v: $name) -> Self {
-                v.0.load()
+                v.load()
             }
         }
 
-        impl $name {
-            pub fn load(&self) -> $p {
-                self.0.load()
-            }
-            pub fn store(&self, v: $p) {
-                self.0.store(v)
+        impl Clone for $name {
+            fn clone(&self) -> Self {
+                Self::from(self.load())
             }
         }
         impl std::default::Default for $name {
             fn default() -> $name {
-                $name(Primitive::<$p, $a>::from(<$p>::default()))
+                $name::from(<$p>::default())
             }
+        }
+        impl SimpleAtomicTest for $p {
+            type Atomic = $a;
+            type Composed = $name;
         }
     };
 }
-
-pub fn make_simple_atomic<P, A>(v: P) -> Primitive<P, A>
-where
-    P: Copy,
-    A: From<P>,
-{
-    Primitive::<P, A>::from(v)
+macro_rules! impl_is_num {
+    ($t0:ty) => {
+        impl IsAtomicNumber<$t0> for $t0 {}
+    };
+    ($t0:ty,$($t:ty),+) => {
+        impl IsAtomicNumber<$t0> for $t0 {}
+        impl_is_num!($($t),+);
+    };
+}
+pub fn make_simple_atomic<P: SimpleAtomicTest>(v: P) -> P::Composed {
+    P::Composed::from(v)
 }
 
 impl_simple_atomic!(Bool, bool, "bool", atomic::AtomicBool);
@@ -109,9 +102,7 @@ impl_simple_atomic!(F32, f32, "f32", atomic_float::AtomicF32);
 impl_simple_atomic!(I64, i64, "i64", atomic::AtomicI64);
 impl_simple_atomic!(U64, u64, "u64", atomic::AtomicU64);
 impl_simple_atomic!(F64, f64, "f64", atomic_float::AtomicF64);
-
-
-
+impl_is_num!(usize, i8, u8, i16, u16, i32, u32, f32, i64, u64, f64);
 #[cfg(test)]
 mod test {
     use super::*;

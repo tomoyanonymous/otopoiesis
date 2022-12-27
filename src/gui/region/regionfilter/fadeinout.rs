@@ -1,24 +1,21 @@
 use crate::data;
 use crate::gui;
-use crate::utils::AtomicRange;
+use crate::utils::{AtomicRange, SimpleAtomic};
 use std::sync::Arc;
 
 /// origin needed to be boxed to be recursive data structure.
 
 pub struct State {
     pub origin: Box<super::region::State>,
-    pub range: AtomicRange,
+    pub range: AtomicRange<i64>,
     start_tmp: f32,
     end_tmp: f32,
 }
 impl State {
-    pub fn new(origin: &data::Region, range: &AtomicRange) -> Self {
+    pub fn new(origin: &data::Region, range: &AtomicRange<i64>) -> Self {
         let label = &origin.label.clone();
         Self {
-            origin: Box::new(super::region::State::new(
-                origin,
-                format!("{}_fade", label),
-            )),
+            origin: Box::new(super::region::State::new(origin, format!("{}_fade", label))),
             range: range.clone(),
             start_tmp: 0.0,
             end_tmp: 0.0,

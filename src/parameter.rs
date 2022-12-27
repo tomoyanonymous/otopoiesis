@@ -33,7 +33,6 @@ impl Parameter<f32> for FloatParameter {
     // note that no need to be "&mut self" here.
     fn set(&self, v: f32) {
         self.value
-            .0
             .store(v.max(*self.range.start()).min(*self.range.end()));
     }
 }
@@ -55,12 +54,11 @@ impl Parameter<u64> for UIntParameter {
     }
 
     fn get(&self) -> u64 {
-        self.value.0.load()
+        self.value.load()
     }
     // note that no need to be "&mut self" here.
     fn set(&self, v: u64) {
         self.value
-            .0
             .store(v.max(*self.range.start()).min(*self.range.end()));
     }
 }

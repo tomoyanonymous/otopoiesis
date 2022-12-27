@@ -41,7 +41,7 @@ where
 }
 
 pub fn get_component_for_generator(kind: &data::Generator) -> Box<dyn Component + Send + Sync> {
-     match kind {
+    match kind {
         data::Generator::Oscillator(fun, param) => Box::new(match fun {
             data::OscillatorFun::SineWave => oscillator::sinewave(param.clone()),
             data::OscillatorFun::SawTooth(dir) => oscillator::saw(param.clone(), dir.clone()),
