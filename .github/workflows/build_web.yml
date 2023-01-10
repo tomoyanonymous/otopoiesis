@@ -1,4 +1,10 @@
-on: [push, pull_request]
+on:
+  push:
+      branches:
+      - main
+      - dev
+  pull_request:
+
 jobs:
   build_web:
     runs-on: ubuntu-latest
