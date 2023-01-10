@@ -1,52 +1,55 @@
 use crate::data;
-use crate::utils::atomic::SimpleAtomic;
-enum RegionContent {
-    Editable(data::Region, super::region::State), //todo
-    NonEditable(super::region::ReadOnlyModel),
+pub struct RegionContent<'a> {
+    param: &'a mut data::Region,
+    state: &'a mut super::region::State,
 }
-impl egui::Widget for &mut RegionContent {
+
+impl<'a> egui::Widget for RegionContent<'a> {
     fn ui(self, ui: &mut egui::Ui) -> egui::Response {
-        match self {
-            RegionContent::Editable(p, m) => ui.add(super::region::Model::new(p, m)),
-            RegionContent::NonEditable(m) => m.ui(ui),
-        }
+        ui.add(super::region::Model::new(self.param, self.state))
+    }
+}
+pub struct State {
+    pub regions: Vec<super::region::State>,
+}
+impl State {
+    pub fn new(origin: &data::Region, count: u64) -> Self {
+        let regions = (0..count)
+            .into_iter()
+            .map(|i| super::region::State::new(origin, origin.label.clone(), i == 0))
+            .collect::<Vec<super::region::State>>();
+        Self { regions }
     }
 }
 
-pub struct Replicate {
-    pub param: data::ReplicateParam,
-    pub origin: data::Region,
-    regions: Vec<RegionContent>,
+pub struct Replicate<'a> {
+    pub param: &'a data::ReplicateParam,
+    pub origin: &'a mut data::Region,
+    state: &'a mut State,
 }
 
-impl Replicate {
-    pub fn new(param: data::ReplicateParam, origin: data::Region) -> Self {
-        let regions = (0..param.count.load())
-            .into_iter()
-            .map(|i| {
-                if i == 0 {
-                    RegionContent::Editable(
-                        origin.clone(),
-                        super::region::State::new(&origin, origin.label.clone()),
-                    )
-                } else {
-                    RegionContent::NonEditable(super::region::ReadOnlyModel::new(&origin))
-                }
-            })
-            .collect::<Vec<RegionContent>>();
+impl<'a> Replicate<'a> {
+    pub fn new(
+        param: &'a data::ReplicateParam,
+        origin: &'a mut data::Region,
+        state: &'a mut State,
+    ) -> Self {
         Self {
             param,
             origin,
-            regions,
+            state,
         }
     }
 }
 
-impl egui::Widget for &mut Replicate {
+impl<'a> egui::Widget for Replicate<'a> {
     fn ui(self, ui: &mut egui::Ui) -> egui::Response {
         ui.horizontal(|ui| {
-            for region in self.regions.iter_mut() {
-                ui.add(region);
+            for region in self.state.regions.iter_mut() {
+                ui.add(RegionContent {
+                    param: self.origin,
+                    state: region,
+                });
             }
         })
         .response

@@ -1,7 +1,6 @@
 use crate::data;
 use crate::gui;
 use crate::utils::{AtomicRange, SimpleAtomic};
-use std::sync::Arc;
 
 /// origin needed to be boxed to be recursive data structure.
 
@@ -12,11 +11,15 @@ pub struct State {
     end_tmp: f32,
 }
 impl State {
-    pub fn new(origin: &data::Region, range: &AtomicRange<i64>) -> Self {
+    pub fn new(origin: &data::Region, range: AtomicRange<i64>) -> Self {
         let label = &origin.label.clone();
         Self {
-            origin: Box::new(super::region::State::new(origin, format!("{}_fade", label))),
-            range: range.clone(),
+            origin: Box::new(super::region::State::new(
+                origin,
+                format!("{}_fade", label),
+                false,
+            )),
+            range,
             start_tmp: 0.0,
             end_tmp: 0.0,
         }
@@ -24,13 +27,13 @@ impl State {
 }
 
 pub struct FadeHandle<'a> {
-    param: &'a Arc<data::FadeParam>,
+    param: &'a data::FadeParam,
     origin_ui: &'a mut data::Region,
     state: &'a mut State,
 }
 impl<'a> FadeHandle<'a> {
     pub fn new(
-        param: &'a Arc<data::FadeParam>,
+        param: &'a data::FadeParam,
         origin_ui: &'a mut data::Region,
         state: &'a mut State,
     ) -> Self {

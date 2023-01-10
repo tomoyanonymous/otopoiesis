@@ -33,7 +33,7 @@ fn get_region_from_param(track: &data::Track) -> Vec<gui::region::State> {
     match track {
         data::Track::Regions(regions) => regions
             .iter()
-            .map(|region| gui::region::State::new(region, region.label.clone()))
+            .map(|region| gui::region::State::new(region, region.label.clone(), true))
             .collect::<Vec<_>>(),
         data::Track::Generator(_) => todo!(),
         data::Track::Transformer() => todo!(),

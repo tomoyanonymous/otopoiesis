@@ -5,6 +5,11 @@ mod region_handle;
 pub mod regionfilter;
 use region_handle::{HandleMode, UiBar, UiBarState};
 
+use self::regionfilter::fadeinout::FadeHandle;
+use self::regionfilter::replicate::Replicate;
+use self::regionfilter::RegionFilterState;
+use self::regionfilter::{fadeinout, replicate};
+
 pub enum ContentModel {
     RegionFilter(regionfilter::RegionFilterState),
     Generator(data::Generator, super::generator::State),
@@ -31,10 +36,11 @@ pub struct State {
     content: ContentModel,
     range_handles: [UiBarState; 2], // pub osc_params: Arc<oscillator::SharedParams>,
     offset_saved: i64,
+    is_interactive: bool,
 }
 
 impl State {
-    pub fn new(params: &data::Region, labeltext: impl ToString) -> Self {
+    pub fn new(params: &data::Region, labeltext: impl ToString, is_interactive: bool) -> Self {
         let handle_left = UiBarState::new(0..=params.range.0.load());
         let handle_right = UiBarState::new(params.range.1.load()..=i64::MAX);
         let content = match &params.content {
@@ -42,9 +48,21 @@ impl State {
                 ContentModel::Generator(param.clone(), super::generator::State::new(512))
             }
             data::Content::AudioFile(_) => todo!(),
-            data::Content::Transformer(filter, origin) => ContentModel::RegionFilter(
-                regionfilter::RegionFilterState::new(filter.clone(), *origin.clone()),
-            ),
+            data::Content::Transformer(filter, origin) => {
+                ContentModel::RegionFilter(match filter {
+                    data::RegionFilter::Gain => todo!(),
+                    data::RegionFilter::Reverse => todo!(),
+                    data::RegionFilter::FadeInOut(_p) => {
+                        regionfilter::RegionFilterState::FadeInOut(fadeinout::State::new(
+                            origin,
+                            origin.range.clone(),
+                        ))
+                    }
+                    data::RegionFilter::Replicate(p) => regionfilter::RegionFilterState::Replicate(
+                        replicate::State::new(origin.as_ref(), p.count.load() as u64),
+                    ),
+                })
+            }
         };
         let range_handles = [handle_left, handle_right];
         Self {
@@ -52,6 +70,7 @@ impl State {
             content,
             range_handles,
             offset_saved: 0,
+            is_interactive,
         }
     }
 }
@@ -69,17 +88,17 @@ impl<'a> Model<'a> {
         // self.osc_params.amp.get().abs()
         1.0
     }
-    fn interact_main(&mut self, main: &egui::Response, is_interactive: bool) -> egui::Response {
+    fn interact_main(&mut self, main: &egui::Response) -> egui::Response {
         let mut main = main.clone();
-        if is_interactive && main.drag_started() {
+        if main.drag_started() {
             self.state.offset_saved = self.params.range.start() as i64;
         }
-        if is_interactive && main.dragged() {
+        if main.dragged() {
             let offset = (main.drag_delta().x * gui::SAMPLES_PER_PIXEL_DEFAULT) as i64;
             self.params.range.shift_bounded(offset);
             main = main.on_hover_cursor(egui::CursorIcon::Grabbing)
         }
-        if is_interactive && main.drag_released() {
+        if main.drag_released() {
             self.state.offset_saved = 0;
         }
         main
@@ -108,26 +127,36 @@ impl<'a> egui::Widget for Model<'a> {
             let bar_size = egui::vec2(bar_width, height);
 
             let (main, is_interactive) = match (&mut self.params.content, &mut self.state.content) {
-                (data::Content::Transformer(filter, origin), ContentModel::RegionFilter(f)) => {
-                    let fade_param = match filter {
-                        data::RegionFilter::Gain => todo!(),
-                        data::RegionFilter::FadeInOut(param) => {
+                (data::Content::Transformer(filter, origin), ContentModel::RegionFilter(state)) => {
+                    match (filter, state) {
+                        (data::RegionFilter::Gain, _) => todo!(),
+                        (data::RegionFilter::FadeInOut(param), RegionFilterState::FadeInOut(s)) => {
                             self.params.range.set_start(origin.range.start());
                             self.params.range.set_end(origin.range.end());
-                            param
+                            (
+                                ui.add(regionfilter::RegionFilter::FadeInOut(FadeHandle::new(
+                                    param.as_ref(),
+                                    origin.as_mut(),
+                                    s,
+                                ))),
+                                false,
+                            )
                         }
-                        data::RegionFilter::Reverse => todo!(),
-                        data::RegionFilter::Replicate(_) => todo!(),
-                    };
-
-                    (
-                        ui.add(regionfilter::RegionFilter::new(
-                            fade_param,
-                            f,
-                            origin.as_mut(),
-                        )),
-                        false,
-                    )
+                        (data::RegionFilter::Reverse, _) => todo!(),
+                        (data::RegionFilter::Replicate(param), RegionFilterState::Replicate(s)) => {
+                            (
+                                ui.add(regionfilter::RegionFilter::Replicate(Replicate::new(
+                                    param,
+                                    origin.as_mut(),
+                                    s,
+                                ))),
+                                false,
+                            )
+                        }
+                        (_, _) => panic!(
+                            "invalid combination of parameter and gui state in pattern matching "
+                        ),
+                    }
                 }
                 (data::Content::Generator(param), ContentModel::Generator(_genmodel, genstate)) => {
                     let mut handle_start = UiBar::new(
@@ -150,48 +179,10 @@ impl<'a> egui::Widget for Model<'a> {
                 _ => unreachable!(),
             };
 
-            self.interact_main(&main, is_interactive)
+            if self.state.is_interactive && is_interactive {
+                self.interact_main(&main);
+            }
         })
         .response
-    }
-}
-
-/// UI model that is used only for display element.
-/// it is mostly for displaying information for replicating regions.
-/// Any data are not shared between audio thread.
-pub(crate) struct ReadOnlyModel {
-    // params: data::Region,
-    content: ContentModel,
-}
-impl ReadOnlyModel {
-    pub fn new(origin: &data::Region) -> Self {
-        // let params = data::Region::new(
-        //     AtomicRange<i64>::new(origin.range.start(), origin.range.end()),
-        //     origin.content.clone(),
-        //     "dummy",
-        // );
-        match &origin.content {
-            data::Content::Generator(g) => Self {
-                // params,
-                content: ContentModel::Generator(g.clone(), super::generator::State::new(512)),
-            },
-            data::Content::AudioFile(_) => todo!(),
-            data::Content::Transformer(filter, origin) => Self {
-                content: ContentModel::RegionFilter(regionfilter::RegionFilterState::new(
-                    filter.clone(),
-                    *origin.clone(),
-                )),
-            },
-            // data::Content::Array(_) => todo!(),
-        }
-    }
-}
-
-impl egui::Widget for &mut ReadOnlyModel {
-    fn ui(self, ui: &mut egui::Ui) -> egui::Response {
-        match &mut self.content {
-            ContentModel::RegionFilter(_f) => todo!(), //ui.add(f),
-            ContentModel::Generator(p, vec) => ui.add(super::generator::Generator::new(p, vec)),
-        }
     }
 }
