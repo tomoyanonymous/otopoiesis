@@ -1,16 +1,15 @@
 on:
   push:
-      branches:
+    branches:
       - main
       - dev
   pull_request:
-
 
 jobs:
   build_cache:
     strategy:
       matrix:
-        os: [ubuntu-latest, windows-latest,macos-12]
+        os: [ubuntu-latest, windows-latest, macos-12]
     runs-on: ${{ matrix.os }}
     env:
       RUSTC_FORCE_INCREMENTAL: 1
@@ -46,7 +45,7 @@ jobs:
   test:
     strategy:
       matrix:
-        os: [ubuntu-latest, windows-latest,macos-12]
+        os: [ubuntu-latest, windows-latest, macos-12]
     runs-on: ${{ matrix.os }}
     env:
       RUSTC_FORCE_INCREMENTAL: 1
