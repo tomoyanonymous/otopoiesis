@@ -45,10 +45,10 @@ impl<'a> Model<'a> {
         Self { id, app, state }
     }
 
-    fn get_position_to_add(param: &[data::Region]) -> i64 {
+    fn get_position_to_add(param: &[data::Region]) -> f64 {
         param
             .iter()
-            .fold(0i64, |acc, region| acc.max(region.range.end()))
+            .fold(0.0, |acc, region| acc.max(region.range.end()))
     }
     // fn add_region_to_app(&self, region: data::Region) {
     //     match &self.param {
@@ -64,7 +64,7 @@ impl<'a> Model<'a> {
             let pos = Self::get_position_to_add(target);
             let label = format!("region{}", id + 1);
             let region_param = data::Region::new(
-                AtomicRange::<i64>::from(pos..pos + 49000),
+                AtomicRange::<f64>::from(pos..pos + 1.0),
                 data::Content::Generator(data::Generator::default()),
                 label,
             );
@@ -81,13 +81,13 @@ impl<'a> Model<'a> {
             let t_count = target.len() + 1;
             let label = format!("region{}", t_count);
             let region_elem = data::Region::new(
-                AtomicRange::<i64>::from(pos..pos + 4000),
+                AtomicRange::<f64>::from(pos..pos + 1.0),
                 data::Content::Generator(data::Generator::default()),
                 label.clone(),
             );
 
             data::Region::new(
-                AtomicRange::<i64>::from(pos..pos + 49000),
+                AtomicRange::<f64>::from(pos..pos + 1.0),
                 data::Content::Transformer(
                     data::RegionFilter::Replicate(count.into()),
                     Box::new(data::Region::with_fade(region_elem)),
@@ -122,6 +122,7 @@ impl<'a> egui::Widget for Model<'a> {
                         let area = ui.available_rect_before_wrap();
                         let left_top = area.left_top();
                         let top = area.top() - height / 2.;
+                        let scale = move |sec: f64| (sec * gui::PIXELS_PER_SEC_DEFAULT as f64) as f32;
 
                         let res = ui.group(|ui| {
                             self.state
@@ -130,10 +131,8 @@ impl<'a> egui::Widget for Model<'a> {
                                 .zip(region_params.iter_mut())
                                 .map(|(region, region_param)| {
                                     let range = region_param.range.clone();
-                                    let x_start = area.left()
-                                        + range.start() as f32 / gui::SAMPLES_PER_PIXEL_DEFAULT;
-                                    let x_end = area.left()
-                                        + range.end() as f32 / gui::SAMPLES_PER_PIXEL_DEFAULT;
+                                    let x_start = area.left() + scale(range.start());
+                                    let x_end = area.left() + scale(range.end());
                                     let rect = egui::Rect::from_points(&[
                                         [x_start, top].into(),
                                         [x_end, top + height].into(),

@@ -41,8 +41,8 @@ pub struct State {
 
 impl State {
     pub fn new(params: &data::Region, labeltext: impl ToString, is_interactive: bool) -> Self {
-        let handle_left = UiBarState::new(0..=params.range.0.load());
-        let handle_right = UiBarState::new(params.range.1.load()..=i64::MAX);
+        let handle_left = UiBarState::new(0.0..=params.range.0.load());
+        let handle_right = UiBarState::new(params.range.1.load()..=f64::MAX);
         let content = match &params.content {
             data::Content::Generator(param) => {
                 ContentModel::Generator(param.clone(), super::generator::State::new(512))
@@ -94,7 +94,7 @@ impl<'a> Model<'a> {
             self.state.offset_saved = self.params.range.start() as i64;
         }
         if main.dragged() {
-            let offset = (main.drag_delta().x * gui::SAMPLES_PER_PIXEL_DEFAULT) as i64;
+            let offset = main.drag_delta().x as f64 / gui::PIXELS_PER_SEC_DEFAULT as f64;
             self.params.range.shift_bounded(offset);
             main = main.on_hover_cursor(egui::CursorIcon::Grabbing)
         }
@@ -118,7 +118,7 @@ impl<'a> egui::Widget for Model<'a> {
         let bar_width = 5.;
         let start = self.params.range.start();
         let end = self.params.range.end();
-        let min_start = 0;
+        let min_start = 0.0;
         let max_end = end + self.params.range.getrange();
 
         ui.spacing_mut().item_spacing = egui::vec2(0., 0.);

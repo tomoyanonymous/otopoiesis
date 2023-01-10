@@ -61,7 +61,7 @@ impl<'a> Model<'a> {
                                 app.can_undo(),
                                 egui::Button::new(format!(
                                     "Undo {} | {}",
-                                    app.history.display(),
+                                    app.history.undo_text().unwrap_or_default(),
                                     str
                                 )),
                             );
@@ -75,7 +75,7 @@ impl<'a> Model<'a> {
                                     app.can_redo(),
                                     egui::Button::new(format!(
                                         "Redo {} | {}",
-                                        app.history.display(),
+                                        app.history.redo_text().unwrap_or_default(),
                                         str
                                     )),
                                 )

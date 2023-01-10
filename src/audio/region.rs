@@ -9,7 +9,7 @@ use std::sync::Arc;
 
 /// Interface for offline rendering.
 pub trait RangedComponent: std::fmt::Debug {
-    fn get_range(&self) -> RangeInclusive<i64>;
+    fn get_range(&self) -> RangeInclusive<f64>;
     fn get_output_channels(&self) -> u64;
     fn render_offline(&mut self, dest: &mut [f32], sample_rate: u32, channels: u64);
 }
@@ -29,7 +29,7 @@ impl FadeModel {
 }
 
 impl RangedComponent for FadeModel {
-    fn get_range(&self) -> RangeInclusive<i64> {
+    fn get_range(&self) -> RangeInclusive<f64> {
         let (start, end) = self.origin.params.range.get_pair();
         start..=end
     }
@@ -86,14 +86,14 @@ impl RegionArray {
 impl RangedComponent for RegionArray {
     /// panics  if the end is earlier than the start.
     ///
-    fn get_range(&self) -> RangeInclusive<i64> {
+    fn get_range(&self) -> RangeInclusive<f64> {
         if !self.0.is_empty() {
             let start = self.0[0].params.range.start();
             let end = self.0.last().unwrap().params.range.end();
             assert!(end >= start);
             start..=end
         } else {
-            0..=0
+            0.0..=0.0
         }
     }
 
@@ -119,12 +119,12 @@ impl RangedComponent for RegionArray {
 #[derive(Debug)]
 pub struct RangedComponentDyn {
     generator: Box<dyn Component + Sync + Send>,
-    range: AtomicRange<i64>,
+    range: AtomicRange<f64>,
     buffer: Vec<f32>,
 }
 
 impl RangedComponentDyn {
-    pub fn new(generator: Box<dyn Component + Sync + Send>, range: AtomicRange<i64>) -> Self {
+    pub fn new(generator: Box<dyn Component + Sync + Send>, range: AtomicRange<f64>) -> Self {
         Self {
             generator,
             range,
@@ -134,7 +134,7 @@ impl RangedComponentDyn {
 }
 
 impl RangedComponent for RangedComponentDyn {
-    fn get_range(&self) -> RangeInclusive<i64> {
+    fn get_range(&self) -> RangeInclusive<f64> {
         let (start, end) = self.range.get_pair();
         start..=end
     }
@@ -217,7 +217,7 @@ impl Model {
             .render_offline(&mut self.interleaved_samples_cache, sample_rate, channels);
         self.cache_completed = true;
     }
-    pub fn contains_samples(&self, range: RangeInclusive<i64>) -> bool {
+    pub fn contains_samples(&self, range: RangeInclusive<f64>) -> bool {
         let t_range = &self.params.range;
         let start = t_range.start();
         let end = t_range.end();

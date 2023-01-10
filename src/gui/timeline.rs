@@ -54,8 +54,9 @@ impl<'a> Model<'a> {
         let stroke = style.visuals.window_stroke();
 
         let rect = painter.clip_rect();
-
-        let x = self.get_current_time_in_sample() as f32 / gui::SAMPLES_PER_PIXEL_DEFAULT as f32
+        let sr = self.app.try_lock().unwrap().project.sample_rate.load();
+        let x = (self.get_current_time_in_sample() as f64 * gui::PIXELS_PER_SEC_DEFAULT as f64
+            / sr as f64) as f32
             + rect.left();
         painter.line_segment(
             [

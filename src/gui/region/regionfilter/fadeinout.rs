@@ -6,12 +6,12 @@ use crate::utils::{AtomicRange, SimpleAtomic};
 
 pub struct State {
     pub origin: Box<super::region::State>,
-    pub range: AtomicRange<i64>,
+    pub range: AtomicRange<f64>,
     start_tmp: f32,
     end_tmp: f32,
 }
 impl State {
-    pub fn new(origin: &data::Region, range: AtomicRange<i64>) -> Self {
+    pub fn new(origin: &data::Region, range: AtomicRange<f64>) -> Self {
         let label = &origin.label.clone();
         Self {
             origin: Box::new(super::region::State::new(
@@ -88,10 +88,10 @@ impl<'a> egui::Widget for FadeHandle<'a> {
 
             ui_handle.on_hover_cursor(egui::CursorIcon::PointingHand)
         };
-        let range = (self.state.range.end() - self.state.range.start()) as f32
-            / gui::SAMPLES_PER_PIXEL_DEFAULT;
-        let scale = move |sec| sec * 44100.0 / gui::SAMPLES_PER_PIXEL_DEFAULT;
-        let descale = move |pix| pix * gui::SAMPLES_PER_PIXEL_DEFAULT / 44100.0;
+        let range_pix = (self.state.range.end() - self.state.range.start()) as f32
+            * gui::PIXELS_PER_SEC_DEFAULT;
+        let scale = move |sec| sec * gui::PIXELS_PER_SEC_DEFAULT;
+        let descale = move |pix| gui::PIXELS_PER_SEC_DEFAULT / pix;
         let in_width = scale(self.param.time_in.load());
         let out_width = scale(self.param.time_out.load());
         let start = make_circle(in_width, true);
@@ -100,7 +100,7 @@ impl<'a> egui::Widget for FadeHandle<'a> {
         }
         if start.dragged() {
             self.state.start_tmp += start.drag_delta().x;
-            let v = (self.state.start_tmp + start.drag_delta().x).clamp(0.0, range - out_width);
+            let v = (self.state.start_tmp + start.drag_delta().x).clamp(0.0, range_pix - out_width);
             self.param.time_in.store(descale(v));
         }
         if start.drag_released() {
@@ -113,7 +113,7 @@ impl<'a> egui::Widget for FadeHandle<'a> {
         if end.dragged() {
             //accumlate delta.
             self.state.end_tmp -= end.drag_delta().x;
-            let v = (self.state.end_tmp - end.drag_delta().x).clamp(0.0, range - in_width);
+            let v = (self.state.end_tmp - end.drag_delta().x).clamp(0.0, range_pix - in_width);
 
             self.param.time_out.store(descale(v));
         }

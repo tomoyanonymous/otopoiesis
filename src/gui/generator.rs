@@ -61,8 +61,8 @@ impl<'a> Generator<'a> {
                 [x, y as f64]
             })
             .collect::<Vec<_>>();
-
-        egui::plot::Plot::new(ui.auto_id_with("generator"))
+        let uid = ui.auto_id_with("generator");
+        egui::plot::Plot::new(uid)
             .allow_drag(false)
             .allow_zoom(false)
             .allow_boxed_zoom(false)
