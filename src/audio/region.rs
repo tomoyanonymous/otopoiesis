@@ -256,3 +256,64 @@ pub fn render_region_offline_async(
         })
         .expect("failed to launch thread")
 }
+
+#[cfg(test)]
+mod test {
+    use crate::parameter::Parameter;
+
+    use super::*;
+    #[test]
+    pub fn run_generator_region() {
+        let channel = 2;
+        let sample_rate = 48000;
+        let range = 0.1..0.2;
+        let osc_param = data::generator::OscillatorParam::default();
+        let data = data::Region::new(
+            AtomicRange::<f64>::new(range.start, range.end),
+            data::Content::Generator(data::generator::Generator::Oscillator(
+                data::generator::OscillatorFun::SineWave,
+                Arc::new(osc_param.clone()),
+            )),
+            "test_sin",
+        );
+        let mut model = Model::new(data, channel);
+        model.render_offline(sample_rate, channel);
+        let range_samps =
+            ((range.end - range.start) * sample_rate as f64) as usize * channel as usize;
+        assert_eq!(model.interleaved_samples_cache.len(), range_samps);
+
+        let mut answer = vec![0.0f32; range_samps];
+        let mut phase = osc_param.phase.get();
+        assert_eq!(phase.sin(), 0.0);
+        answer
+            .chunks_mut(channel as usize)
+            .enumerate()
+            .for_each(|(_count, o_per_channel)| {
+                // let now = count as f64 / sample_rate as f64;
+                let twopi = std::f32::consts::PI * 2.0;
+                o_per_channel.iter_mut().enumerate().for_each(|(ch, o)| {
+                    if ch == 0 {
+                        *o = phase.sin() * osc_param.amp.get();
+                    } else {
+                        *o = 0.0;
+                    }
+                });
+                phase = (phase + twopi * osc_param.freq.get() / (sample_rate as f32)) % twopi;
+            });
+        assert!(model.cache_completed);
+        model
+            .interleaved_samples_cache
+            .iter()
+            .zip(answer.iter())
+            .enumerate()
+            .for_each(|(i, (computed, answer))| {
+                debug_assert!(
+                    (answer - computed).abs() <= f32::EPSILON,
+                    "\nindex:{} \ncomputed: {}\nanswer: {}",
+                    i,
+                    computed,
+                    answer
+                )
+            })
+    }
+}
