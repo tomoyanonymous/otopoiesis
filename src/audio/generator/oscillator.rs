@@ -27,10 +27,10 @@ impl<T: Oscillator> GeneratorComponent for T {
     }
 
     fn render_sample(&mut self, out: &mut f32, info: &PlaybackInfo) {
+        *out = self.map(self.phase()) * self.get_params().amp.get();
         self.set_phase(
             (self.phase() + TWOPI * self.get_params().freq.get() / info.sample_rate as f32) % TWOPI,
         );
-        *out = self.map(self.phase())
     }
 }
 

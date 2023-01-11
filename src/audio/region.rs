@@ -105,10 +105,11 @@ impl RangedComponent for RegionArray {
         //todo: asynchrounous render
         self.0.iter_mut().for_each(|region| {
             let range = &region.params.range;
-            let dest = &mut dest[(range.start() as usize)..(range.end() as usize)];
+            let scale_to_index = |x: f64| (x * sample_rate as f64) as usize * channels as usize;
+            let dest = &mut dest[scale_to_index(range.start())..scale_to_index(range.end())];
             region
                 .interleaved_samples_cache
-                .resize((range.getrange() as u64 * channels) as usize, 0.0);
+                .resize(scale_to_index(range.getrange()), 0.0); // no need?
             region.render_offline(sample_rate, channels);
             assert_eq!(region.interleaved_samples_cache.len(), dest.len());
             dest.copy_from_slice(&region.interleaved_samples_cache);
@@ -150,8 +151,12 @@ impl RangedComponent for RangedComponentDyn {
             frame_per_buffer: dest.len() as u64 / channels,
             channels,
         };
-        self.buffer.resize(self.range.getrange() as usize, 0.0);
+        self.buffer.resize(
+            (self.range.getrange() * sample_rate as f64) as usize * channels as usize,
+            0.0,
+        );
         let input_dummy = vec![0.0f32; 1];
+        self.generator.prepare_play(&info_local);
         self.generator.render(&input_dummy, dest, &info_local)
     }
 }
@@ -210,7 +215,7 @@ impl Model {
     }
     pub fn render_offline(&mut self, sample_rate: u32, channels: u64) {
         self.interleaved_samples_cache.resize(
-            (self.params.range.getrange() as u64 * channels) as usize,
+            (self.params.range.getrange() * sample_rate as f64) as usize * channels as usize,
             0.0,
         );
         self.content
