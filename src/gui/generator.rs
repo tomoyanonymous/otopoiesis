@@ -41,6 +41,7 @@ impl<'a> Generator<'a> {
             data::Generator::Noise() => {
                 unimplemented!()
             }
+            data::Generator::Constant => unimplemented!(),
         }
     }
     fn make_graph_sized(&mut self, ui: &mut egui::Ui, size: egui::Vec2) -> egui::Response {
@@ -107,6 +108,7 @@ impl<'a> egui::Widget for Generator<'a> {
                     slider
                 }
                 data::Generator::Noise() => todo!(),
+                data::Generator::Constant => unimplemented!()
             };
             res
         })

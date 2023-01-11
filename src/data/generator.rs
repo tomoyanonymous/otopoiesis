@@ -38,6 +38,8 @@ pub enum OscillatorFun {
 pub enum Generator {
     Oscillator(OscillatorFun, Arc<OscillatorParam>),
     Noise(),
+    ///mostly for debugging filter.
+    Constant,
 }
 
 impl std::default::Default for Generator {

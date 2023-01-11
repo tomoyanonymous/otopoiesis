@@ -16,6 +16,8 @@ pub struct FadeParam {
     pub time_out: atomic::F32,
 }
 
+
+
 #[derive(Serialize, Deserialize, Clone, Default, Debug)]
 pub struct ReplicateParam {
     pub count: atomic::U32,
