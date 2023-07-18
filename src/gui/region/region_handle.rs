@@ -1,3 +1,4 @@
+use crate::gui;
 use crate::utils::atomic::{self, SimpleAtomic};
 use std::ops::RangeInclusive;
 use std::sync::Arc;
@@ -14,44 +15,43 @@ impl From<bool> for HandleMode {
     }
 }
 pub(super) struct UiBarState {
-    saved_state: i64,
-    range: RangeInclusive<i64>,
+    saved_state: f64,
+    range: RangeInclusive<f64>,
 }
 impl UiBarState {
-    pub fn new(range: RangeInclusive<i64>) -> Self {
+    pub fn new(range: RangeInclusive<f64>) -> Self {
         Self {
-            saved_state: 0,
+            saved_state: 0.0,
             range,
         }
     }
 }
 
 pub(super) struct UiBar<'a> {
-    pos: &'a Arc<atomic::I64>,
+    pos: &'a Arc<atomic::F64>,
     state: &'a mut UiBarState,
     mode: HandleMode,
 }
 impl<'a> UiBar<'a> {
-    pub fn new(pos: &'a Arc<atomic::I64>, state: &'a mut UiBarState, mode: HandleMode) -> Self {
+    pub fn new(pos: &'a Arc<atomic::F64>, state: &'a mut UiBarState, mode: HandleMode) -> Self {
         Self { pos, state, mode }
     }
-    pub fn set_limit(&mut self, range: RangeInclusive<i64>) {
+    pub fn set_limit(&mut self, range: RangeInclusive<f64>) {
         self.state.range = range;
     }
     fn react(&mut self, response: &egui::Response) {
         if response.drag_started() {
-            self.state.saved_state = self.pos.load() as i64;
+            self.state.saved_state = self.pos.load() as f64;
         }
         if response.dragged() {
             self.state.saved_state +=
-                (response.drag_delta().x * crate::gui::SAMPLES_PER_PIXEL_DEFAULT) as i64;
-            self.pos.store((self.state.saved_state).clamp(
-                *self.state.range.start() as i64,
-                *self.state.range.end() as i64,
-            ) as i64);
+                (response.drag_delta().x / gui::PIXELS_PER_SEC_DEFAULT) as f64;
+            self.pos.store(
+                (self.state.saved_state).clamp(*self.state.range.start(), *self.state.range.end()),
+            );
         }
         if response.drag_released() {
-            self.state.saved_state = 0
+            self.state.saved_state = 0.0
         }
     }
 }

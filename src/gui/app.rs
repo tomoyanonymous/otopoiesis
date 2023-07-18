@@ -10,10 +10,11 @@ pub struct State {
 
 impl State {
     pub fn new(param: &data::AppModel) -> Self {
-        let timeline = gui::timeline::State::new(&param.project.tracks);
         let sr = param.project.sample_rate.load();
         let transport = &param.transport;
         let transport = gui::transport::Model::new(Arc::clone(transport), sr);
+        let timeline =
+            gui::timeline::State::new(&param.project.tracks, transport.param.time.clone(), sr);
         Self {
             timeline,
             transport,
@@ -61,7 +62,7 @@ impl<'a> Model<'a> {
                                 app.can_undo(),
                                 egui::Button::new(format!(
                                     "Undo {} | {}",
-                                    app.history.display(),
+                                    app.history.undo_text().unwrap_or_default(),
                                     str
                                 )),
                             );
@@ -75,7 +76,7 @@ impl<'a> Model<'a> {
                                     app.can_redo(),
                                     egui::Button::new(format!(
                                         "Redo {} | {}",
-                                        app.history.display(),
+                                        app.history.redo_text().unwrap_or_default(),
                                         str
                                     )),
                                 )

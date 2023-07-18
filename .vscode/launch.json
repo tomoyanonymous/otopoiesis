@@ -26,16 +26,15 @@
         {
             "type": "lldb",
             "request": "launch",
-            "name": "Debug unit tests in executable 'hello'",
+            "name": "Debug unit tests in executable 'otopoiesis'",
             "cargo": {
                 "args": [
                     "test",
                     "--no-run",
-                    "--bin=hello",
-                    "--package=hello"
+                    "--package=otopoiesis"
                 ],
                 "filter": {
-                    "name": "hello",
+                    "name": "otopoiesis",
                     "kind": "bin"
                 }
             },

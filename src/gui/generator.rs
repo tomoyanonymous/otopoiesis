@@ -41,6 +41,7 @@ impl<'a> Generator<'a> {
             data::Generator::Noise() => {
                 unimplemented!()
             }
+            data::Generator::Constant => unimplemented!(),
         }
     }
     fn make_graph_sized(&mut self, ui: &mut egui::Ui, size: egui::Vec2) -> egui::Response {
@@ -61,8 +62,8 @@ impl<'a> Generator<'a> {
                 [x, y as f64]
             })
             .collect::<Vec<_>>();
-
-        egui::plot::Plot::new(ui.auto_id_with("generator"))
+        let uid = ui.auto_id_with("generator");
+        egui::plot::Plot::new(uid)
             .allow_drag(false)
             .allow_zoom(false)
             .allow_boxed_zoom(false)
@@ -107,6 +108,7 @@ impl<'a> egui::Widget for Generator<'a> {
                     slider
                 }
                 data::Generator::Noise() => todo!(),
+                data::Generator::Constant => unimplemented!()
             };
             res
         })

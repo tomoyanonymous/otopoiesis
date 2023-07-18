@@ -37,7 +37,9 @@ impl AppModel {
     }
     pub fn undo(&mut self) {
         let history = &mut self.history;
-        let _ = history.undo(&mut self.project).unwrap();
+        if let Some(Err(e)) = history.undo(&mut self.project) {
+            eprintln!("{}", e)
+        }
     }
     pub fn can_redo(&self) -> bool {
         let history = &self.history;

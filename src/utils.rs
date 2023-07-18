@@ -10,11 +10,11 @@ use atomic::IsAtomicNumber;
 #[derive(Serialize, Deserialize, Debug)]
 pub struct AtomicRange<T>(pub Arc<T::Composed>, pub Arc<T::Composed>)
 where
-    T: IsAtomicNumber<T> + std::cmp::Ord;
+    T: IsAtomicNumber<T>;
 
 impl<T> AtomicRange<T>
 where
-    T: IsAtomicNumber<T> + std::cmp::Ord,
+    T: IsAtomicNumber<T>,
 {
     pub fn new(start: T, end: T) -> Self {
         Self(
@@ -46,12 +46,15 @@ where
         self.1.store(v);
     }
     pub fn shift(&self, v: T) {
-        self.set_start((self.start() + v).max(T::default()));
-        self.set_end((self.end() + v).max(T::default()));
+        self.set_start(self.start() + v);
+        self.set_end(self.end() + v);
     }
     //does not shrink when the range reached to 0.
     pub fn shift_bounded(&self, v: T) {
-        let start_bounded = (self.start() as T + v).max(T::default());
+        let mut start_bounded = self.start() as T + v;
+        if start_bounded > T::default() {
+            start_bounded = T::default();
+        }
         let end_bounded = start_bounded + self.getrange();
         self.set_start(start_bounded);
         self.set_end(end_bounded);
@@ -59,7 +62,7 @@ where
 }
 impl<T> Clone for AtomicRange<T>
 where
-    T: IsAtomicNumber<T> + std::cmp::Ord,
+    T: IsAtomicNumber<T>,
 {
     fn clone(&self) -> Self {
         Self(Arc::clone(&self.0), Arc::clone(&self.1))
@@ -67,7 +70,7 @@ where
 }
 impl<T> From<std::ops::Range<T>> for AtomicRange<T>
 where
-    T: IsAtomicNumber<T> + std::cmp::Ord,
+    T: IsAtomicNumber<T>,
 {
     fn from(t: std::ops::Range<T>) -> Self {
         Self::new(t.start, t.end)
@@ -76,7 +79,7 @@ where
 
 impl<T> From<std::ops::RangeInclusive<T>> for AtomicRange<T>
 where
-    T: IsAtomicNumber<T> + std::cmp::Ord,
+    T: IsAtomicNumber<T>,
 {
     fn from(t: std::ops::RangeInclusive<T>) -> Self {
         Self::new(*t.start(), *t.end())
@@ -84,7 +87,7 @@ where
 }
 impl<T> From<&AtomicRange<T>> for std::ops::RangeInclusive<T>
 where
-    T: IsAtomicNumber<T> + std::cmp::Ord,
+    T: IsAtomicNumber<T>,
 {
     fn from(t: &AtomicRange<T>) -> Self {
         t.start()..=t.end()

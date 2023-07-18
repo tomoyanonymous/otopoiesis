@@ -16,6 +16,8 @@ pub struct FadeParam {
     pub time_out: atomic::F32,
 }
 
+
+
 #[derive(Serialize, Deserialize, Clone, Default, Debug)]
 pub struct ReplicateParam {
     pub count: atomic::U32,
@@ -50,7 +52,7 @@ pub enum Content {
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Region {
     /// range stores a real time, not in sample.
-    pub range: AtomicRange<i64>,
+    pub range: AtomicRange<f64>,
     pub content: Content,
     pub label: String,
 }
@@ -58,7 +60,7 @@ pub struct Region {
 impl Region {
     /// Utility function that converts a raw region into the region with fadein/out transformer.
     ///
-    pub fn new(range: AtomicRange<i64>, content: Content, label: impl Into<String>) -> Self {
+    pub fn new(range: AtomicRange<f64>, content: Content, label: impl Into<String>) -> Self {
         Self {
             range,
             content,
@@ -67,7 +69,7 @@ impl Region {
     }
     pub fn with_fade(origin: Self) -> Self {
         Self::new(
-            AtomicRange::<i64>::new(origin.range.start(), origin.range.end()),
+            AtomicRange::<f64>::new(origin.range.start(), origin.range.end()),
             Content::Transformer(
                 RegionFilter::FadeInOut(Arc::new(FadeParam {
                     time_in: 0.1.into(),
@@ -123,7 +125,7 @@ impl Region {
 impl std::default::Default for Region {
     fn default() -> Self {
         Self {
-            range: AtomicRange::<i64>::new(0, 0),
+            range: AtomicRange::<f64>::new(0.0, 0.0),
             content: Content::Generator(Generator::default()),
             label: "".to_string(),
         }

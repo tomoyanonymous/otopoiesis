@@ -8,6 +8,8 @@ use undo;
 #[derive(Debug)]
 pub enum Error {
     FailToLock(String),
+    /// (length of the container, actual index)
+    InvalidIndex(usize, i64),
     ContainerEmpty,
     InvalidTrackType,
     NothingToBeAdded, // _Never(PhantomData<T>),
@@ -18,6 +20,11 @@ impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::ContainerEmpty => write!(f, "tried to remove container that was empty"),
+            Self::InvalidIndex(len, index) => write!(
+                f,
+                "Invalid Index to the Container,length was {} but the index was {}",
+                len, index
+            ),
             Self::NothingToBeAdded => write!(f, "Nothing to be Added"),
             Self::FailToLock(msg) => write!(f, "{msg}"),
             Self::InvalidTrackType => write!(f, "Track type was not an array of regions"),
@@ -96,7 +103,7 @@ impl AddRegion {
 
 impl std::fmt::Display for AddRegion {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "add region")
+        write!(f, "Add Region {} in Track {}", self.pos, self.track_num)
     }
 }
 
@@ -111,7 +118,8 @@ impl undo::Action for AddRegion {
         match target.tracks.get_mut(self.track_num).unwrap() {
             data::Track::Regions(regions) => {
                 regions.push(self.elem.clone());
-                self.pos = regions.len();
+                assert!(!regions.is_empty());
+                self.pos = regions.len() - 1;
                 Ok(())
             }
             _ => Err(Error::InvalidTrackType),
@@ -123,6 +131,8 @@ impl undo::Action for AddRegion {
             data::Track::Regions(regions) => {
                 if regions.is_empty() {
                     Err(Error::ContainerEmpty)
+                } else if regions.len() < self.pos {
+                    Err(Error::InvalidIndex(regions.len(), self.pos as i64))
                 } else {
                     regions.remove(self.pos);
                     Ok(())
@@ -155,7 +165,7 @@ impl undo::Action for AddTrack {
 
     fn apply(&mut self, target: &mut Self::Target) -> undo::Result<Self> {
         target.tracks.push(self.elem.clone());
-        self.pos = target.tracks.len();
+        self.pos = target.tracks.len() - 1;
         Ok(())
     }
 
@@ -170,7 +180,7 @@ impl undo::Action for AddTrack {
 }
 impl std::fmt::Display for AddTrack {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Add track")
+        write!(f, "Add track {}", self.pos)
     }
 }
 impl DisplayableAction for AddTrack {}

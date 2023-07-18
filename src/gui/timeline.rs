@@ -1,16 +1,20 @@
 use crate::action;
 use crate::data;
 use crate::gui;
-use crate::utils::atomic::SimpleAtomic;
+use crate::utils::atomic::{self, SimpleAtomic};
 use std::sync::{Arc, Mutex};
 
 pub struct State {
     track: Vec<gui::track::State>,
+    now: Arc<atomic::U64>,
+    sample_rate: u64,
 }
 impl State {
-    pub fn new(track_p: &[data::Track]) -> Self {
+    pub fn new(track_p: &[data::Track], now: Arc<atomic::U64>, sample_rate: u64) -> Self {
         Self {
             track: param_to_track(track_p),
+            now,
+            sample_rate,
         }
     }
     pub fn sync_state(&mut self, track_p: &[data::Track]) {
@@ -40,7 +44,7 @@ impl<'a> Model<'a> {
     //     self.param.sample_rate.load(Ordering::Relaxed)
     // }
     fn get_current_time_in_sample(&self) -> u64 {
-        self.app.lock().unwrap().transport.time.load()
+        self.state.now.load()
     }
     fn draw_frame(&mut self, painter: &egui::Painter, style: &egui::Style) {
         let rect = painter.clip_rect();
@@ -54,8 +58,9 @@ impl<'a> Model<'a> {
         let stroke = style.visuals.window_stroke();
 
         let rect = painter.clip_rect();
-
-        let x = self.get_current_time_in_sample() as f32 / gui::SAMPLES_PER_PIXEL_DEFAULT as f32
+        let sr = self.state.sample_rate;
+        let x = (self.get_current_time_in_sample() as f64 * gui::PIXELS_PER_SEC_DEFAULT as f64
+            / sr as f64) as f32
             + rect.left();
         painter.line_segment(
             [
