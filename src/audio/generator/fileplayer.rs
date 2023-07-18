@@ -3,7 +3,6 @@ use crate::data::FilePlayerParam;
 use crate::parameter::Parameter;
 use std::sync::Arc;
 
-use cpal::Sample;
 use symphonia::core::codecs::{Decoder, DecoderOptions, CODEC_TYPE_NULL};
 use symphonia::core::errors::Error;
 use symphonia::core::formats::{FormatOptions, FormatReader};
@@ -12,24 +11,27 @@ use symphonia::core::meta::MetadataOptions;
 use symphonia::core::probe::Hint;
 use symphonia::core::audio::{SampleBuffer, SignalSpec, Layout};
 
-pub struct FilePlayer<'a> {
+pub struct FilePlayer {
     param: Arc<FilePlayerParam>,
-    decoder: Option<Box<dyn Decoder + 'a>>,
+    decoder: Option<Box<dyn Decoder>>,
     track_id: u32,
     format: Box<dyn FormatReader>,
     seek_pos: u64,
     audiobuffer:SampleBuffer<f32>
 }
-impl<'a> FilePlayer<'a> {
-    fn new(param:Arc<FilePlayerParam>)->Self{
+impl FilePlayer {
+    pub fn new(param:Arc<FilePlayerParam>)->Self{
         #[cfg(not(target_arch = "wasm32"))]
         let src = std::fs::File::open(param.path.clone()).expect("failed to open media");
+        #[cfg(target_arch = "wasm32")]
+        let src = todo!();
+
         let mut  mss_opts =  MediaSourceStreamOptions::default();
          mss_opts.buffer_len = (param.duration.get() *param.channels.get() as f32) as usize;
          let mss = MediaSourceStream::new(Box::new(src), mss_opts);
          // Create a probe hint using the file's extension. [Optional]
-         let mut hint = Hint::new();
-         hint.with_extension("mp3");
+         let  hint = Hint::new();
+        //  hint.with_extension("mp3");
  
          // Use the default options for metadata and format readers.
          let meta_opts: MetadataOptions = Default::default();
@@ -64,7 +66,7 @@ impl<'a> FilePlayer<'a> {
         self.param.channels.get()
     }
 }
-impl<'a> std::fmt::Debug for FilePlayer<'a> {
+impl std::fmt::Debug for FilePlayer {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("FilePlayer")
             .field("param", &self.param)
@@ -73,7 +75,7 @@ impl<'a> std::fmt::Debug for FilePlayer<'a> {
     }
 }
 
-impl<'a> Component for FilePlayer<'a> {
+impl Component for FilePlayer {
     fn get_input_channels(&self) -> u64 {
         self.get_channels()
     }
@@ -88,11 +90,10 @@ impl<'a> Component for FilePlayer<'a> {
             SignalSpec::new_with_layout(info.sample_rate, Layout::Stereo ));
 
 
-        #[cfg(target_arch = "wasm32")]
-        todo!()
+
     }
 
-    fn render(&mut self, input: &[f32], output: &mut [f32], info: &crate::audio::PlaybackInfo) {
+    fn render(&mut self, _input: &[f32], output: &mut [f32], _info: &crate::audio::PlaybackInfo) {
         // Get the next packet from the media format.
         let packet = match self.format.next_packet() {
             Ok(packet) => packet,
@@ -129,6 +130,8 @@ impl<'a> Component for FilePlayer<'a> {
             Ok(decoded) => {
                 // Consume the decoded audio samples (see below)
                 self.audiobuffer.copy_interleaved_ref(decoded.clone());
+                assert_eq!(self.audiobuffer.samples().len(),output.len());
+                output.copy_from_slice( self.audiobuffer.samples());
             }
             Err(Error::IoError(_)) => {
                 // The packet failed to decode due to an IO error, skip the packet.
@@ -153,6 +156,11 @@ mod test {
 
     #[test]
     fn fileload() {
-        // FilePlayer::<'static>::
+        FilePlayerParam{ 
+            path: todo!(), 
+            channels: todo!(), 
+            start_sec: todo!(), 
+            duration: todo!() }
+        // FilePlayer::
     }
 }
