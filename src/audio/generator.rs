@@ -1,6 +1,7 @@
 use super::*;
 use crate::data;
 pub mod oscillator;
+pub mod fileplayer;
 
 pub trait GeneratorComponent {
     type Params;

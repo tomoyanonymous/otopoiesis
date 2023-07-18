@@ -34,6 +34,7 @@ undo = "0.47.*"
 console_error_panic_hook = { version = "0.1.6", optional = true }
 wasm-bindgen-futures = { version = "0.4.33", optional = true }
 wee_alloc = { version = "0.4.5", optional = true }
+symphonia = {version = "0.5.2", features = ["wav"]}
 
 [dev-dependencies]
 wasm-bindgen-test = { version = "0.2" }

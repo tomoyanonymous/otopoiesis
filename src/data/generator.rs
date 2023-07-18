@@ -1,10 +1,11 @@
+use std::string;
 use std::sync::Arc;
 
 /// Generator is a similar concept to Unit Generator in the other popular sound programming environments.
 /// These generators are loaded from Region or Track.
 ///
 use crate::data::atomic;
-use crate::parameter::{FloatParameter, Parameter};
+use crate::parameter::{FloatParameter, UIntParameter, Parameter};
 use serde::{Deserialize, Serialize};
 /// Utility Parameter for oscillator with some default values.
 
@@ -32,6 +33,14 @@ pub enum OscillatorFun {
     // Duty Ratio
     Rectanglular(Arc<atomic::F32>),
     Triangular,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct FilePlayerParam{
+    pub path: String,
+    pub channels: UIntParameter,
+    pub start_sec: FloatParameter,
+    pub duration: FloatParameter
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
