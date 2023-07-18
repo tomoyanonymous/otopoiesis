@@ -95,7 +95,7 @@ impl<'a> Model<'a> {
         }
         if main.dragged() {
             let offset = main.drag_delta().x as f64 / gui::PIXELS_PER_SEC_DEFAULT as f64;
-            self.params.range.shift_bounded(offset);
+            self.params.range.shift(offset);
             main = main.on_hover_cursor(egui::CursorIcon::Grabbing)
         }
         if main.drag_released() {
@@ -179,7 +179,7 @@ impl<'a> egui::Widget for Model<'a> {
                 _ => unreachable!(),
             };
 
-            if self.state.is_interactive && is_interactive {
+            if  is_interactive {
                 self.interact_main(&main);
             }
         })
