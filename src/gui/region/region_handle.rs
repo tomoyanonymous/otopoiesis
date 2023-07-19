@@ -41,7 +41,7 @@ impl<'a> UiBar<'a> {
     }
     fn react(&mut self, response: &egui::Response) {
         if response.drag_started() {
-            self.state.saved_state = self.pos.load() as f64;
+            self.state.saved_state = self.pos.load();
         }
         if response.dragged() {
             self.state.saved_state +=

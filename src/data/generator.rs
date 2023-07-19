@@ -1,4 +1,3 @@
-use std::string;
 use std::sync::Arc;
 
 /// Generator is a similar concept to Unit Generator in the other popular sound programming environments.

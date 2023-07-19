@@ -44,7 +44,7 @@ impl RangedComponent for FadeModel {
         let chs = self.get_output_channels() as usize;
         let in_time = (self.param.time_in.load() as f64 * sample_rate as f64) as usize;
         let out_time = (self.param.time_out.load() as f64 * sample_rate as f64) as usize;
-        let len = (self.origin.params.range.getrange() * sample_rate as f64) as usize;
+
         let slice = &self.origin.interleaved_samples_cache[0..dest.len()];
         dest.copy_from_slice(slice);
 
@@ -187,7 +187,6 @@ impl TransformerModel {
             data::RegionFilter::Reverse => todo!(),
             data::RegionFilter::Replicate(c) => Box::new(RegionArray(
                 (0..c.count.load())
-                    .into_iter()
                     .map(|_| Model::new(origin.clone(), 2))
                     .collect::<Vec<_>>(),
             )),
