@@ -36,6 +36,7 @@ pub struct State {
     content: ContentModel,
     range_handles: [UiBarState; 2], // pub osc_params: Arc<oscillator::SharedParams>,
     offset_saved: i64,
+    #[allow(dead_code)]
     is_interactive: bool,
 }
 
@@ -47,7 +48,6 @@ impl State {
             data::Content::Generator(param) => {
                 ContentModel::Generator(param.clone(), super::generator::State::new(512))
             }
-            data::Content::AudioFile(_) => todo!(),
             data::Content::Transformer(filter, origin) => {
                 ContentModel::RegionFilter(match filter {
                     data::RegionFilter::Gain => todo!(),

@@ -66,7 +66,6 @@ pub enum RegionFilter {
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub enum Content {
     Generator(Generator),
-    AudioFile(),
     // region transformer is an recursive data
     Transformer(RegionFilter, Box<Region>),
 }

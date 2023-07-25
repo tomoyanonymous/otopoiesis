@@ -1,6 +1,7 @@
 use super::*;
 use crate::data;
 pub mod oscillator;
+#[cfg(not(target_arch = "wasm32"))]
 pub mod fileplayer;
 
 pub trait GeneratorComponent {

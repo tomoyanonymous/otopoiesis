@@ -4,15 +4,15 @@ use crate::parameter::Parameter;
 use std::io::ErrorKind;
 use std::sync::Arc;
 
-use symphonia::core::audio::{AudioBufferRef, Layout, SampleBuffer, SignalSpec};
+use symphonia::core::audio::{Layout, SampleBuffer, SignalSpec};
 use symphonia::core::codecs::{Decoder, DecoderOptions, CODEC_TYPE_NULL};
 use symphonia::core::errors::Error;
 use symphonia::core::formats::{FormatOptions, FormatReader};
 use symphonia::core::io::{MediaSourceStream, MediaSourceStreamOptions};
 use symphonia::core::meta::MetadataOptions;
 use symphonia::core::probe::{Hint, ProbeResult};
-use symphonia::core::units::Duration;
-use web_sys::console::assert;
+
+
 
 pub struct FilePlayer {
     param: Arc<FilePlayerParam>,
@@ -108,7 +108,7 @@ impl Component for FilePlayer {
         self.get_channels()
     }
 
-    fn prepare_play(&mut self, info: &crate::audio::PlaybackInfo) {
+    fn prepare_play(&mut self, _info: &crate::audio::PlaybackInfo) {
         self.seek_pos = 0;
         self.is_finished_playing = false;
         // self.audiobuffer = SampleBuffer::<f32>::new(
@@ -225,7 +225,7 @@ mod test {
         let mut output_buf = vec![0.0f32; 512];
         let input_buf = vec![0.0f32; 512];
         let read_count_max = (48000.0f32 / 256.0).round() as usize;
-        for i in 0..read_count_max - 1 {
+        for _i in 0..read_count_max - 1 {
             info.current_time += 256;
             player.render(&input_buf, output_buf.as_mut_slice(), &info);
         }

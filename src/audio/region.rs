@@ -214,7 +214,6 @@ impl Model {
                 let ranged_component = RangedComponentDyn::new(c, params.range.clone());
                 Box::new(ranged_component)
             }
-            data::Content::AudioFile(_) => todo!(),
             data::Content::Transformer(filter, origin) => {
                 TransformerModel::new(filter, *origin.clone()).0
             } // data::Content::Array(vec) => Box::new(RegionArray::new(vec)),
