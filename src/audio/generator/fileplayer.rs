@@ -1,3 +1,4 @@
+use crate::app::filemanager::{self, FileManager};
 use crate::audio::Component;
 use crate::data::FilePlayerParam;
 use crate::parameter::Parameter;
@@ -8,7 +9,7 @@ use symphonia::core::audio::{Layout, SampleBuffer, SignalSpec};
 use symphonia::core::codecs::{Decoder, DecoderOptions, CODEC_TYPE_NULL};
 use symphonia::core::errors::Error;
 use symphonia::core::formats::{FormatOptions, FormatReader, SeekMode, SeekTo};
-use symphonia::core::io::{MediaSourceStream, MediaSourceStreamOptions};
+use symphonia::core::io::{MediaSource, MediaSourceStream, MediaSourceStreamOptions};
 use symphonia::core::meta::MetadataOptions;
 use symphonia::core::probe::{Hint, ProbeResult};
 use symphonia::core::units::Time;
@@ -23,9 +24,14 @@ pub struct FilePlayer {
     is_finished_playing: bool,
 }
 
-fn get_default_decoder(
-    mss: MediaSourceStream,
-) -> Result<(Box<dyn Decoder>, ProbeResult, u32), symphonia::core::errors::Error> {
+type DecoderSet = (Box<dyn Decoder>, ProbeResult, u32);
+
+fn get_default_decoder(path: impl ToString) -> Result<DecoderSet, Box<dyn std::error::Error>> {
+    let flmgr = filemanager::get_global_file_manager();
+    let src = flmgr.get_file(path).expect("failed to open file");
+    let ms: Box<dyn MediaSource> = Box::new(src);
+    let mss_opts = MediaSourceStreamOptions::default();
+    let mss = MediaSourceStream::new(ms, mss_opts);
     let hint = Hint::new();
     //  hint.with_extension("mp3");
     // Use the default options for metadata and format readers.
@@ -51,16 +57,9 @@ fn get_default_decoder(
 
 impl FilePlayer {
     pub fn new(param: Arc<FilePlayerParam>) -> Self {
-        #[cfg(not(target_arch = "wasm32"))]
-        let src = std::fs::File::open(param.path.clone()).expect("failed to open media");
-        #[cfg(target_arch = "wasm32")]
-        let src = todo!();
-
-        let mss_opts = MediaSourceStreamOptions::default();
-        let buf_len = mss_opts.buffer_len;
-        let mss = MediaSourceStream::new(Box::new(src), mss_opts);
-
-        let (decoder, probed, track_id) = get_default_decoder(mss).expect("decoder not found");
+        let buf_len = MediaSourceStreamOptions::default().buffer_len;
+        let (decoder, probed, track_id) =
+            get_default_decoder(param.path.clone()).expect("decoder not found");
 
         let max_frames = decoder.codec_params().max_frames_per_packet.unwrap();
         let audiobuffer = SampleBuffer::<f32>::new(
@@ -118,11 +117,6 @@ impl Component for FilePlayer {
             )
             .unwrap_or_else(|_| panic!("failed to seek position {}", start_sec));
         self.is_finished_playing = false;
-
-        // self.audiobuffer = SampleBuffer::<f32>::new(
-        //     info.frame_per_buffer,
-        //     SignalSpec::new_with_layout(info.sample_rate, Layout::Stereo),
-        // );
     }
 
     fn render(&mut self, _input: &[f32], output: &mut [f32], _info: &crate::audio::PlaybackInfo) {
@@ -152,12 +146,12 @@ impl Component for FilePlayer {
                             // Consume the decoded audio samples (see below)
                             self.audiobuffer.copy_interleaved_ref(decoded.clone());
                             let _nsamples = prod.push_slice(self.audiobuffer.samples());
-                            println!(
-                                "frames:{}, timestamp:{}, n_samples: {}",
-                                decoded.frames(),
-                                packet.ts(),
-                                _nsamples
-                            );
+                            // println!(
+                            //     "frames:{}, timestamp:{}, n_samples: {}",
+                            //     decoded.frames(),
+                            //     packet.ts(),
+                            //     _nsamples
+                            // );
                         });
                         res.map(|()| false)
                     }
@@ -172,14 +166,14 @@ impl Component for FilePlayer {
                     Err(err) => Err(err),
                 }
             } else {
-                println!("ring buffer has remaining ");
+                // println!("ring buffer has remaining ");
                 Ok(false)
             };
             self.is_finished_playing = reached_eof.map_or(false, |res| res);
 
             let read_len = cons.len().min(output.len());
-            dbg!(read_count, cons.len());
-            let next_read = read_count + read_len;
+            // dbg!(read_count, cons.len(),output.len());
+            let next_read = (read_count + read_len).min(output.len());
 
             let output_buf = &mut output[read_count..next_read];
             read_count += read_len;
