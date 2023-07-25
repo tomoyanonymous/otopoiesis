@@ -15,9 +15,9 @@ jobs:
       - run: rustup target add wasm32-unknown-unknown
       - run: rustup default stable
       - run: sudo apt-get install -y libasound2-dev
-      - uses: ./.github/actions/cache_cargo
       - run: cargo install wasm-pack
       - run: npm install
+      - uses: ./.github/actions/cache_cargo
       - name: build web app
         run: npm run build
   test_web:
