@@ -48,7 +48,7 @@ impl<'a> Generator<'a> {
                 let mut phase_gui = 0.0f32;
                 for s in self.state.samples.iter_mut() {
                     *s = phase_gui;
-                    phase_gui = phase_gui + 0.1;
+                    phase_gui += 0.1;
                 }
             }
         }
@@ -119,9 +119,7 @@ impl<'a> egui::Widget for Generator<'a> {
                 data::Generator::Noise() => todo!(),
                 data::Generator::Constant => unimplemented!(),
                 #[cfg(not(target_arch = "wasm32"))]
-                data::Generator::FilePlayer(param)=>{
-                    ui.label(format!("{}",param.path))
-                }
+                data::Generator::FilePlayer(param) => ui.label(param.path.to_string()),
             };
             res
         })

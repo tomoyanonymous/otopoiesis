@@ -179,7 +179,7 @@ impl<'a> egui::Widget for Model<'a> {
                 _ => unreachable!(),
             };
 
-            if  is_interactive {
+            if is_interactive {
                 self.interact_main(&main);
             }
         })

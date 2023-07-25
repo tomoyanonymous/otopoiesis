@@ -44,7 +44,11 @@ pub struct FilePlayerParam {
 
 impl FilePlayerParam {
     pub fn new_test_file() -> (Self, usize) {
-        let path = concat!(env!("CARGO_MANIFEST_DIR"), "/test/assets/test-voice-stereo.wav").to_string();
+        let path = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/test/assets/test-voice-stereo.wav"
+        )
+        .to_string();
         let length_in_samples = 119608;
         (
             Self {
