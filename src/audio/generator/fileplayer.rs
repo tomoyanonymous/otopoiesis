@@ -7,17 +7,17 @@ use std::sync::Arc;
 use symphonia::core::audio::{Layout, SampleBuffer, SignalSpec};
 use symphonia::core::codecs::{Decoder, DecoderOptions, CODEC_TYPE_NULL};
 use symphonia::core::errors::Error;
-use symphonia::core::formats::{FormatOptions, FormatReader};
+use symphonia::core::formats::{FormatOptions, FormatReader, SeekMode, SeekTo};
 use symphonia::core::io::{MediaSourceStream, MediaSourceStreamOptions};
 use symphonia::core::meta::MetadataOptions;
 use symphonia::core::probe::{Hint, ProbeResult};
+use symphonia::core::units::Time;
 
 pub struct FilePlayer {
     param: Arc<FilePlayerParam>,
     decoder: Box<dyn Decoder>,
     track_id: u32,
     format: Box<dyn FormatReader>,
-    seek_pos: u64,
     audiobuffer: SampleBuffer<f32>,
     ringbuf: ringbuf::HeapRb<f32>,
     is_finished_playing: bool,
@@ -74,7 +74,6 @@ impl FilePlayer {
             decoder,
             track_id,
             format: probed.format,
-            seek_pos: 0,
             audiobuffer,
             ringbuf,
             is_finished_playing: false,
@@ -106,8 +105,20 @@ impl Component for FilePlayer {
     }
 
     fn prepare_play(&mut self, _info: &crate::audio::PlaybackInfo) {
-        self.seek_pos = 0;
+        let start_sec = self.param.start_sec.get();
+        let time_sec = start_sec.floor() as u64;
+        let time_frac = start_sec.fract() as f64;
+        self.format
+            .seek(
+                SeekMode::Accurate,
+                SeekTo::Time {
+                    time: Time::new(time_sec, time_frac),
+                    track_id: Some(0),
+                },
+            )
+            .unwrap_or_else(|_| panic!("failed to seek position {}", start_sec));
         self.is_finished_playing = false;
+
         // self.audiobuffer = SampleBuffer::<f32>::new(
         //     info.frame_per_buffer,
         //     SignalSpec::new_with_layout(info.sample_rate, Layout::Stereo),
@@ -119,67 +130,62 @@ impl Component for FilePlayer {
         // Get the next packet from the media format.
         let (mut prod, mut cons) = self.ringbuf.split_ref();
         let mut read_count = 0;
-        let mut is_reading = true;
-        while is_reading {
-            let res_play_finished = match self.format.next_packet() {
-                Ok(packet) => {
-                    // Consume any new metadata that has been read since the last packet.
-                    while !self.format.metadata().is_latest() {
-                        // Pop the old head of the metadata queue.
-                        self.format.metadata().pop();
+        let mut finished_loop = false;
+        while !finished_loop {
+            let reached_eof = if cons.len() < output.len() {
+                match self.format.next_packet() {
+                    Ok(packet) => {
+                        // Consume any new metadata that has been read since the last packet.
+                        while !self.format.metadata().is_latest() {
+                            // Pop the old head of the metadata queue.
+                            self.format.metadata().pop();
 
-                        // Consume the new metadata at the head of the metadata queue.
+                            // Consume the new metadata at the head of the metadata queue.
 
-                        // If the packet does not belong to the selected track, skip over it.
-                        if packet.track_id() != self.track_id {
-                            return;
+                            // If the packet does not belong to the selected track, skip over it.
+                            if packet.track_id() != self.track_id {
+                                return;
+                            }
                         }
+                        // Decode the packet into audio samples.
+                        let res = self.decoder.decode(&packet).map(|decoded| {
+                            // Consume the decoded audio samples (see below)
+                            self.audiobuffer.copy_interleaved_ref(decoded.clone());
+                            let _nsamples = prod.push_slice(self.audiobuffer.samples());
+                            println!(
+                                "frames:{}, timestamp:{}, n_samples: {}",
+                                decoded.frames(),
+                                packet.ts(),
+                                _nsamples
+                            );
+                        });
+                        res.map(|()| false)
                     }
-                    // Decode the packet into audio samples.
-                    let res = self.decoder.decode(&packet).map(|decoded| {
-                        // Consume the decoded audio samples (see below)
-                        self.audiobuffer.copy_interleaved_ref(decoded.clone());
-                        let _nsamples = prod.push_slice(self.audiobuffer.samples());
-                        // println!(
-                        //     "frames:{}, timestamp:{}, n_samples: {}",
-                        //     decoded.frames(),
-                        //     packet.ts(),
-                        //     _nsamples
-                        // );
-                        // output.copy_from_slice(self.audiobuffer.samples());
-                    });
-                    res.map(|()| false)
+                    Err(Error::ResetRequired) => {
+                        // The track list has been changed. Re-examine it and create a new set of decoders,
+                        // then restart the decode loop. This is an advanced feature and it is not
+                        // unreasonable to consider this "the end." As of v0.5.0, the only usage of this is
+                        // for chained OGG physical streams.
+                        unimplemented!();
+                    }
+                    Err(Error::IoError(err)) if err.kind() == ErrorKind::UnexpectedEof => Ok(true),
+                    Err(err) => Err(err),
                 }
-                Err(Error::ResetRequired) => {
-                    // The track list has been changed. Re-examine it and create a new set of decoders,
-                    // then restart the decode loop. This is an advanced feature and it is not
-                    // unreasonable to consider this "the end." As of v0.5.0, the only usage of this is
-                    // for chained OGG physical streams.
-                    unimplemented!();
-                }
-                Err(Error::IoError(err)) if err.kind() == ErrorKind::UnexpectedEof => Ok(true),
-                Err(err) => Err(err),
-            };
-            match res_play_finished {
-                Ok(finished) => {
-                    self.is_finished_playing = finished;
-                }
-                Err(e) => {
-                    // A unrecoverable error occurred, halt decoding.
-                    panic!("{:?}", e);
-                }
-            }
-
-            let next_read = read_count + cons.len();
-            let end_point = if next_read > output.len() {
-                output.len()
             } else {
-                next_read
+                println!("ring buffer has remaining ");
+                Ok(false)
             };
-            let output_buf = &mut output[read_count..end_point];
-            read_count += cons.len();
+            self.is_finished_playing = reached_eof.map_or(false, |res| res);
+
+            let read_len = cons.len().min(output.len());
+            dbg!(read_count, cons.len());
+            let next_read = read_count + read_len;
+
+            let output_buf = &mut output[read_count..next_read];
+            read_count += read_len;
             cons.pop_slice(output_buf);
-            is_reading = !self.is_finished_playing && read_count < output.len() - 1;
+
+            finished_loop = self.is_finished_playing || read_count > output.len() - 1;
         }
     }
 }
@@ -202,16 +208,35 @@ mod test {
         (player, info, len_samples)
     }
     #[test]
-    fn fileload() {
+    fn render_long_buffer() {
+        let (mut player, info, len_samples) = read_prep();
+        player.prepare_play(&info);
+        let mut output_buf = vec![0.0f32; len_samples * 2 + 1];
+        let input_buf = vec![0.0f32; 512];
+        player.render(&input_buf, output_buf.as_mut_slice(), &info);
+        assert!(player.is_finished_playing());
+    }
+    #[test]
+    fn render_long_buffer_fail() {
+        let (mut player, info, len_samples) = read_prep();
+        player.prepare_play(&info);
+        let mut output_buf = vec![0.0f32; len_samples * 2];
+        let input_buf = vec![0.0f32; 512];
+        player.render(&input_buf, output_buf.as_mut_slice(), &info);
+        assert!(!player.is_finished_playing());
+    }
+    #[test]
+    fn render_small_chunks() {
         let (mut player, mut info, len_samples) = read_prep();
         player.prepare_play(&info);
-        let mut output_buf = vec![0.0f32; 512];
-        let input_buf = vec![0.0f32; 512];
-        let read_count_max = (len_samples as f32 / 256.0).floor() as usize;
+        let samples = 512;
+        let mut output_buf = vec![0.0f32; samples * 2];
+        let input_buf = vec![0.0f32; samples * 2];
+        let read_count_max = (len_samples as f32 / samples as f32).floor() as usize;
         for _i in 0..read_count_max {
             player.render(&input_buf, output_buf.as_mut_slice(), &info);
-            info.current_time += 256;
-            // println!("{}", info.current_time);
+            info.current_time += samples;
+            println!("test read {}", info.current_time);
         }
         assert!(!player.is_finished_playing());
         player.render(&input_buf, output_buf.as_mut_slice(), &info);
