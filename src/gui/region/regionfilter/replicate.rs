@@ -15,7 +15,6 @@ pub struct State {
 impl State {
     pub fn new(origin: &data::Region, count: u64) -> Self {
         let regions = (0..count)
-            .into_iter()
             .map(|i| {
                 let is_editable = i == 0;
                 super::region::State::new(origin, origin.label.clone(), is_editable)

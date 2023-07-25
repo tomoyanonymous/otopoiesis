@@ -176,7 +176,7 @@ fn pass_out(
         };
         // todo:if  channels are different?
         model.effector.render(&buf, buffer, &info);
-        model.current_time.store(t + frame_per_buffer as u64);
+        model.current_time.store(t + frame_per_buffer);
     }
 }
 

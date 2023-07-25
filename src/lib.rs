@@ -27,6 +27,7 @@ static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 #[cfg(target_arch = "wasm32")]
 #[wasm_bindgen]
 pub struct WebHandle {
+    #[allow(dead_code)]
     handle: eframe::web::AppRunnerRef,
 }
 

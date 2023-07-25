@@ -37,7 +37,7 @@ impl Parameter<f32> for FloatParameter {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct UIntParameter {
     value: atomic::U64,
     pub range: RangeInclusive<u64>,

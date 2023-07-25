@@ -96,7 +96,7 @@ impl Transport {
     pub fn ready_to_trigger(&self) -> Option<PlayOp> {
         if self.is_playing.load() != self.playing_history.load() {
             let res = Some(PlayOp::from(self.is_playing.load()));
-            self.playing_history.store(self.is_playing.load() as u8);
+            self.playing_history.store(self.is_playing.load());
             res
         } else {
             None

@@ -62,13 +62,7 @@ impl<'a> Model<'a> {
         let x = (self.get_current_time_in_sample() as f64 * gui::PIXELS_PER_SEC_DEFAULT as f64
             / sr as f64) as f32
             + rect.left();
-        painter.line_segment(
-            [
-                [x as f32, rect.top()].into(),
-                [x as f32, rect.bottom()].into(),
-            ],
-            stroke,
-        );
+        painter.line_segment([[x, rect.top()].into(), [x, rect.bottom()].into()], stroke);
     }
     fn add_track(&mut self) {
         if let Ok(mut app) = self.app.lock() {

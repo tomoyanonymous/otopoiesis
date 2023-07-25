@@ -3,20 +3,11 @@ use crate::data::{atomic, AtomicRange};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct AudioFile {
-    file: String,
-    length: usize,
-    trim_range: AtomicRange<i64>,
-}
-
 #[derive(Serialize, Deserialize, Clone, Default, Debug)]
 pub struct FadeParam {
     pub time_in: atomic::F32,
     pub time_out: atomic::F32,
 }
-
-
 
 #[derive(Serialize, Deserialize, Clone, Default, Debug)]
 pub struct ReplicateParam {
@@ -41,7 +32,6 @@ pub enum RegionFilter {
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub enum Content {
     Generator(Generator),
-    AudioFile(AudioFile),
     Transformer(RegionFilter, Box<Region>),
     // Array(Vec<Arc<Region>>),
 }

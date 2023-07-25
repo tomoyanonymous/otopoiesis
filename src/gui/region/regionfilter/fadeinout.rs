@@ -46,7 +46,7 @@ impl<'a> FadeHandle<'a> {
 }
 
 impl<'a> egui::Widget for FadeHandle<'a> {
-    fn ui(mut self, ui: &mut egui::Ui) -> egui::Response {
+    fn ui(self, ui: &mut egui::Ui) -> egui::Response {
         let origin = ui.add(super::region::Model::new(
             self.origin_ui,
             self.state.origin.as_mut(),

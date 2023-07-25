@@ -1,5 +1,7 @@
 use super::*;
 use crate::data;
+#[cfg(not(target_arch = "wasm32"))]
+pub mod fileplayer;
 pub mod oscillator;
 
 pub trait GeneratorComponent {
@@ -68,5 +70,7 @@ pub fn get_component_for_generator(kind: &data::Generator) -> Box<dyn Component 
         }),
         data::Generator::Constant => Box::new(Constant()),
         data::Generator::Noise() => todo!(),
+        #[cfg(not(target_arch = "wasm32"))]
+        data::Generator::FilePlayer(param) => Box::new(fileplayer::FilePlayer::new(param.clone())),
     }
 }
