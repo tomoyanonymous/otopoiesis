@@ -4,7 +4,7 @@ use std::sync::Arc;
 /// These generators are loaded from Region or Track.
 ///
 use crate::data::atomic;
-use crate::parameter::{FloatParameter, UIntParameter, Parameter};
+use crate::parameter::{FloatParameter, Parameter, UIntParameter};
 use serde::{Deserialize, Serialize};
 /// Utility Parameter for oscillator with some default values.
 
@@ -35,11 +35,27 @@ pub enum OscillatorFun {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct FilePlayerParam{
+pub struct FilePlayerParam {
     pub path: String,
     pub channels: UIntParameter,
     pub start_sec: FloatParameter,
-    pub duration: FloatParameter
+    pub duration: FloatParameter,
+}
+
+impl FilePlayerParam {
+    pub fn new_test_file() -> (Self, usize) {
+        let path = concat!(env!("CARGO_MANIFEST_DIR"), "/test/assets/test-voice-stereo.wav").to_string();
+        let length_in_samples = 119608;
+        (
+            Self {
+                path,
+                channels: UIntParameter::new(2, 0..=2, "channels"),
+                start_sec: FloatParameter::new(0.0, 0.0..=10.0, "start"),
+                duration: FloatParameter::new(1.0, 0.0..=10.0, "duration"),
+            },
+            length_in_samples,
+        )
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -48,6 +64,8 @@ pub enum Generator {
     Noise(),
     ///mostly for debugging filter.
     Constant,
+    #[cfg(not(target_arch = "wasm32"))]
+    FilePlayer(Arc<FilePlayerParam>),
 }
 
 impl std::default::Default for Generator {

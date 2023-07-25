@@ -1,8 +1,6 @@
 use std::sync::Arc;
 use std::sync::Mutex;
 
-use egui::InnerResponse;
-
 use crate::action;
 use crate::data;
 use crate::gui;
@@ -59,13 +57,13 @@ impl<'a> Model<'a> {
     //         data::Track::Transformer() => todo!(),
     //     }
     // }
-    fn add_region(app: &mut data::AppModel, id: usize) {
+    fn add_region(app: &mut data::AppModel, id: usize, generator: data::Generator) {
         let region = if let data::Track::Regions(target) = app.get_track_for_id(id).unwrap() {
             let pos = Self::get_position_to_add(target);
             let label = format!("region{}", id + 1);
             let region_param = data::Region::new(
                 AtomicRange::<f64>::from(pos..pos + 1.0),
-                data::Content::Generator(data::Generator::default()),
+                data::Content::Generator(generator),
                 label,
             );
             data::Region::with_fade(region_param)
@@ -74,7 +72,17 @@ impl<'a> Model<'a> {
         };
         action::add_region(app, id, region).unwrap();
     }
-
+    fn add_region_osc(app: &mut data::AppModel, id: usize) {
+        Self::add_region(app, id, data::Generator::default());
+    }
+    #[allow(unused_variables)]
+    fn add_regionfile(app: &mut data::AppModel, id: usize) {
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            let (file, _len) = data::generator::FilePlayerParam::new_test_file();
+            Self::add_region(app, id, data::Generator::FilePlayer(Arc::new(file)));
+        }
+    }
     fn add_region_array(app: &mut data::AppModel, id: usize, count: u32) {
         let region_array = if let data::Track::Regions(target) = app.get_track_for_id(id).unwrap() {
             let pos = Self::get_position_to_add(target);
@@ -110,19 +118,17 @@ impl<'a> egui::Widget for Model<'a> {
         ui.spacing_mut().item_spacing = egui::vec2(0.0, 0.0);
 
         let height = gui::TRACK_HEIGHT + 30.0;
-        let (addregion, addarray, response) = if let Ok(mut app) = self.app.lock() {
+        let response = if let Ok(mut app) = self.app.lock() {
             let track = app.get_track_for_id(self.id).unwrap();
-            match track {
+            let (addregion, addfile, addarray) = match track {
                 data::Track::Regions(region_params) => {
                     let w = ui.available_size().x;
-                    let InnerResponse {
-                        inner: (addregion, addarray),
-                        response,
-                    } = ui.allocate_ui(egui::vec2(w, height), |ui| {
+                    ui.allocate_ui(egui::vec2(w, height), |ui| {
                         let area = ui.available_rect_before_wrap();
                         let left_top = area.left_top();
                         let top = area.top() - height / 2.;
-                        let scale = move |sec: f64| (sec * gui::PIXELS_PER_SEC_DEFAULT as f64) as f32;
+                        let scale =
+                            move |sec: f64| (sec * gui::PIXELS_PER_SEC_DEFAULT as f64) as f32;
 
                         let res = ui.group(|ui| {
                             self.state
@@ -155,12 +161,10 @@ impl<'a> egui::Widget for Model<'a> {
                             rect_right.right_center() + egui::vec2(10.0, 0.0),
                             egui::vec2(button_w, gui::TRACK_HEIGHT),
                         );
-                        let InnerResponse {
-                            inner: (addregion, addarray),
-                            response: _,
-                        } = ui.allocate_ui_at_rect(new_rect, |ui| {
+                        ui.allocate_ui_at_rect(new_rect, |ui| {
                             ui.vertical_centered(|ui| {
-                                let addregion_button = ui.button("+");
+                                let addregion = ui.button("+");
+                                let addregionfile = ui.button("+F");
                                 let addarray_button = ui
                                     .horizontal_centered(|ui| {
                                         let res = ui.button("+…");
@@ -170,32 +174,34 @@ impl<'a> egui::Widget for Model<'a> {
                                         res
                                     })
                                     .inner;
-
-                                (addregion_button, addarray_button)
+                                (addregion, addregionfile, addarray_button)
                             })
                             .inner
-                        });
-                        (addregion, addarray)
-                    });
-                    if addregion.clicked() {
-                        Self::add_region(&mut app, self.id);
-                    }
-                    if addarray.clicked() {
-                        Self::add_region_array(&mut app, self.id, self.state.new_array_count);
-                    }
-                    (addregion, addarray, response)
+                        })
+                        .inner
+                    })
+                    .inner
                 }
 
                 data::Track::Generator(_) => todo!(),
                 data::Track::Transformer() => todo!(),
+            };
+            if addregion.clicked() {
+                Self::add_region_osc(&mut app, self.id);
             }
+            if addfile.clicked() {
+                Self::add_regionfile(&mut app, self.id);
+            }
+            if addarray.clicked() {
+                Self::add_region_array(&mut app, self.id, self.state.new_array_count);
+            }
+            addregion.union(addfile.union(addarray))
         } else {
             unreachable!()
         };
-        if addregion.clicked() || addarray.clicked() {
-            self.sync_state()
+        if response.clicked() {
+            self.sync_state();
         }
-
         response
     }
 }

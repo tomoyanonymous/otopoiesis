@@ -42,8 +42,8 @@ impl<'a> Model<'a> {
                 ui.label("otopoiesis");
                 ui.horizontal(|ui| {
                     ui.menu_button("File", |ui| {
-                        #[cfg(debug_assertions)]
                         if ui.button("Force Sync Ui State(Debug)").clicked() {
+                            #[cfg(debug_assertions)]
                             self.state
                                 .timeline
                                 .sync_state(&self.app.lock().unwrap().project.tracks);

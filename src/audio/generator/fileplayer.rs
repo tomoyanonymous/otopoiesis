@@ -12,8 +12,6 @@ use symphonia::core::io::{MediaSourceStream, MediaSourceStreamOptions};
 use symphonia::core::meta::MetadataOptions;
 use symphonia::core::probe::{Hint, ProbeResult};
 
-
-
 pub struct FilePlayer {
     param: Arc<FilePlayerParam>,
     decoder: Box<dyn Decoder>,
@@ -46,7 +44,6 @@ fn get_default_decoder(
     let id = track.id;
     // Use the default options for the decoder.
     let dec_opts: DecoderOptions = Default::default();
-
     // Create a decoder for the track.
     let decoder = symphonia::default::get_codecs().make(&track.codec_params, &dec_opts)?;
     Ok((decoder, probed, id))
@@ -118,12 +115,12 @@ impl Component for FilePlayer {
     }
 
     fn render(&mut self, _input: &[f32], output: &mut [f32], _info: &crate::audio::PlaybackInfo) {
+        output.fill(0.0);
         // Get the next packet from the media format.
         let (mut prod, mut cons) = self.ringbuf.split_ref();
-
-        if cons.len() < output.len() {
-            // println!("ringbuffer len= {},read packets", cons.len());
-
+        let mut read_count = 0;
+        let mut is_reading = true;
+        while is_reading {
             let res_play_finished = match self.format.next_packet() {
                 Ok(packet) => {
                     // Consume any new metadata that has been read since the last packet.
@@ -141,9 +138,14 @@ impl Component for FilePlayer {
                     // Decode the packet into audio samples.
                     let res = self.decoder.decode(&packet).map(|decoded| {
                         // Consume the decoded audio samples (see below)
-                        // println!("frames:{}, timestamp:{}", decoded.frames(), packet.ts());
                         self.audiobuffer.copy_interleaved_ref(decoded.clone());
-                        prod.push_slice(self.audiobuffer.samples());
+                        let _nsamples = prod.push_slice(self.audiobuffer.samples());
+                        // println!(
+                        //     "frames:{}, timestamp:{}, n_samples: {}",
+                        //     decoded.frames(),
+                        //     packet.ts(),
+                        //     _nsamples
+                        // );
                         // output.copy_from_slice(self.audiobuffer.samples());
                     });
                     res.map(|()| false)
@@ -167,67 +169,49 @@ impl Component for FilePlayer {
                     panic!("{:?}", e);
                 }
             }
-        }
-        // println!(
-        //     "ringbuffer len = {}, current time={}",
-        //     cons.len(),
-        //     _info.current_time
-        // );
-        match (self.is_finished_playing, cons.len()) {
-            (true, 0) => {
-                output.fill(0.0);
-            }
-            (true, c) if c < output.len() => {
-                output.fill(0.0);
-                let out = &mut output[0..cons.len() - 1];
-                cons.pop_slice(out);
-            }
-            (false, _) => {
-                cons.pop_slice(output);
-            }
-            (true, _) => {
-                unreachable!();
-            }
+
+            let next_read = read_count + cons.len();
+            let end_point = if next_read > output.len() {
+                output.len()
+            } else {
+                next_read
+            };
+            let output_buf = &mut output[read_count..end_point];
+            read_count += cons.len();
+            cons.pop_slice(output_buf);
+            is_reading = !self.is_finished_playing && read_count < output.len() - 1;
         }
     }
 }
 
 #[cfg(test)]
 mod test {
-    use crate::{
-        audio::PlaybackInfo,
-        parameter::{FloatParameter, UIntParameter},
-    };
+    use crate::{audio::PlaybackInfo, data};
+    use std::sync::Arc;
 
     use super::*;
-    fn read_prep() -> (FilePlayer, PlaybackInfo) {
-        let path = concat!(env!("CARGO_MANIFEST_DIR"), "/test/assets/test_stereo.wav").to_string();
-        dbg!(path.clone());
-        let param = Arc::new(FilePlayerParam {
-            path,
-            channels: UIntParameter::new(2, 0..=2, "channels"),
-            start_sec: FloatParameter::new(1.0, 0.0..=10.0, "start"),
-            duration: FloatParameter::new(1.0, 0.0..=10.0, "duration"),
-        });
-        let player = FilePlayer::new(param);
+    fn read_prep() -> (FilePlayer, PlaybackInfo, usize) {
+        let (param, len_samples) = data::FilePlayerParam::new_test_file();
+        let player = FilePlayer::new(Arc::new(param));
         let info = PlaybackInfo {
             sample_rate: 48000,
             current_time: 0,
             frame_per_buffer: 256,
             channels: 2,
         };
-        (player, info)
+        (player, info, len_samples)
     }
     #[test]
     fn fileload() {
-        let (mut player, mut info) = read_prep();
+        let (mut player, mut info, len_samples) = read_prep();
         player.prepare_play(&info);
         let mut output_buf = vec![0.0f32; 512];
         let input_buf = vec![0.0f32; 512];
-        let read_count_max = (48000.0f32 / 256.0).round() as usize;
-        for _i in 0..read_count_max - 1 {
-            info.current_time += 256;
+        let read_count_max = (len_samples as f32 / 256.0).floor() as usize;
+        for _i in 0..read_count_max {
             player.render(&input_buf, output_buf.as_mut_slice(), &info);
+            info.current_time += 256;
+            // println!("{}", info.current_time);
         }
         assert!(!player.is_finished_playing());
         player.render(&input_buf, output_buf.as_mut_slice(), &info);
