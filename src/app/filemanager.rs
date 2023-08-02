@@ -3,7 +3,7 @@ use symphonia::core::io::MediaSource;
 
 pub trait FileManager {
     //required to convert into symphonia::MediaSource
-    
+
     type Stream: MediaSource;
     type Error: std::error::Error;
     fn get_file(&self, path: impl ToString) -> Result<Self::Stream, Self::Error>;
@@ -27,20 +27,20 @@ mod native {
 #[cfg(target_arch = "wasm32")]
 pub mod web {
     use super::*;
-    pub struct WebMediaSource{}
-    impl std::io::Read for WebMediaSource{
+    pub struct WebMediaSource {}
+    impl std::io::Read for WebMediaSource {
         fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
             todo!()
         }
     }
-    impl std::io::Seek for WebMediaSource{
+    impl std::io::Seek for WebMediaSource {
         fn seek(&mut self, pos: std::io::SeekFrom) -> std::io::Result<u64> {
             todo!()
         }
     }
-    unsafe impl Send for WebMediaSource{}
-    unsafe impl Sync for WebMediaSource{}
-    impl MediaSource for WebMediaSource{
+    unsafe impl Send for WebMediaSource {}
+    unsafe impl Sync for WebMediaSource {}
+    impl MediaSource for WebMediaSource {
         fn is_seekable(&self) -> bool {
             todo!()
         }
@@ -51,10 +51,8 @@ pub mod web {
     }
     pub struct WebFileManager {}
 
-    pub struct WebFileError{}
-    impl std::error::Error for WebFileError{
-
-    }
+    pub struct WebFileError {}
+    impl std::error::Error for WebFileError {}
     impl std::fmt::Display for WebFileError {
         fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
             write!(f, "file operation is currenrly not compatible with wasm")
