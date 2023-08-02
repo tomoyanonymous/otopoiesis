@@ -13,6 +13,8 @@ description = "a constructive audio programming environment with timeline-based 
 crate-type = ["cdylib", "rlib"]
 
 [features]
+default = ["native"]
+native = ["dep:clap","dep:dirs"]
 web = [
     "dep:wasm-bindgen-futures",
     "dep:wee_alloc",
@@ -20,7 +22,7 @@ web = [
 ]
 
 [dependencies]
-cpal = { version = "0.14.0", features = ["wasm-bindgen"] }
+cpal = { version = "0.15.2", features = ["wasm-bindgen"] }
 egui = "0.20.0"
 eframe = { version = "0.20.0" }
 # to resolve conflict versions used between egui and nannou_audio(cpal)
@@ -31,10 +33,16 @@ serde = { version = "*", features = ["rc"] }
 serde_json = "*"
 serde_with = "2.1.0"
 undo = "0.47.*"
+symphonia = { version = "0.5.2", features = ["wav"] }
+clap = { version = "4.3.19", features = ["derive"], optional = true }
+dirs = { version = "5.0", optional = true }
 console_error_panic_hook = { version = "0.1.6", optional = true }
 wasm-bindgen-futures = { version = "0.4.33", optional = true }
 wee_alloc = { version = "0.4.5", optional = true }
-symphonia = {version = "0.5.2", features = ["wav"]}
+
+
+[target.'cfg(target_os = "macos")'.dependencies]
+coreaudio-sys = "0.2.12"
 
 [dev-dependencies]
 wasm-bindgen-test = { version = "0.2" }

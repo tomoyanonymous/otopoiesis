@@ -51,6 +51,7 @@ where
                     pass_in(imodel.clone(), data, c.clone())
                 },
                 |_e| {},
+                None,
             );
             let _ = in_stream.as_ref().map(|i| i.pause());
             // if let Err(e) = &in_stream {
@@ -85,6 +86,7 @@ where
                     pass_out(omodel.clone(), data, oc.clone())
                 },
                 |_e| {},
+                None,
             );
             // if let Err(e) = &out_stream {
             //     web_sys::console::log_1(&e.to_string().into())
