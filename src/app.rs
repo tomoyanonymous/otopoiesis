@@ -1,8 +1,9 @@
+use atomic::SimpleAtomic;
 use std::sync::{Arc, Mutex};
 
 use crate::audio::renderer::{Renderer, RendererBase};
 use crate::{audio, data, gui, utils::atomic};
-use atomic::SimpleAtomic;
+
 pub(crate) mod filemanager;
 
 extern crate eframe;
@@ -27,9 +28,8 @@ fn new_renderer(app: &data::AppModel) -> Renderer<audio::timeline::Model> {
 }
 
 impl Model {
-    pub fn new(_cc: &eframe::CreationContext<'_>) -> Self {
+    pub fn new(_cc: &eframe::CreationContext<'_>, arg: Option<data::LaunchArg>) -> Self {
         let sample_rate = 44100;
-
         let project = data::Project {
             sample_rate: atomic::U64::from(sample_rate),
             tracks: vec![],
@@ -40,7 +40,9 @@ impl Model {
             println!("{}", e);
             "failed to print".to_string()
         });
-        let appmodel = data::AppModel::new(data::Transport::new(), data::GlobalSetting {}, project);
+        let arg = arg.unwrap_or_default();
+        let appmodel =
+            data::AppModel::new(data::Transport::new(), data::GlobalSetting {}, arg, project);
         let ui = gui::app::State::new(&appmodel);
         let app = Arc::new(Mutex::new(appmodel));
 

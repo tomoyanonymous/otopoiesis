@@ -245,7 +245,8 @@ impl Model {
     }
 }
 
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(not(feature = "web"))]
+
 pub fn render_region_offline_async(
     region: Model,
     info: &PlaybackInfo,

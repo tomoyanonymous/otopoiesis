@@ -42,7 +42,7 @@ impl<'a> Generator<'a> {
                 unimplemented!()
             }
             data::Generator::Constant => unimplemented!(),
-            #[cfg(not(target_arch = "wasm32"))]
+            #[cfg(not(feature = "web"))]
             data::Generator::FilePlayer(_param) => {
                 //todo!
                 let mut phase_gui = 0.0f32;
@@ -118,7 +118,7 @@ impl<'a> egui::Widget for Generator<'a> {
                 }
                 data::Generator::Noise() => todo!(),
                 data::Generator::Constant => unimplemented!(),
-                #[cfg(not(target_arch = "wasm32"))]
+                #[cfg(not(feature = "web"))]
                 data::Generator::FilePlayer(param) => ui.label(param.path.to_string()),
             };
             res

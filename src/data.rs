@@ -13,20 +13,54 @@ pub mod region;
 pub use generator::*;
 pub use region::*;
 
+#[cfg(feature = "native")]
+use dirs;
+
+pub struct LaunchArg {
+    pub file: Option<String>,
+    pub project_root: Option<String>,
+    pub config_dir: Option<String>,
+    pub log_level: u8,
+}
+impl Default for LaunchArg {
+    fn default() -> Self {
+        #[cfg(feature = "native")]
+        let config_dir = dirs::home_dir().map(|mut p| {
+            p.push(std::path::PathBuf::from(".otopoiesis"));
+            p.to_str().unwrap_or("").to_string()
+        });
+        #[cfg(feature = "web")]
+        let config_dir = None;
+        Self {
+            file: None,
+            project_root: None,
+            config_dir,
+            log_level: 3,
+        }
+    }
+}
+
 // #[derive(Serialize, Deserialize, Clone)]
 pub struct AppModel {
     pub transport: Arc<Transport>,
     pub global_setting: GlobalSetting,
+    pub launch_arg: LaunchArg,
     pub project: Project,
     pub history: undo::Record<action::Action>,
 }
 
 impl AppModel {
-    pub fn new(transport: Transport, global_setting: GlobalSetting, project: Project) -> Self {
+    pub fn new(
+        transport: Transport,
+        global_setting: GlobalSetting,
+        launch_arg: LaunchArg,
+        project: Project,
+    ) -> Self {
         let transport = Arc::new(transport);
         Self {
             transport,
             global_setting,
+            launch_arg,
             project,
             history: undo::Record::new(),
         }

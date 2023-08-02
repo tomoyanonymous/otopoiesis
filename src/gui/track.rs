@@ -77,7 +77,7 @@ impl<'a> Model<'a> {
     }
     #[allow(unused_variables)]
     fn add_regionfile(app: &mut data::AppModel, id: usize) {
-        #[cfg(not(target_arch = "wasm32"))]
+        #[cfg(not(feature = "web"))]
         {
             let (file, _len) = data::generator::FilePlayerParam::new_test_file();
             Self::add_region(app, id, data::Generator::FilePlayer(Arc::new(file)));

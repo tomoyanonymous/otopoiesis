@@ -8,7 +8,8 @@ pub trait FileManager {
     type Error: std::error::Error;
     fn get_file(&self, path: impl ToString) -> Result<Self::Stream, Self::Error>;
 }
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(not(feature = "web"))]
+
 mod native {
     use super::*;
     pub struct NativeFileManager {
@@ -24,7 +25,8 @@ mod native {
         }
     }
 }
-#[cfg(target_arch = "wasm32")]
+#[cfg(feature = "web")]
+
 pub mod web {
     use super::*;
     pub struct WebMediaSource {}
@@ -74,9 +76,11 @@ pub mod web {
     }
 }
 
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(not(feature = "web"))]
+
 static GLOBAL_FILE_MANAGER: native::NativeFileManager = native::NativeFileManager {};
-#[cfg(target_arch = "wasm32")]
+#[cfg(feature = "web")]
+
 static GLOBAL_FILE_MANAGER: web::WebFileManager = web::WebFileManager {};
 
 pub fn get_global_file_manager() -> &'static impl FileManager {
