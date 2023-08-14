@@ -31,7 +31,7 @@ mod native {
         }
         fn read_to_string(&self, path: impl ToString, str: &mut String) -> Result<(), Self::Error> {
             let mut file = self.open_file_stream(path)?;
-            file.read_to_string(str).map(|io_res| ())
+            file.read_to_string(str).map(|_| ())
         }
         fn save_file<C: AsRef<[u8]>>(
             &self,

@@ -4,11 +4,11 @@ use crate::action;
 use crate::app::filemanager::{self, FileManager};
 use crate::utils::{atomic, AtomicRange, SimpleAtomic};
 
+use rfd;
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 use std::sync::Arc;
 use undo;
-use rfd;
 
 pub mod generator;
 pub mod region;
@@ -63,9 +63,9 @@ impl AppModel {
             String::from(path.to_string_lossy())
         });
         let mut project_str = String::new();
-        project_file.clone().map(|file| {
+        if let Some(file) = project_file.clone() {
             let _ = filemanager::get_global_file_manager().read_to_string(file, &mut project_str);
-        });
+        }
 
         Self {
             transport,
@@ -98,13 +98,17 @@ impl AppModel {
 
     pub fn open_file(&mut self) {
         let dir = self.project_file.clone().unwrap_or("~/".to_string());
-        let file = rfd::FileDialog::new()
-            .add_filter("json", &["json"])
-            .set_directory(dir)
-            .pick_file();
-        let path_str = String::from(file.unwrap().to_string_lossy());
+        #[cfg(feature = "native")]
+        {
+            let file = rfd::FileDialog::new()
+                .add_filter("json", &["json"])
+                .set_directory(dir)
+                .pick_file();
+            let path_str = String::from(file.unwrap().to_string_lossy());
 
-        let _ = filemanager::GLOBAL_FILE_MANAGER.read_to_string(path_str, &mut self.project_str);
+            let _ =
+                filemanager::GLOBAL_FILE_MANAGER.read_to_string(path_str, &mut self.project_str);
+        }
     }
     pub fn save_file(&mut self) {
         match &self.project_file {
@@ -117,15 +121,17 @@ impl AppModel {
     }
     pub fn save_as_file(&mut self) {
         let dir = self.project_file.clone().unwrap_or("~/".to_string());
-
-        let file = rfd::FileDialog::new()
-            .set_directory(dir)
-            .add_filter("json", &["json"])
-            .save_file();
-        let path_str = String::from(file.unwrap().to_string_lossy());
-        let _ =
-            filemanager::GLOBAL_FILE_MANAGER.save_file(path_str.clone(), self.project_str.clone());
-        self.project_file = Some(path_str);
+        #[cfg(feature = "native")]
+        {
+            let file = rfd::FileDialog::new()
+                .set_directory(dir)
+                .add_filter("json", &["json"])
+                .save_file();
+            let path_str = String::from(file.unwrap().to_string_lossy());
+            let _ = filemanager::GLOBAL_FILE_MANAGER
+                .save_file(path_str.clone(), self.project_str.clone());
+            self.project_file = Some(path_str);
+        }
     }
     pub fn ui_to_code(&mut self) {
         let json = serde_json::to_string_pretty(&self.project);
