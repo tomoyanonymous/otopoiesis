@@ -3,14 +3,20 @@ use symphonia::core::io::MediaSource;
 
 pub trait FileManager {
     //required to convert into symphonia::MediaSource
-
+    // type File: std::fs::File;
     type Stream: MediaSource;
     type Error: std::error::Error;
-    fn get_file(&self, path: impl ToString) -> Result<Self::Stream, Self::Error>;
+    // fn open_file(&self, path: impl ToString)-> Result<Self::File,Self::Error>;
+    fn open_file_stream(&self, path: impl ToString) -> Result<Self::Stream, Self::Error>;
+    fn read_to_string(&self, path: impl ToString, str: &mut String) -> Result<(), Self::Error>;
+    fn save_file<C: AsRef<[u8]>>(&self, path: impl ToString, content: C)
+        -> Result<(), Self::Error>;
 }
 #[cfg(not(feature = "web"))]
 
 mod native {
+    use std::io::Read;
+
     use super::*;
     pub struct NativeFileManager {
         // currently has no member
@@ -18,10 +24,23 @@ mod native {
     impl FileManager for NativeFileManager {
         type Stream = std::fs::File;
         type Error = std::io::Error;
-        fn get_file(&self, path: impl ToString) -> Result<Self::Stream, Self::Error> {
+        fn open_file_stream(&self, path: impl ToString) -> Result<Self::Stream, Self::Error> {
             let s = path.to_string();
             let p = std::path::Path::new(&s);
             std::fs::File::open(p)
+        }
+        fn read_to_string(&self, path: impl ToString, str: &mut String) -> Result<(), Self::Error> {
+            let mut file = self.open_file_stream(path)?;
+            file.read_to_string(str).map(|io_res| ())
+        }
+        fn save_file<C: AsRef<[u8]>>(
+            &self,
+            path: impl ToString,
+            content: C,
+        ) -> Result<(), Self::Error> {
+            let s = path.to_string();
+            let p = std::path::Path::new(&s);
+            std::fs::write(p, content)
         }
     }
 }
@@ -70,7 +89,17 @@ pub mod web {
     impl FileManager for WebFileManager {
         type Stream = WebMediaSource;
         type Error = WebFileError;
-        fn get_file(&self, path: impl ToString) -> Result<Self::Stream, Self::Error> {
+        fn open_file_stream(&self, path: impl ToString) -> Result<Self::Stream, Self::Error> {
+            Err(WebFileError {})
+        }
+        fn read_to_string(&self, path: impl ToString, str: &mut String) -> Result<(), Self::Error> {
+            Err(WebFileError {})
+        }
+        fn save_file<C: AsRef<[u8]>>(
+            &self,
+            path: impl ToString,
+            content: C,
+        ) -> Result<(), Self::Error> {
             Err(WebFileError {})
         }
     }
@@ -78,10 +107,10 @@ pub mod web {
 
 #[cfg(not(feature = "web"))]
 
-static GLOBAL_FILE_MANAGER: native::NativeFileManager = native::NativeFileManager {};
+pub static GLOBAL_FILE_MANAGER: native::NativeFileManager = native::NativeFileManager {};
 #[cfg(feature = "web")]
 
-static GLOBAL_FILE_MANAGER: web::WebFileManager = web::WebFileManager {};
+pub static GLOBAL_FILE_MANAGER: web::WebFileManager = web::WebFileManager {};
 
 pub fn get_global_file_manager() -> &'static impl FileManager {
     &GLOBAL_FILE_MANAGER

@@ -28,7 +28,7 @@ type DecoderSet = (Box<dyn Decoder>, ProbeResult, u32);
 
 fn get_default_decoder(path: impl ToString) -> Result<DecoderSet, Box<dyn std::error::Error>> {
     let flmgr = filemanager::get_global_file_manager();
-    let src = flmgr.get_file(path).expect("failed to open file");
+    let src = flmgr.open_file_stream(path).expect("failed to open file");
     let ms: Box<dyn MediaSource> = Box::new(src);
     let mss_opts = MediaSourceStreamOptions::default();
     let mss = MediaSourceStream::new(ms, mss_opts);
