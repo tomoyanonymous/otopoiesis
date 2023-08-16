@@ -46,7 +46,7 @@ impl State {
         let handle_right = UiBarState::new(params.range.1.load()..=f64::MAX);
         let content = match &params.content {
             data::Content::Generator(param) => {
-                ContentModel::Generator(param.clone(), super::generator::State::new(512))
+                ContentModel::Generator(param.clone(), super::generator::State::new(0))
             }
             data::Content::Transformer(filter, origin) => {
                 ContentModel::RegionFilter(match filter {
