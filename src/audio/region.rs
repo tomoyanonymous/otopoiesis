@@ -216,7 +216,7 @@ impl Model {
             }
             data::Content::Transformer(filter, origin) => {
                 TransformerModel::new(filter, *origin.clone()).0
-            } // data::Content::Array(vec) => Box::new(RegionArray::new(vec)),
+            }
         };
         Self {
             params,

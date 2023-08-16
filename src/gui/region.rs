@@ -15,22 +15,6 @@ pub enum ContentModel {
     Generator(data::Generator, super::generator::State),
 }
 
-// fn ui_vec<'a, T>(vec: &'a mut [T], ui: &mut egui::Ui) -> egui::Response
-// where
-//     T: 'a,
-//     &'a mut T: egui::Widget,
-// {
-//     ui.group(|ui| {
-//         vec.iter_mut()
-//             .map(|r| r.ui(ui))
-//             .fold(None, |acc: Option<egui::Response>, response| {
-//                 acc.map_or_else(|| Some(response.clone()), |a| Some(response.union(a)))
-//             })
-//             .unwrap_or(ui.group(|_| {}).response)
-//     })
-//     .inner
-// }
-
 pub struct State {
     pub label: String,
     content: ContentModel,
@@ -46,7 +30,7 @@ impl State {
         let handle_right = UiBarState::new(params.range.1.load()..=f64::MAX);
         let content = match &params.content {
             data::Content::Generator(param) => {
-                ContentModel::Generator(param.clone(), super::generator::State::new(0))
+                ContentModel::Generator(param.clone(), super::generator::State::new())
             }
             data::Content::Transformer(filter, origin) => {
                 ContentModel::RegionFilter(match filter {
@@ -165,15 +149,26 @@ impl<'a> egui::Widget for Model<'a> {
                         HandleMode::Start,
                     );
                     handle_start.set_limit(min_start..=end);
-                    ui.add_sized(bar_size, handle_start);
-                    let main = ui.add(super::generator::Generator::new(param, genstate));
+                    let startui = ui.add_sized(bar_size, handle_start);
+                    let gen =
+                        super::generator::Generator::new(param, &mut self.params.range, genstate);
+                    let main = ui.add(gen);
                     let mut handle_end = UiBar::new(
                         &self.params.range.1,
                         &mut self.state.range_handles[1],
                         HandleMode::End,
                     );
                     handle_end.set_limit(start..=max_end);
-                    ui.add_sized(bar_size, handle_end);
+                    let endui = ui.add_sized(bar_size, handle_end);
+                    if startui.union(endui).drag_released() {
+                        let mut gen = super::generator::Generator::new(
+                            param,
+                            &mut self.params.range,
+                            genstate,
+                        );
+                        gen.update_shape(&ui.ctx().style());
+                    }
+
                     (main, true)
                 }
                 _ => unreachable!(),

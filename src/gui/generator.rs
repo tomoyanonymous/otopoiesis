@@ -1,21 +1,35 @@
-use crate::{audio, data, parameter::Parameter};
-/// 一時的にaudio Componentを生成して画像用の波形をNon-Realtime Renderする
+use crate::{
+    audio::{
+        self,
+        region::{RangedComponent, RangedComponentDyn},
+    },
+    data,
+    utils::AtomicRange,
+};
+use egui::{
+    epaint::{PathShape, Shape},
+    Pos2, Sense, Vec2,
+};
+
+use std::ops::RangeInclusive;
 
 pub struct State {
     samples: Vec<f32>,
+    shape: Shape,
 }
 
 impl State {
-    pub fn new(size: usize) -> Self {
+    pub fn new() -> Self {
         Self {
-            samples: vec![0.0; size],
+            samples: vec![0.0; 0],
+            shape: Shape::Noop,
         }
     }
 }
-
-pub struct Generator<'a> {
-    param: &'a mut data::Generator,
-    state: &'a mut State,
+impl Default for State {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 /// get peak samples
@@ -30,99 +44,123 @@ fn reduce_samples(input: &[f32], output: &mut [f32]) {
             *o = is.chunks(chs).map(|i| i[0].abs()).reduce(f32::max).unwrap();
         });
 }
+pub trait GeneratorUI<'a> {
+    fn get_generator(&self) -> &data::Generator;
+    fn get_samples(&mut self) -> &mut Vec<f32>;
+    fn get_displayed_range(&self) -> RangeInclusive<f64>;
 
-impl<'a> Generator<'a> {
-    pub fn new(param: &'a mut data::Generator, state: &'a mut State) -> Self {
-        Self { param, state }
+    fn get_displayed_duration(&self) -> f64 {
+        let range = self.get_displayed_range();
+        range.end() - range.start()
     }
-    pub fn update_samples(&mut self, width: f32) {
-        // let mut phase = 0.0f32;
+    fn update_samples(&mut self) {
+        let width = self.get_displayed_duration() * super::PIXELS_PER_SEC_DEFAULT as f64;
         let sample_rate = 44100u32;
         let channels = 2;
-        let len_samples =
-            (sample_rate as f32 * width / super::PIXELS_PER_SEC_DEFAULT).ceil() as usize;
+        let len_samples = (sample_rate as f64 / self.get_displayed_duration()).ceil() as usize;
         let pix_len = width.ceil() as usize;
-        let dummy = vec![0.0f32; 0];
         let mut buf = vec![0.0f32; len_samples * channels];
-
-        let mut audio_component = audio::generator::get_component_for_generator(self.param);
-        audio_component.render(
-            &dummy,
-            &mut buf,
-            &audio::PlaybackInfo {
-                sample_rate,
-                current_time: 0,
-                frame_per_buffer: pix_len as u64,
-                channels: 2,
-            },
+        let audio_component = audio::generator::get_component_for_generator(self.get_generator());
+        let mut ranged_component = RangedComponentDyn::new(
+            audio_component,
+            AtomicRange::from(self.get_displayed_range()),
         );
-        self.state.samples.resize(pix_len, 0.0f32);
-        reduce_samples(&buf, &mut self.state.samples);
+        ranged_component.render_offline(&mut buf, sample_rate, channels as u64);
+        self.get_samples().resize(pix_len, 0.0f32);
+        reduce_samples(&buf, self.get_samples());
     }
-    fn make_graph_sized(&mut self, ui: &mut egui::Ui, size: egui::Vec2) -> egui::Response {
-        let points = self
-            .state
-            .samples
+}
+
+pub struct Generator<'a> {
+    param: &'a mut data::Generator,
+    displayed_range: &'a mut AtomicRange<f64>,
+    state: &'a mut State,
+}
+
+impl<'a> GeneratorUI<'a> for Generator<'a> {
+    fn get_generator(&self) -> &data::Generator {
+        self.param
+    }
+
+    fn get_samples(&mut self) -> &mut Vec<f32> {
+        &mut self.state.samples
+    }
+
+    fn get_displayed_range(&self) -> RangeInclusive<f64> {
+        self.displayed_range.start()..=self.displayed_range.end()
+    }
+}
+
+impl<'a> Generator<'a> {
+    pub fn new(
+        param: &'a mut data::Generator,
+        displayed_range: &'a mut AtomicRange<f64>,
+        state: &'a mut State,
+    ) -> Self {
+        Self {
+            param,
+            displayed_range,
+            state,
+        }
+    }
+    fn get_size(&self) -> Vec2 {
+        let width = self.get_displayed_duration() as f32 * super::PIXELS_PER_SEC_DEFAULT;
+        let height = super::TRACK_HEIGHT;
+        egui::vec2(width, height)
+    }
+    pub fn update_shape(&mut self, style: &egui::Style) {
+        self.update_samples();
+
+        let from = 0.0..=self.get_samples().len() as f64;
+        let to = 0.0..=self.get_size().x as f64;
+        let y_origin = self.get_size().y;
+        let points_upper = self
+            .get_samples()
             .iter()
             .enumerate()
             .map(|(i, s)| {
-                let x = egui::emath::remap(
-                    i as f64,
-                    0.0..=self.state.samples.len() as f64,
-                    0.0..=size.x as f64,
-                );
-                let y = *s * size.y;
-                [x, y as f64]
+                let x = egui::emath::remap(i as f64, from.clone(), to.clone());
+                let y = *s * y_origin * 0.5;
+                egui::pos2(x as f32, y)
             })
-            .collect::<Vec<_>>();
+            .collect::<Vec<Pos2>>();
+        let points_lower = points_upper
+            .clone()
+            .into_iter()
+            .rev()
+            .map(|p| egui::pos2(p.x, -p.y));
 
-        let plot = egui::plot::Plot::new(ui.auto_id_with("generator"))
-            .allow_drag(false)
-            .allow_zoom(false)
-            .allow_boxed_zoom(false)
-            .allow_scroll(false)
-            .allow_double_click_reset(false)
-            .width(size.x)
-            .height(size.y)
-            .show_x(false)
-            .show_y(false)
-            .show_axes([false, true])
-            .min_size(egui::vec2(0., 0.))
-            .set_margin_fraction(egui::vec2(0., 0.));
-
-        plot.show(ui, |plot_ui| {
-            plot_ui.line(egui::plot::Line::new(points).fill(0.0))
-        })
-        .response
-        .on_hover_cursor(egui::CursorIcon::Grab)
-        .interact(egui::Sense::click_and_drag())
+        let points_to_draw = points_upper
+            .into_iter()
+            .chain(points_lower)
+            .collect::<Vec<Pos2>>();
+        let visu = style.visuals.widgets.active;
+        let pathshape =
+            PathShape::convex_polygon(points_to_draw, visu.fg_stroke.color, visu.fg_stroke);
+        self.state.shape = Shape::Path(pathshape);
     }
 }
 
 impl<'a> egui::Widget for Generator<'a> {
     fn ui(mut self, ui: &mut egui::Ui) -> egui::Response {
         ui.vertical(|ui| {
-            let res = self.make_graph_sized(ui, ui.available_size());
+            let (response, painter) = ui.allocate_painter(self.get_size(), Sense::hover());
+
             if self.state.samples.is_empty() {
-                self.update_samples(res.rect.width());
+                self.update_shape(&ui.ctx().style());
             }
+            let mut shape_c = self.state.shape.clone();
+            shape_c.translate(egui::vec2(
+                response.rect.left_top().x,
+                response.rect.size().y,
+            ));
+            painter.add(shape_c);
+
             let _controller = match &self.param {
                 data::Generator::Oscillator(_kind, osc) => {
-                    let range = &osc.freq.range;
-                    let slider = ui.add(
-                        egui::Slider::from_get_set(
-                            *range.start() as f64..=*range.end() as f64,
-                            |v: Option<f64>| {
-                                if let Some(n) = v {
-                                    osc.freq.set(n as f32);
-                                }
-                                osc.freq.get() as f64
-                            },
-                        )
-                        .logarithmic(true),
-                    );
+                    let slider = ui.add(super::slider_from_parameter(&osc.freq, true));
                     if slider.drag_released() && slider.changed() {
-                        self.update_samples(res.rect.width());
+                        self.update_shape(&ui.ctx().style());
                     }
                     slider
                 }
@@ -131,7 +169,9 @@ impl<'a> egui::Widget for Generator<'a> {
                 #[cfg(not(feature = "web"))]
                 data::Generator::FilePlayer(param) => ui.label(param.path.to_string()),
             };
-            res
+            response
+                .on_hover_cursor(egui::CursorIcon::Grab)
+                .interact(egui::Sense::click_and_drag())
         })
         .inner
     }
