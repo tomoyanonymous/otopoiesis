@@ -22,7 +22,7 @@ web = [
 ]
 
 [dependencies]
-cpal = { version = "0.15.2", features = ["wasm-bindgen"] }
+cpal = { version = "0.15.2"}
 egui = "0.20.0"
 eframe = { version = "0.20.0" }
 # to resolve conflict versions used between egui and nannou_audio(cpal)
@@ -35,12 +35,12 @@ serde_with = "2.1.0"
 undo = "0.47.*"
 rfd = "0.11"
 
-image = { version = "0.24", default-features = false, features = [
-    "jpeg",
-    "png",
-] }
-egui_extras = { version = "0.20.0", features = ["image"] }
+# image = { version = "0.24", default-features = false, features = [
+#     "jpeg",
+#     "png",
+# ] }
 
+egui_extras = { version = "0.20.0", features = ["image"] }
 
 symphonia = { version = "0.5.2", features = ["wav"] }
 clap = { version = "4.3.19", features = ["derive"], optional = true }

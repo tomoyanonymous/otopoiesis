@@ -43,7 +43,7 @@ pub async fn start(canvas_id: &str) -> Result<WebHandle, eframe::wasm_bindgen::J
     eframe::start_web(
         canvas_id,
         web_options,
-        Box::new(|cc| Box::new(app::Model::new(cc))),
+        Box::new(|cc| Box::new(app::Model::new(cc, None))),
     )
     .await
     .map(|handle| WebHandle { handle })

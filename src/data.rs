@@ -27,7 +27,7 @@ pub struct LaunchArg {
 }
 impl Default for LaunchArg {
     fn default() -> Self {
-        #[cfg(feature = "native")]
+        #[cfg(not(feature = "web"))]
         let config_dir = dirs::home_dir().map(|mut p| {
             p.push(std::path::PathBuf::from(".otopoiesis"));
             p.to_str().unwrap_or("").to_string()
@@ -97,9 +97,9 @@ impl AppModel {
     }
 
     pub fn open_file(&mut self) {
-        let dir = self.project_file.clone().unwrap_or("~/".to_string());
-        #[cfg(feature = "native")]
+        #[cfg(not(feature = "web"))]
         {
+            let dir = self.project_file.clone().unwrap_or("~/".to_string());
             let file = rfd::FileDialog::new()
                 .add_filter("json", &["json"])
                 .set_directory(dir)
@@ -116,13 +116,15 @@ impl AppModel {
                 let _ = filemanager::GLOBAL_FILE_MANAGER
                     .save_file(file.clone(), self.project_str.clone());
             }
-            None => self.save_as_file(),
+            None => {
+                self.save_as_file();
+            }
         }
     }
     pub fn save_as_file(&mut self) {
-        let dir = self.project_file.clone().unwrap_or("~/".to_string());
-        #[cfg(feature = "native")]
+        #[cfg(not(feature = "web"))]
         {
+            let dir = self.project_file.clone().unwrap_or("~/".to_string());
             let file = rfd::FileDialog::new()
                 .set_directory(dir)
                 .add_filter("json", &["json"])
