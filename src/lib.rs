@@ -13,7 +13,7 @@ pub mod gui;
 pub mod parameter;
 pub mod utils;
 
-#[cfg(feature = "native")]
+#[cfg(not(feature = "web"))]
 pub mod cli;
 
 #[cfg(feature = "web")]

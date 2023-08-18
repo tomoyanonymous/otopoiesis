@@ -3,10 +3,10 @@ use otopoiesis::*;
 extern crate eframe;
 extern crate egui;
 
-#[cfg(feature = "native")]
+#[cfg(not(feature = "web"))]
 use crate::cli::{self, Parser};
 
-#[cfg(feature = "native")]
+#[cfg(not(feature = "web"))]
 fn main() {
     let native_options = eframe::NativeOptions {
         initial_window_size: Some(egui::vec2(1200., 900.)),

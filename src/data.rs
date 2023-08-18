@@ -16,7 +16,7 @@ pub mod region;
 pub use generator::*;
 pub use region::*;
 
-#[cfg(feature = "native")]
+#[cfg(not(feature = "web"))]
 use dirs;
 
 pub struct LaunchArg {
