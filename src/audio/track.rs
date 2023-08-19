@@ -28,7 +28,7 @@ impl Model {
         //fetch update.
 
         let channels = info.channels;
-        #[cfg(not(target_arch = "wasm32"))]
+        #[cfg(not(feature = "web"))]
         let res = {
             self.param
                 .iter()
@@ -40,7 +40,7 @@ impl Model {
                 .map(move |h| h.join().expect("hoge"))
                 .collect::<Vec<super::region::Model>>()
         };
-        #[cfg(target_arch = "wasm32")]
+        #[cfg(feature = "web")]
         let res = self
             .param
             .iter()

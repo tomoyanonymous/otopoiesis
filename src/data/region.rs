@@ -33,7 +33,6 @@ pub enum RegionFilter {
 pub enum Content {
     Generator(Generator),
     Transformer(RegionFilter, Box<Region>),
-    // Array(Vec<Arc<Region>>),
 }
 
 /// Data structure for region.

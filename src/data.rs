@@ -1,7 +1,10 @@
 //! The main data format like project file, track, region and etc. Can be (de)serialized to/from json with serde.
 
 use crate::action;
+use crate::app::filemanager::{self, FileManager};
 use crate::utils::{atomic, AtomicRange, SimpleAtomic};
+
+use rfd;
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 use std::sync::Arc;
@@ -13,21 +16,64 @@ pub mod region;
 pub use generator::*;
 pub use region::*;
 
+#[cfg(not(feature = "web"))]
+use dirs;
+
+pub struct LaunchArg {
+    pub file: Option<String>,
+    pub project_root: Option<String>,
+    pub config_dir: Option<String>,
+    pub log_level: u8,
+}
+impl Default for LaunchArg {
+    fn default() -> Self {
+        #[cfg(not(feature = "web"))]
+        let config_dir = dirs::home_dir().map(|mut p| {
+            p.push(std::path::PathBuf::from(".otopoiesis"));
+            p.to_str().unwrap_or("").to_string()
+        });
+        #[cfg(feature = "web")]
+        let config_dir = None;
+        Self {
+            file: None,
+            project_root: None,
+            config_dir,
+            log_level: 3,
+        }
+    }
+}
+
 // #[derive(Serialize, Deserialize, Clone)]
 pub struct AppModel {
     pub transport: Arc<Transport>,
     pub global_setting: GlobalSetting,
+    pub launch_arg: LaunchArg,
     pub project: Project,
+    pub project_str: String,
+    pub project_file: Option<String>,
     pub history: undo::Record<action::Action>,
 }
 
 impl AppModel {
-    pub fn new(transport: Transport, global_setting: GlobalSetting, project: Project) -> Self {
+    pub fn new(transport: Transport, global_setting: GlobalSetting, launch_arg: LaunchArg) -> Self {
         let transport = Arc::new(transport);
+        let file = launch_arg.file.clone();
+        let project_file = file.map(|file| {
+            let path = std::path::PathBuf::from(file);
+            String::from(path.to_string_lossy())
+        });
+        let mut project_str = String::new();
+        if let Some(file) = project_file.clone() {
+            let _ = filemanager::get_global_file_manager().read_to_string(file, &mut project_str);
+        }
+
         Self {
             transport,
             global_setting,
-            project,
+            launch_arg,
+            project: Project::new(44100),
+            project_str,
+            project_file,
             history: undo::Record::new(),
         }
     }
@@ -48,6 +94,59 @@ impl AppModel {
     pub fn redo(&mut self) {
         let history = &mut self.history;
         let _ = history.redo(&mut self.project).unwrap();
+    }
+
+    pub fn open_file(&mut self) {
+        #[cfg(not(feature = "web"))]
+        {
+            let dir = self.project_file.clone().unwrap_or("~/".to_string());
+            let file = rfd::FileDialog::new()
+                .add_filter("json", &["json"])
+                .set_directory(dir)
+                .pick_file();
+            let path_str = String::from(file.unwrap().to_string_lossy());
+
+            let _ =
+                filemanager::GLOBAL_FILE_MANAGER.read_to_string(path_str, &mut self.project_str);
+        }
+    }
+    pub fn save_file(&mut self) {
+        match &self.project_file {
+            Some(file) => {
+                let _ = filemanager::GLOBAL_FILE_MANAGER
+                    .save_file(file.clone(), self.project_str.clone());
+            }
+            None => {
+                self.save_as_file();
+            }
+        }
+    }
+    pub fn save_as_file(&mut self) {
+        #[cfg(not(feature = "web"))]
+        {
+            let dir = self.project_file.clone().unwrap_or("~/".to_string());
+            let file = rfd::FileDialog::new()
+                .set_directory(dir)
+                .add_filter("json", &["json"])
+                .save_file();
+            let path_str = String::from(file.unwrap().to_string_lossy());
+            let _ = filemanager::GLOBAL_FILE_MANAGER
+                .save_file(path_str.clone(), self.project_str.clone());
+            self.project_file = Some(path_str);
+        }
+    }
+    pub fn ui_to_code(&mut self) {
+        let json = serde_json::to_string_pretty(&self.project);
+        let json_str = json.unwrap_or_else(|e| {
+            println!("{}", e);
+            "failed to print".to_string()
+        });
+        self.project_str = json_str;
+    }
+    pub fn code_to_ui(&mut self) -> Result<(), serde_json::Error> {
+        serde_json::from_str::<Project>(&self.project_str).map(|proj| {
+            self.project = proj.clone();
+        })
     }
     pub fn get_track_for_id(&mut self, id: usize) -> Option<&mut Track> {
         self.project.tracks.get_mut(id)
@@ -122,6 +221,14 @@ pub struct GlobalSetting;
 pub struct Project {
     pub sample_rate: atomic::U64,
     pub tracks: Vec<Track>,
+}
+impl Project {
+    fn new(sample_rate: u64) -> Self {
+        Self {
+            sample_rate: atomic::U64::from(sample_rate),
+            tracks: vec![],
+        }
+    }
 }
 
 /// Data structure for track.

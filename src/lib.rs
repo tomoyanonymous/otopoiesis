@@ -13,18 +13,21 @@ pub mod gui;
 pub mod parameter;
 pub mod utils;
 
-#[cfg(target_arch = "wasm32")]
+#[cfg(not(feature = "web"))]
+pub mod cli;
+
+#[cfg(feature = "web")]
 use eframe::wasm_bindgen::{self, prelude::*};
 
-#[cfg(target_arch = "wasm32")]
+#[cfg(feature = "web")]
 extern crate wee_alloc;
 
 // Use `wee_alloc` as the global allocator.
-#[cfg(target_arch = "wasm32")]
+#[cfg(feature = "web")]
 #[global_allocator]
 static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 
-#[cfg(target_arch = "wasm32")]
+#[cfg(feature = "web")]
 #[wasm_bindgen]
 pub struct WebHandle {
     #[allow(dead_code)]
@@ -32,7 +35,7 @@ pub struct WebHandle {
 }
 
 /// Call this once from the HTML.
-#[cfg(target_arch = "wasm32")]
+#[cfg(feature = "web")]
 #[wasm_bindgen]
 pub async fn start(canvas_id: &str) -> Result<WebHandle, eframe::wasm_bindgen::JsValue> {
     console_error_panic_hook::set_once();
@@ -40,7 +43,7 @@ pub async fn start(canvas_id: &str) -> Result<WebHandle, eframe::wasm_bindgen::J
     eframe::start_web(
         canvas_id,
         web_options,
-        Box::new(|cc| Box::new(app::Model::new(cc))),
+        Box::new(|cc| Box::new(app::Model::new(cc, None))),
     )
     .await
     .map(|handle| WebHandle { handle })

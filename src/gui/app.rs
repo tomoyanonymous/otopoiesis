@@ -42,6 +42,19 @@ impl<'a> Model<'a> {
                 ui.label("otopoiesis");
                 ui.horizontal(|ui| {
                     ui.menu_button("File", |ui| {
+                        if let Ok(mut app) = self.app.lock() {
+                            if ui.button("Open").clicked() {
+                                app.open_file();
+                            }
+                            ui.add_enabled_ui(app.project_file.is_some(), |ui| {
+                                if ui.button("Save").clicked() {
+                                    app.save_as_file();
+                                }
+                            });
+                            if ui.button("Save as").clicked() {
+                                app.save_as_file();
+                            }
+                        }
                         if ui.button("Force Sync Ui State(Debug)").clicked() {
                             #[cfg(debug_assertions)]
                             self.state

@@ -68,7 +68,7 @@ pub enum Generator {
     Noise(),
     ///mostly for debugging filter.
     Constant,
-    #[cfg(not(target_arch = "wasm32"))]
+    #[cfg(not(feature = "web"))]
     FilePlayer(Arc<FilePlayerParam>),
 }
 

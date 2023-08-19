@@ -1,0 +1,127 @@
+{
+  "sample_rate": 44100,
+  "tracks": [
+    {
+      "Regions": [
+        {
+          "range": [
+            0.43088195800781254,
+            1.430881958007812
+          ],
+          "content": {
+            "Transformer": [
+              {
+                "FadeInOut": {
+                  "time_in": 0.1,
+                  "time_out": 0.1
+                }
+              },
+              {
+                "range": [
+                  0.43088195800781254,
+                  1.430881958007812
+                ],
+                "content": {
+                  "Generator": {
+                    "Oscillator": [
+                      "SineWave",
+                      {
+                        "amp": {
+                          "value": 0.8,
+                          "range": {
+                            "start": 0.0,
+                            "end": 1.0
+                          },
+                          "label": "amp"
+                        },
+                        "freq": {
+                          "value": 440.0,
+                          "range": {
+                            "start": 20.0,
+                            "end": 20000.0
+                          },
+                          "label": "freq"
+                        },
+                        "phase": {
+                          "value": 0.0,
+                          "range": {
+                            "start": 0.0,
+                            "end": 6.2831855
+                          },
+                          "label": "phase"
+                        }
+                      }
+                    ]
+                  }
+                },
+                "label": "region1"
+              }
+            ]
+          },
+          "label": "region1"
+        }
+      ]
+    },
+    {
+      "Regions": [
+        {
+          "range": [
+            1.3325192260742187,
+            2.3325192260742185
+          ],
+          "content": {
+            "Transformer": [
+              {
+                "FadeInOut": {
+                  "time_in": 0.1,
+                  "time_out": 0.1
+                }
+              },
+              {
+                "range": [
+                  1.3325192260742187,
+                  2.3325192260742185
+                ],
+                "content": {
+                  "Generator": {
+                    "Oscillator": [
+                      "SineWave",
+                      {
+                        "amp": {
+                          "value": 0.8,
+                          "range": {
+                            "start": 0.0,
+                            "end": 1.0
+                          },
+                          "label": "amp"
+                        },
+                        "freq": {
+                          "value": 440.0,
+                          "range": {
+                            "start": 20.0,
+                            "end": 20000.0
+                          },
+                          "label": "freq"
+                        },
+                        "phase": {
+                          "value": 0.0,
+                          "range": {
+                            "start": 0.0,
+                            "end": 6.2831855
+                          },
+                          "label": "phase"
+                        }
+                      }
+                    ]
+                  }
+                },
+                "label": "region2"
+              }
+            ]
+          },
+          "label": "region2"
+        }
+      ]
+    }
+  ]
+}
