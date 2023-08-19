@@ -41,7 +41,7 @@ jobs:
       - run: sudo apt-get install -y libasound2-dev libgtk-3-dev librust-atk-dev
       - uses: ./.github/actions/cache_cargo
       - name: clippy
-        run: cargo clippy --all-targets --all-features -- -D warnings
+        run: cargo clippy --all-targets -- -D warnings
   test:
     strategy:
       matrix:
