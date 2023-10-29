@@ -266,7 +266,7 @@ pub fn render_region_offline_async(
 
 #[cfg(test)]
 mod test {
-    use crate::parameter::Parameter;
+    use crate::parameter::{FloatParameter, Parameter};
 
     use super::*;
 
@@ -397,7 +397,9 @@ mod test {
         let sample_rate = 48000;
         let range = 0.1..0.2;
 
-        let generator = data::Content::Generator(data::Generator::Constant);
+        let generator = data::Content::Generator(data::Generator::Constant(Arc::new(
+            FloatParameter::new(0.0, 0.0..=1.0, "test"),
+        )));
         let range_atomic = AtomicRange::<f64>::new(range.start, range.end);
 
         let data = data::Region::new(

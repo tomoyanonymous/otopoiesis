@@ -3,7 +3,11 @@ use crate::data;
 #[cfg(not(feature = "web"))]
 pub mod fileplayer;
 pub mod oscillator;
+pub mod constant;
+pub mod noise;
 
+use constant::Constant;
+use noise::Noise;
 pub trait GeneratorComponent {
     type Params;
     fn get_params(&self) -> &Self::Params;
@@ -42,22 +46,6 @@ where
     }
 }
 
-#[derive(Clone, Debug)]
-pub struct Constant();
-impl Component for Constant {
-    fn get_input_channels(&self) -> u64 {
-        0
-    }
-    fn get_output_channels(&self) -> u64 {
-        2
-    }
-
-    fn prepare_play(&mut self, _info: &PlaybackInfo) {}
-    fn render(&mut self, _input: &[f32], output: &mut [f32], _info: &PlaybackInfo) {
-        output.fill(1.0);
-    }
-}
-
 pub fn get_component_for_generator(kind: &data::Generator) -> Box<dyn Component + Send + Sync> {
     match kind {
         data::Generator::Oscillator(fun, param) => Box::new(match fun {
@@ -68,8 +56,8 @@ pub fn get_component_for_generator(kind: &data::Generator) -> Box<dyn Component 
             }
             data::OscillatorFun::Triangular => oscillator::triangle(param.clone()),
         }),
-        data::Generator::Constant => Box::new(Constant()),
-        data::Generator::Noise() => todo!(),
+        data::Generator::Constant(param) => Box::new(Constant(param.clone())),
+        data::Generator::Noise() => Box::new(Noise{}),
         #[cfg(not(feature = "web"))]
         data::Generator::FilePlayer(param) => Box::new(fileplayer::FilePlayer::new(param.clone())),
     }
