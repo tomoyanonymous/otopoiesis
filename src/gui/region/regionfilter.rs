@@ -30,7 +30,7 @@ use crate::gui::region;
 // }
 
 pub enum RegionFilter<'a> {
-    FadeInOut(fadeinout::FadeHandle<'a>),
+    FadeInOut(fadeinout::FadeInOut<'a>),
     Replicate(replicate::Replicate<'a>),
 }
 pub enum RegionFilterState {

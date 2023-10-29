@@ -88,53 +88,42 @@ impl eframe::App for Model {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         {
             let mut app = self.app.lock().unwrap();
-
-            if ctx
-                .input_mut()
-                .consume_shortcut(&egui::KeyboardShortcut::new(
+            ctx.input_mut(|i| {
+                if i.consume_shortcut(&egui::KeyboardShortcut::new(
                     egui::Modifiers::COMMAND,
                     egui::Key::Z,
-                ))
-                && app.can_undo()
-            {
-                app.undo();
-                self.ui.sync_state(&app.project.tracks);
-            }
-            if ctx
-                .input_mut()
-                .consume_shortcut(&egui::KeyboardShortcut::new(
+                )) && app.can_undo()
+                {
+                    app.undo();
+                    self.ui.sync_state(&app.project.tracks);
+                }
+                if i.consume_shortcut(&egui::KeyboardShortcut::new(
                     egui::Modifiers::COMMAND.plus(egui::Modifiers::SHIFT),
                     egui::Key::Z,
-                ))
-                && app.can_redo()
-            {
-                app.redo();
-                self.ui.sync_state(&app.project.tracks);
-            }
-            if ctx
-                .input_mut()
-                .consume_shortcut(&egui::KeyboardShortcut::new(
+                )) && app.can_redo()
+                {
+                    app.redo();
+                    self.ui.sync_state(&app.project.tracks);
+                }
+                if i.consume_shortcut(&egui::KeyboardShortcut::new(
                     egui::Modifiers::NONE,
                     egui::Key::Space,
-                ))
-            {
-                let op = if app.transport.is_playing() {
-                    data::PlayOp::Pause
-                } else {
-                    data::PlayOp::Play
-                };
-                app.transport.request_play(op);
-            }
-            if ctx
-                .input_mut()
-                .consume_shortcut(&egui::KeyboardShortcut::new(
+                )) {
+                    let op = if app.transport.is_playing() {
+                        data::PlayOp::Pause
+                    } else {
+                        data::PlayOp::Play
+                    };
+                    app.transport.request_play(op);
+                }
+                if i.consume_shortcut(&egui::KeyboardShortcut::new(
                     egui::Modifiers::NONE,
                     egui::Key::ArrowLeft,
-                ))
-            {
-                app.transport.time.store(0);
-                self.audio.prepare_play();
-            }
+                )) {
+                    app.transport.time.store(0);
+                    self.audio.prepare_play();
+                }
+            });
         }
         let mut mainui = gui::app::Model::new(self.app.clone(), &mut self.ui);
         mainui.show_ui(ctx);

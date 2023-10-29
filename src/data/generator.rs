@@ -67,7 +67,7 @@ pub enum Generator {
     Oscillator(OscillatorFun, Arc<OscillatorParam>),
     Noise(),
     ///mostly for debugging filter.
-    Constant,
+    Constant(Arc<FloatParameter>),
     #[cfg(not(feature = "web"))]
     FilePlayer(Arc<FilePlayerParam>),
 }

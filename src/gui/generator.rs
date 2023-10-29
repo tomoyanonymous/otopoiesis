@@ -144,7 +144,7 @@ impl<'a> Generator<'a> {
 impl<'a> egui::Widget for Generator<'a> {
     fn ui(mut self, ui: &mut egui::Ui) -> egui::Response {
         ui.vertical(|ui| {
-            let (response, painter) = ui.allocate_painter(self.get_size(), Sense::hover());
+            let (response, painter) = ui.allocate_painter(self.get_size(), Sense::click_and_drag());
 
             if self.state.samples.is_empty() {
                 self.update_shape(&ui.ctx().style());
@@ -155,20 +155,30 @@ impl<'a> egui::Widget for Generator<'a> {
                 response.rect.size().y,
             ));
             painter.add(shape_c);
-
-            let _controller = match &self.param {
-                data::Generator::Oscillator(_kind, osc) => {
-                    let slider = ui.add(super::slider_from_parameter(&osc.freq, true));
-                    if slider.drag_released() && slider.changed() {
-                        self.update_shape(&ui.ctx().style());
-                    }
-                    slider
-                }
-                data::Generator::Noise() => todo!(),
-                data::Generator::Constant => unimplemented!(),
-                #[cfg(not(feature = "web"))]
-                data::Generator::FilePlayer(param) => ui.label(param.path.to_string()),
-            };
+            ui.set_max_width(self.state.shape.visual_bounding_rect().width());
+            let _controller = ui.push_id(ui.next_auto_id(), |ui| {
+                ui.collapsing("parameter", |ui| {
+                    match &self.param {
+                        data::Generator::Oscillator(_kind, osc) => {
+                            let slider = ui.add(super::slider_from_parameter(&osc.freq, true));
+                            if slider.drag_released() && slider.changed() {
+                                self.update_shape(&ui.ctx().style());
+                            }
+                            slider
+                        }
+                        data::Generator::Noise() => ui.label("Noise"),
+                        data::Generator::Constant(param) => {
+                            let slider = ui.add(super::slider_from_parameter(&param, true));
+                            if slider.drag_released() && slider.changed() {
+                                self.update_shape(&ui.ctx().style());
+                            }
+                            slider
+                        }
+                        #[cfg(not(feature = "web"))]
+                        data::Generator::FilePlayer(param) => ui.label(param.path.to_string()),
+                    };
+                });
+            });
             response
                 .on_hover_cursor(egui::CursorIcon::Grab)
                 .interact(egui::Sense::click_and_drag())

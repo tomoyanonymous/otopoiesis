@@ -5,7 +5,7 @@ mod region_handle;
 pub mod regionfilter;
 use region_handle::{HandleMode, UiBar, UiBarState};
 
-use self::regionfilter::fadeinout::FadeHandle;
+use self::regionfilter::fadeinout::FadeInOut;
 use self::regionfilter::replicate::Replicate;
 use self::regionfilter::RegionFilterState;
 use self::regionfilter::{fadeinout, replicate};
@@ -76,6 +76,7 @@ impl<'a> Model<'a> {
         let mut main = main.clone();
         if main.drag_started() {
             self.state.offset_saved = self.params.range.start() as i64;
+            
         }
         if main.dragged() {
             let offset = main.drag_delta().x as f64 / gui::PIXELS_PER_SEC_DEFAULT as f64;
@@ -118,7 +119,7 @@ impl<'a> egui::Widget for Model<'a> {
                             self.params.range.set_start(origin.range.start());
                             self.params.range.set_end(origin.range.end());
                             (
-                                ui.add(regionfilter::RegionFilter::FadeInOut(FadeHandle::new(
+                                ui.add(regionfilter::RegionFilter::FadeInOut(FadeInOut::new(
                                     param.as_ref(),
                                     origin.as_mut(),
                                     s,

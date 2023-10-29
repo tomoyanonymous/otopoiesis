@@ -72,7 +72,7 @@ impl<'a> egui::Widget for UiBar<'a> {
 
         if response.dragged() {
             painter.rect_filled(rect, 0., ui.style().visuals.strong_text_color());
-            ui.ctx().output().cursor_icon = icon;
+            ui.ctx().output_mut(|o| o.cursor_icon = icon);
         }
 
         self.react(&response);

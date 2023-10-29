@@ -28,3 +28,15 @@ fn slider_from_parameter(param: &FloatParameter, is_log: bool) -> egui::Slider<'
     )
     .logarithmic(is_log)
 }
+
+// struct UI<'a,P,A>{
+    
+// }
+
+// trait UI<'a,P,A>{
+//     type Param;
+//     type State;
+//     type UI = (&'a mut Param, &'a mut State);
+
+
+// }
