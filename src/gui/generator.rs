@@ -72,8 +72,8 @@ pub trait GeneratorUI<'a> {
 }
 
 pub struct Generator<'a> {
-    param: &'a mut data::Generator,
-    displayed_range: &'a mut AtomicRange<f64>,
+    param: &'a data::Generator,
+    displayed_range: &'a AtomicRange<f64>,
     state: &'a mut State,
 }
 
@@ -93,8 +93,8 @@ impl<'a> GeneratorUI<'a> for Generator<'a> {
 
 impl<'a> Generator<'a> {
     pub fn new(
-        param: &'a mut data::Generator,
-        displayed_range: &'a mut AtomicRange<f64>,
+        param: &'a data::Generator,
+        displayed_range: &'a AtomicRange<f64>,
         state: &'a mut State,
     ) -> Self {
         Self {

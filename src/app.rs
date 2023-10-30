@@ -1,4 +1,5 @@
 use atomic::SimpleAtomic;
+use undo::Action;
 
 use std::sync::{Arc, Mutex};
 
@@ -87,7 +88,13 @@ impl Model {
 impl eframe::App for Model {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         {
+            
             let mut app = self.app.lock().unwrap();
+            let need_update  = app.consume_actions();
+            if need_update{
+                self.ui.sync_state(&app.project.tracks);
+            }
+
             ctx.input_mut(|i| {
                 if i.consume_shortcut(&egui::KeyboardShortcut::new(
                     egui::Modifiers::COMMAND,

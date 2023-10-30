@@ -60,12 +60,12 @@ impl State {
 }
 
 pub struct Model<'a> {
-    pub params: &'a mut data::Region,
+    pub params: &'a data::Region,
     pub state: &'a mut State,
 }
 
 impl<'a> Model<'a> {
-    pub fn new(params: &'a mut data::Region, state: &'a mut State) -> Self {
+    pub fn new(params: &'a data::Region, state: &'a mut State) -> Self {
         Self { params, state }
     }
     pub fn get_current_amp(&self) -> f32 {
@@ -76,7 +76,6 @@ impl<'a> Model<'a> {
         let mut main = main.clone();
         if main.drag_started() {
             self.state.offset_saved = self.params.range.start() as i64;
-            
         }
         if main.dragged() {
             let offset = main.drag_delta().x as f64 / gui::PIXELS_PER_SEC_DEFAULT as f64;
@@ -98,20 +97,24 @@ impl<'a> std::hash::Hash for Model<'a> {
 
 impl<'a> egui::Widget for Model<'a> {
     fn ui(mut self, ui: &mut egui::Ui) -> egui::Response {
-        let height = gui::TRACK_HEIGHT;
+        let height = gui::TRACK_HEIGHT+30.0;
 
         let bar_width = 5.;
         let start = self.params.range.start();
         let end = self.params.range.end();
         let min_start = 0.0;
         let max_end = end + self.params.range.getrange();
+        
+        //for debug
+        // let rect = ui.available_rect_before_wrap();
+        // ui.painter().rect_filled(rect, 0.0, egui::Color32::BLUE);
 
         ui.spacing_mut().item_spacing = egui::vec2(0., 0.);
 
-        ui.horizontal(|ui| {
+        ui.horizontal_top(|ui| {
             let bar_size = egui::vec2(bar_width, height);
 
-            let (main, is_interactive) = match (&mut self.params.content, &mut self.state.content) {
+            let (main, is_interactive) = match (&self.params.content, &mut self.state.content) {
                 (data::Content::Transformer(filter, origin), ContentModel::RegionFilter(state)) => {
                     match (filter, state) {
                         (data::RegionFilter::Gain, _) => todo!(),
@@ -119,9 +122,10 @@ impl<'a> egui::Widget for Model<'a> {
                             self.params.range.set_start(origin.range.start());
                             self.params.range.set_end(origin.range.end());
                             (
+                                
                                 ui.add(regionfilter::RegionFilter::FadeInOut(FadeInOut::new(
                                     param.as_ref(),
-                                    origin.as_mut(),
+                                    origin.as_ref(),
                                     s,
                                 ))),
                                 false,
@@ -132,7 +136,7 @@ impl<'a> egui::Widget for Model<'a> {
                             (
                                 ui.add(regionfilter::RegionFilter::Replicate(Replicate::new(
                                     param,
-                                    origin.as_mut(),
+                                    origin.as_ref(),
                                     s,
                                 ))),
                                 false,
@@ -144,6 +148,7 @@ impl<'a> egui::Widget for Model<'a> {
                     }
                 }
                 (data::Content::Generator(param), ContentModel::Generator(_genmodel, genstate)) => {
+                    ui.add_space(-bar_width);
                     let mut handle_start = UiBar::new(
                         &self.params.range.0,
                         &mut self.state.range_handles[0],
@@ -151,8 +156,7 @@ impl<'a> egui::Widget for Model<'a> {
                     );
                     handle_start.set_limit(min_start..=end);
                     let startui = ui.add_sized(bar_size, handle_start);
-                    let gen =
-                        super::generator::Generator::new(param, &mut self.params.range, genstate);
+                    let gen = super::generator::Generator::new(param, &self.params.range, genstate);
                     let main = ui.add(gen);
                     let mut handle_end = UiBar::new(
                         &self.params.range.1,
@@ -162,11 +166,8 @@ impl<'a> egui::Widget for Model<'a> {
                     handle_end.set_limit(start..=max_end);
                     let endui = ui.add_sized(bar_size, handle_end);
                     if startui.union(endui).drag_released() {
-                        let mut gen = super::generator::Generator::new(
-                            param,
-                            &mut self.params.range,
-                            genstate,
-                        );
+                        let mut gen =
+                            super::generator::Generator::new(param, &self.params.range, genstate);
                         gen.update_shape(&ui.ctx().style());
                     }
 

@@ -30,13 +30,13 @@ impl State {
 }
 pub struct FadeInOut<'a> {
     param: &'a data::FadeParam,
-    origin_ui: &'a mut data::Region,
+    origin_ui: &'a data::Region,
     state: &'a mut State,
 }
 impl<'a> FadeInOut<'a> {
     pub fn new(
         param: &'a data::FadeParam,
-        origin_ui: &'a mut data::Region,
+        origin_ui: &'a data::Region,
         state: &'a mut State,
     ) -> Self {
         Self {

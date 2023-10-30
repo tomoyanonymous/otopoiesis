@@ -1,7 +1,10 @@
 use crate::action;
+use crate::action::Action;
+use crate::action::AddTrack;
 use crate::data;
 use crate::gui;
 use crate::utils::atomic::{self, SimpleAtomic};
+use std::sync::mpsc;
 use std::sync::{Arc, Mutex};
 
 pub struct State {
@@ -23,7 +26,8 @@ impl State {
 }
 
 pub struct Model<'a> {
-    pub app: Arc<Mutex<data::AppModel>>,
+    // pub action_sender: mpsc::Sender<Action>,
+    app: &'a mut data::AppModel,
     state: &'a mut State,
 }
 
@@ -36,7 +40,7 @@ fn param_to_track(track_p: &[data::Track]) -> Vec<gui::track::State> {
 }
 
 impl<'a> Model<'a> {
-    pub fn new(app: Arc<Mutex<data::AppModel>>, state: &'a mut State) -> Self {
+    pub fn new(app: &'a mut data::AppModel, state: &'a mut State) -> Self {
         Self { app, state }
     }
 
@@ -64,11 +68,13 @@ impl<'a> Model<'a> {
             + rect.left();
         painter.line_segment([[x, rect.top()].into(), [x, rect.bottom()].into()], stroke);
     }
-    fn add_track(&mut self) {
-        if let Ok(mut app) = self.app.lock() {
-            let _res = action::add_track(&mut app, data::Track::new());
-            self.state.track = param_to_track(&app.project.tracks);
-        }
+    fn add_track(&self) {
+        // if let Ok(mut app) = self.app.lock() {
+        self.app
+            .action_tx
+            .send(Action::from(AddTrack::new(data::Track::new())));
+
+        // self.state.track = param_to_track(&app.project.tracks);
     }
 }
 
@@ -78,7 +84,13 @@ impl<'a> egui::Widget for Model<'a> {
             let res = ui
                 .vertical(|ui| {
                     for (i, state) in self.state.track.iter_mut().enumerate() {
-                        ui.add(gui::track::Model::new(i, self.app.clone(), state));
+                        ui.add(gui::track::Model::new(
+                            i,
+                            self.app.action_tx.clone(),
+                            self.app.get_track_for_id_mut(i).unwrap(),
+                            state,
+                        ));
+                        ui.add_space(30.0);
                     }
                 })
                 .response;

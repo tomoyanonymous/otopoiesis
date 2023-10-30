@@ -86,7 +86,7 @@ impl std::fmt::Display for Action {
 // }
 
 #[derive(Debug)]
-struct AddRegion {
+pub struct AddRegion {
     elem: data::Region,
     track_num: usize,
     pos: usize,
@@ -146,13 +146,13 @@ impl undo::Action for AddRegion {
 impl DisplayableAction for AddRegion {}
 
 #[derive(Debug)]
-struct AddTrack {
+pub struct AddTrack {
     elem: data::Track,
     pos: usize,
 }
 
 impl AddTrack {
-    fn new(elem: data::Track) -> Self {
+    pub fn new(elem: data::Track) -> Self {
         Self { elem, pos: 0 }
     }
 }
@@ -185,17 +185,17 @@ impl std::fmt::Display for AddTrack {
 }
 impl DisplayableAction for AddTrack {}
 
-pub fn add_region(
-    app: &mut data::AppModel,
-    track_num: usize,
-    region: data::Region,
-) -> Result<(), Error> {
-    app.history.apply(
-        &mut app.project,
-        Action::from(AddRegion::new(region, track_num)),
-    )
-}
-pub fn add_track(app: &mut data::AppModel, track: data::Track) -> Result<(), Error> {
-    app.history
-        .apply(&mut app.project, Action::from(AddTrack::new(track)))
-}
+// pub fn add_region(
+//     app: &mut data::AppModel,
+//     track_num: usize,
+//     region: data::Region,
+// ) -> Result<(), Error> {
+//     app.history.apply(
+//         &mut app.project,
+//         Action::from(AddRegion::new(region, track_num)),
+//     )
+// }
+// pub fn add_track(app: &mut data::AppModel, track: data::Track) -> Result<(), Error> {
+//     app.history
+//         .apply(&mut app.project, Action::from(AddTrack::new(track)))
+// }

@@ -1,6 +1,6 @@
 use crate::{data, gui};
 pub struct RegionContent<'a> {
-    param: &'a mut data::Region,
+    param: &'a data::Region,
     state: &'a mut super::region::State,
 }
 
@@ -26,14 +26,14 @@ impl State {
 
 pub struct Replicate<'a> {
     pub param: &'a data::ReplicateParam,
-    pub origin: &'a mut data::Region,
+    pub origin: &'a data::Region,
     state: &'a mut State,
 }
 
 impl<'a> Replicate<'a> {
     pub fn new(
         param: &'a data::ReplicateParam,
-        origin: &'a mut data::Region,
+        origin: &'a data::Region,
         state: &'a mut State,
     ) -> Self {
         Self {

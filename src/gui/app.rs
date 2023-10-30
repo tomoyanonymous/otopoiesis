@@ -104,10 +104,12 @@ impl<'a> Model<'a> {
         });
         egui::CentralPanel::default().show(ctx, |ui| {
             egui::ScrollArea::both().show(ui, |ui| {
-                ui.add(super::timeline::Model::new(
-                    self.app.clone(),
-                    &mut self.state.timeline,
-                ));
+                if let Ok(mut app) = self.app.try_lock() {
+                    ui.add(super::timeline::Model::new(
+                        &mut app,
+                        &mut self.state.timeline,
+                    ));
+                }
                 egui::panel::TopBottomPanel::bottom("footer")
                     .show(ctx, |ui| ui.add(&mut self.state.transport));
             });

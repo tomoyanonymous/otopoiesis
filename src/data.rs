@@ -1,13 +1,13 @@
 //! The main data format like project file, track, region and etc. Can be (de)serialized to/from json with serde.
 
-use crate::action;
+use crate::action::{self, Action};
 use crate::app::filemanager::{self, FileManager};
 use crate::utils::{atomic, AtomicRange, SimpleAtomic};
 
 use rfd;
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
-use std::sync::Arc;
+use std::sync::{mpsc, Arc};
 use undo;
 
 pub mod generator;
@@ -52,6 +52,8 @@ pub struct AppModel {
     pub project_str: String,
     pub project_file: Option<String>,
     pub history: undo::Record<action::Action>,
+    pub action_tx: mpsc::Sender<action::Action>,
+    pub action_rx: mpsc::Receiver<action::Action>,
 }
 
 impl AppModel {
@@ -66,7 +68,7 @@ impl AppModel {
         if let Some(file) = project_file.clone() {
             let _ = filemanager::get_global_file_manager().read_to_string(file, &mut project_str);
         }
-
+        let (action_tx, action_rx) = mpsc::channel();
         Self {
             transport,
             global_setting,
@@ -75,6 +77,8 @@ impl AppModel {
             project_str,
             project_file,
             history: undo::Record::new(),
+            action_tx,
+            action_rx,
         }
     }
     pub fn can_undo(&self) -> bool {
@@ -148,8 +152,19 @@ impl AppModel {
             self.project = proj.clone();
         })
     }
-    pub fn get_track_for_id(&mut self, id: usize) -> Option<&mut Track> {
+    pub fn get_track_for_id_mut(&mut self, id: usize) -> Option<&mut Track> {
         self.project.tracks.get_mut(id)
+    }
+    pub fn get_track_for_id(&self, id: usize) -> Option<&Track> {
+        self.project.tracks.get(id)
+    }
+    pub fn consume_actions(&mut self) ->bool{
+        let mut ui_need_update = false;
+        for action_received in self.action_rx.try_iter(){
+            let _res = self.history.apply(&mut self.project, action_received);
+            ui_need_update=true;
+        }
+        ui_need_update
     }
 }
 
