@@ -94,13 +94,12 @@ impl<'a> egui::Widget for Model<'a> {
                     }
                 })
                 .response;
-            let add_track_button = ui.button("add track");
+            let add_track_button = ui.button("+").on_hover_text("Add new Track");
             if add_track_button.clicked() {
                 self.add_track();
             }
 
             let painter = ui.painter_at(ui.clip_rect());
-            self.draw_frame(&painter, ui.style());
             self.draw_current_time(&painter, ui.style());
 
             res

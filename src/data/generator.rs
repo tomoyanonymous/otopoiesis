@@ -24,7 +24,7 @@ impl Default for OscillatorParam {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub enum OscillatorFun {
     SineWave,
     /// up or down
@@ -33,7 +33,11 @@ pub enum OscillatorFun {
     Rectanglular(Arc<atomic::F32>),
     Triangular,
 }
-
+impl Default for OscillatorFun{
+    fn default() -> Self {
+        OscillatorFun::SineWave
+    }
+}
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct FilePlayerParam {
     pub path: String,
