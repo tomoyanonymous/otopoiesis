@@ -1,6 +1,6 @@
 //! The main data format like project file, track, region and etc. Can be (de)serialized to/from json with serde.
 
-use crate::action::{self, Action};
+use crate::action;
 use crate::app::filemanager::{self, FileManager};
 use crate::utils::{atomic, AtomicRange, SimpleAtomic};
 

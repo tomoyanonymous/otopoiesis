@@ -17,7 +17,8 @@ fn main() {
         "otopoiesis",
         native_options,
         Box::new(|cc| Box::new(app::Model::new(cc, Some(arg)))),
-    );
+    )
+    .ok();
 }
 
 #[cfg(feature = "web")]

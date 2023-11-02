@@ -2,7 +2,6 @@ use crate::data;
 use crate::gui;
 use crate::gui::PIXELS_PER_SEC_DEFAULT;
 use crate::gui::TRACK_HEIGHT;
-use crate::utils::atomic;
 use crate::utils::{AtomicRange, SimpleAtomic};
 
 /// origin needed to be boxed to be recursive data structure.

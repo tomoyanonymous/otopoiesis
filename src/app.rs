@@ -1,6 +1,4 @@
 use atomic::SimpleAtomic;
-use undo::Action;
-
 use std::sync::{Arc, Mutex};
 
 use crate::audio::renderer::{Renderer, RendererBase};

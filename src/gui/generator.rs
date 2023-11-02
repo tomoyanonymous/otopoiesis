@@ -6,10 +6,7 @@ use crate::{
     data,
     utils::AtomicRange,
 };
-use egui::{
-    epaint::{PathShape, Shape},
-    Pos2, Sense, Vec2,
-};
+use egui::{epaint::Shape, Pos2, Sense, Vec2};
 
 use std::ops::RangeInclusive;
 
@@ -114,26 +111,7 @@ impl<'a> Generator<'a> {
         let from = 0.0..=self.get_samples().len() as f64;
         let to = 0.0..=self.get_size().x as f64;
         let y_origin = self.get_size().y;
-        let points_upper = self
-            .get_samples()
-            .iter()
-            .enumerate()
-            .map(|(i, s)| {
-                let x = egui::emath::remap(i as f64, from.clone(), to.clone());
-                let y = *s * y_origin * 0.5;
-                egui::pos2(x as f32, y)
-            })
-            .collect::<Vec<Pos2>>();
-        let points_lower = points_upper
-            .clone()
-            .into_iter()
-            .rev()
-            .map(|p| egui::pos2(p.x, -p.y));
 
-        // let points_to_draw = points_upper
-        //     .into_iter()
-        //     .chain(points_lower)
-        //     .collect::<Vec<Pos2>>();
         let points_to_draw = self
             .get_samples()
             .iter()
@@ -145,8 +123,6 @@ impl<'a> Generator<'a> {
             })
             .collect::<Vec<Pos2>>();
         let visu = style.visuals.widgets.active;
-        // let pathshape =
-        // PathShape::convex_polygon(points_to_draw, visu.fg_stroke.color, visu.fg_stroke);
         self.state.shape = Shape::line(points_to_draw, visu.fg_stroke);
     }
 }

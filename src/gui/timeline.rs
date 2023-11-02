@@ -1,11 +1,8 @@
-use crate::action;
-use crate::action::Action;
-use crate::action::AddTrack;
+use crate::action::{Action, AddTrack};
 use crate::data;
 use crate::gui;
 use crate::utils::atomic::{self, SimpleAtomic};
-use std::sync::mpsc;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 pub struct State {
     track: Vec<gui::track::State>,
@@ -69,12 +66,10 @@ impl<'a> Model<'a> {
         painter.line_segment([[x, rect.top()].into(), [x, rect.bottom()].into()], stroke);
     }
     fn add_track(&self) {
-        // if let Ok(mut app) = self.app.lock() {
-        self.app
+        let _ = self
+            .app
             .action_tx
             .send(Action::from(AddTrack::new(data::Track::new())));
-
-        // self.state.track = param_to_track(&app.project.tracks);
     }
 }
 
