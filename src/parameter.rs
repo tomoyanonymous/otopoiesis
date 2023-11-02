@@ -8,6 +8,8 @@ pub trait Parameter<T> {
     fn new(init: T, range: RangeInclusive<T>, label: impl Into<String>) -> Self;
     fn get(&self) -> T;
     fn set(&self, v: T);
+    fn get_range(&self) -> &RangeInclusive<T>;
+    fn get_label(&self) -> &str;
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -35,13 +37,20 @@ impl Parameter<f32> for FloatParameter {
         self.value
             .store(v.max(*self.range.start()).min(*self.range.end()));
     }
+
+    fn get_label(&self) -> &str {
+        &self.label
+    }
+    fn get_range(&self) -> &RangeInclusive<f32> {
+        &self.range
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct UIntParameter {
     value: atomic::U64,
     pub range: RangeInclusive<u64>,
-    _label: String,
+    label: String,
 }
 
 impl Parameter<u64> for UIntParameter {
@@ -49,7 +58,7 @@ impl Parameter<u64> for UIntParameter {
         Self {
             value: atomic::U64::from(init),
             range,
-            _label: label.into(),
+            label: label.into(),
         }
     }
 
@@ -60,6 +69,13 @@ impl Parameter<u64> for UIntParameter {
     fn set(&self, v: u64) {
         self.value
             .store(v.max(*self.range.start()).min(*self.range.end()));
+    }
+
+    fn get_label(&self) -> &str {
+        &self.label
+    }
+    fn get_range(&self) -> &RangeInclusive<u64> {
+        &self.range
     }
 }
 

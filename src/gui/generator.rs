@@ -4,6 +4,7 @@ use crate::{
         region::{RangedComponent, RangedComponentDyn},
     },
     data,
+    gui::parameter::slider_from_parameter,
     utils::AtomicRange,
 };
 use egui::{epaint::Shape, Pos2, Sense, Vec2};
@@ -143,18 +144,26 @@ impl<'a> egui::Widget for Generator<'a> {
             painter.add(shape_c);
             ui.set_max_width(self.state.shape.visual_bounding_rect().width());
             let _controller = ui.push_id(ui.next_auto_id(), |ui| {
-                ui.collapsing("parameter", |ui| {
+                egui::menu::menu_button(ui, "parameter", |ui| {
+                    //  ui.collapsing("parameter", |ui| {
                     match &self.param {
                         data::Generator::Oscillator(_kind, osc) => {
-                            let slider = ui.add(super::slider_from_parameter(&osc.freq, true));
-                            if slider.drag_released() && slider.changed() {
+                            let response = ui
+                                .vertical(|ui| {
+                                    let f = slider_from_parameter(&osc.freq, true, ui);
+                                    let a = slider_from_parameter(&osc.amp, false, ui);
+                                    let p = slider_from_parameter(&osc.phase, false, ui);
+                                    f.union(a.union(p))
+                                })
+                                .response;
+                            if response.drag_released() && response.changed() {
                                 self.update_shape(&ui.ctx().style());
                             }
-                            slider
+                            response
                         }
                         data::Generator::Noise() => ui.label("Noise"),
                         data::Generator::Constant(param) => {
-                            let slider = ui.add(super::slider_from_parameter(&param, true));
+                            let slider = slider_from_parameter(&param, true, ui);
                             if slider.drag_released() && slider.changed() {
                                 self.update_shape(&ui.ctx().style());
                             }
