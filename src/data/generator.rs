@@ -18,7 +18,7 @@ impl Default for OscillatorParam {
     fn default() -> Self {
         Self {
             amp: FloatParameter::new(0.8, 0.0..=1.0, "amp"),
-            freq: FloatParameter::new(440.0, 20.0..=20000.0, "freq"),
+            freq: FloatParameter::new(440.0, 0.01..=20000.0, "freq"),
             phase: FloatParameter::new(0.0, 0.0..=std::f32::consts::PI * 2.0, "phase"),
         }
     }
