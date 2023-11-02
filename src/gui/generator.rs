@@ -53,11 +53,11 @@ pub trait GeneratorUI<'a> {
     }
     fn update_samples(&mut self) {
         let width = self.get_displayed_duration() * super::PIXELS_PER_SEC_DEFAULT as f64;
+        let pix_len = width.ceil() as usize;
         let sample_rate = 44100u32;
         let channels = 2;
-        let len_samples = (sample_rate as f64 / self.get_displayed_duration()).ceil() as usize;
-        let pix_len = width.ceil() as usize;
-        let mut buf = vec![0.0f32; len_samples * channels];
+        let numsamples = (sample_rate as f64 * self.get_displayed_duration()).ceil() as usize;
+        let mut buf = vec![0.0f32; numsamples * channels];
         let audio_component = audio::generator::get_component_for_generator(self.get_generator());
         let mut ranged_component = RangedComponentDyn::new(
             audio_component,
@@ -123,7 +123,8 @@ impl<'a> Generator<'a> {
                 egui::pos2(x as f32, y)
             })
             .collect::<Vec<Pos2>>();
-        let visu = style.visuals.widgets.active;
+        let mut visu = style.visuals.widgets.active.clone();
+        visu.fg_stroke.width = 1.0;
         self.state.shape = Shape::line(points_to_draw, visu.fg_stroke);
     }
 }
