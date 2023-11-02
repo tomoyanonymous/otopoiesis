@@ -138,10 +138,7 @@ impl<'a> egui::Widget for Generator<'a> {
                 self.update_shape(&ui.ctx().style());
             }
             let mut shape_c = self.state.shape.clone();
-            shape_c.translate(egui::vec2(
-                response.rect.left_top().x,
-                response.rect.size().y,
-            ));
+            shape_c.translate(response.rect.left_center().to_vec2());
             painter.add(shape_c);
             ui.set_max_width(self.state.shape.visual_bounding_rect().width());
             let _controller = ui.push_id(ui.next_auto_id(), |ui| {
@@ -156,8 +153,10 @@ impl<'a> egui::Widget for Generator<'a> {
                                     let p = slider_from_parameter(&osc.phase, false, ui);
                                     f.union(a.union(p))
                                 })
-                                .response;
-                            if response.drag_released() && response.changed() {
+                                .inner;
+                            if (response.clicked() || response.drag_released())
+                                && response.changed()
+                            {
                                 self.update_shape(&ui.ctx().style());
                             }
                             response
@@ -165,7 +164,7 @@ impl<'a> egui::Widget for Generator<'a> {
                         data::Generator::Noise() => ui.label("Noise"),
                         data::Generator::Constant(param) => {
                             let slider = slider_from_parameter(&param, true, ui);
-                            if slider.drag_released() && slider.changed() {
+                            if slider.drag_released() && response.changed() {
                                 self.update_shape(&ui.ctx().style());
                             }
                             slider

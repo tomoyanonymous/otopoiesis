@@ -23,8 +23,8 @@ pub(crate) fn slider_from_parameter(
                     param.get() as f64
                 },
             )
-            .logarithmic(is_log),
+            .logarithmic(is_log)
         )
     })
-    .response
+    .inner
 }
