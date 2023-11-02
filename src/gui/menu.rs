@@ -20,32 +20,32 @@ pub fn add_region_button(
     ui: &mut egui::Ui,
 ) -> egui::Response {
     ui.menu_button("+", |ui| {
-       ui.ctx().memory_mut(|memory| {
-        ui.output(.)
-            memory.data.insert_persisted("osckind".into(), OscillatorFun::SineWave)
-        });
-        let osckind =     ui.ctx().memory_mut(|memory| {
-            memory.data.get_persisted_mut_or_default("osckind".into())
-        });
+        let osckindid = ui.auto_id_with("osckind");
+        let mut osckind = ui
+            .data_mut(|d| {
+                let kind = d.get_persisted::<OscillatorFun>(osckindid);
+                kind
+            })
+            .unwrap_or_default();
         let addosc = ui
             .horizontal(|ui| {
-   
                 let addosc = ui.button("~ Add oscillator");
-                let _ = ui.radio_value(osckind, OscillatorFun::SineWave, "Sinewave");
+                let _ = ui.radio_value(&mut osckind, OscillatorFun::SineWave, "Sinewave");
                 let _ = ui.radio_value(
-                    osckind,
+                    &mut osckind,
                     OscillatorFun::SawTooth(Arc::new(atomic::Bool::new(true))),
                     "Sawtooth",
                 );
-                let _ = ui.radio_value(osckind,  OscillatorFun::Triangular, "Triangular");
+                let _ = ui.radio_value(&mut osckind, OscillatorFun::Triangular, "Triangular");
                 let _ = ui.radio_value(
-                    osckind,
+                    &mut osckind,
                     OscillatorFun::Rectanglular(Arc::new(atomic::F32::new(0.5))),
                     "Rectangular",
                 );
                 addosc
             })
             .inner;
+        ui.data_mut(|d| d.insert_persisted(osckindid, osckind.clone()));
         let addfile = ui.button("💾 Load File");
         let mut array_num = 5;
         let addarray = ui
@@ -57,9 +57,7 @@ pub fn add_region_button(
             .inner;
         if addosc.clicked() {
             let content = data::Content::Generator(data::Generator::Oscillator(
-                ui.ctx()
-                    .data(|d| d.get_temp("osckind".into()))
-                    .unwrap(),
+                osckind,
                 Arc::new(data::OscillatorParam::default()),
             ));
             let region = make_region(trackid, pos, content);
