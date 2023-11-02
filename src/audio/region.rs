@@ -273,23 +273,24 @@ mod test {
     fn gen_sinewave(
         arr: &mut [f32],
         osc_param: &data::OscillatorParam,
-        phase: &mut f32,
+        phase_init: f32,
         sample_rate: u32,
         channel: u32,
     ) {
+        let mut phase = phase_init;
+        let twopi = std::f32::consts::PI * 2.0;
         arr.chunks_mut(channel as usize)
             .enumerate()
             .for_each(|(_count, o_per_channel)| {
                 // let now = count as f64 / sample_rate as f64;
-                let twopi = std::f32::consts::PI * 2.0;
                 o_per_channel.iter_mut().enumerate().for_each(|(ch, o)| {
                     if ch == 0 {
-                        *o = phase.sin() * osc_param.amp.get();
+                        *o = (phase * twopi).sin() * osc_param.amp.get();
                     } else {
                         *o = 0.0;
                     }
                 });
-                *phase = (*phase + twopi * osc_param.freq.get() / (sample_rate as f32)) % twopi;
+                phase = (phase + osc_param.freq.get() / (sample_rate as f32)) % 1.0;
             });
     }
     fn gen_constant(arr: &mut [f32], channel: u32) {
@@ -375,12 +376,12 @@ mod test {
         assert_eq!(model.interleaved_samples_cache.len(), range_samps);
 
         let mut answer = vec![0.0f32; range_samps];
-        let mut phase = osc_param.phase.get();
+        let phase = osc_param.phase.get();
         assert_eq!(phase.sin(), 0.0);
         gen_sinewave(
             answer.as_mut_slice(),
             &osc_param,
-            &mut phase,
+            phase,
             sample_rate,
             channel as u32,
         );
@@ -398,7 +399,7 @@ mod test {
         let range = 0.1..0.2;
 
         let generator = data::Content::Generator(data::Generator::Constant(Arc::new(
-            FloatParameter::new(0.0, 0.0..=1.0, "test"),
+            FloatParameter::new(1.0, 0.0..=1.0, "test"),
         )));
         let range_atomic = AtomicRange::<f64>::new(range.start, range.end);
 
@@ -416,7 +417,7 @@ mod test {
             ((range.end - range.start) * sample_rate as f64) as usize * channel as usize;
         assert_eq!(model.interleaved_samples_cache.len(), range_samps);
 
-        let mut answer = vec![0.0f32; range_samps];
+        let mut answer = vec![1.0f32; range_samps];
 
         gen_constant(answer.as_mut_slice(), channel as u32);
         apply_fadeinout(
