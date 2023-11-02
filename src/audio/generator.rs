@@ -1,10 +1,10 @@
 use super::*;
 use crate::data;
+pub mod constant;
 #[cfg(not(feature = "web"))]
 pub mod fileplayer;
-pub mod oscillator;
-pub mod constant;
 pub mod noise;
+pub mod oscillator;
 
 use constant::Constant;
 use noise::Noise;
@@ -57,7 +57,7 @@ pub fn get_component_for_generator(kind: &data::Generator) -> Box<dyn Component 
             data::OscillatorFun::Triangular => oscillator::triangle(param.clone()),
         }),
         data::Generator::Constant(param) => Box::new(Constant(param.clone())),
-        data::Generator::Noise() => Box::new(Noise{}),
+        data::Generator::Noise() => Box::new(Noise {}),
         #[cfg(not(feature = "web"))]
         data::Generator::FilePlayer(param) => Box::new(fileplayer::FilePlayer::new(param.clone())),
     }

@@ -88,10 +88,9 @@ impl Model {
 impl eframe::App for Model {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         {
-            
             let mut app = self.app.lock().unwrap();
-            let need_update  = app.consume_actions();
-            if need_update{
+            let need_update = app.consume_actions();
+            if need_update {
                 self.ui.sync_state(&app.project.tracks);
             }
 

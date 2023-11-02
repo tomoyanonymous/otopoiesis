@@ -97,14 +97,14 @@ impl<'a> std::hash::Hash for Model<'a> {
 
 impl<'a> egui::Widget for Model<'a> {
     fn ui(mut self, ui: &mut egui::Ui) -> egui::Response {
-        let height = gui::TRACK_HEIGHT+30.0;
+        let height = gui::TRACK_HEIGHT + 30.0;
 
         let bar_width = 5.;
         let start = self.params.range.start();
         let end = self.params.range.end();
         let min_start = 0.0;
         let max_end = end + self.params.range.getrange();
-        
+
         //for debug
         // let rect = ui.available_rect_before_wrap();
         // ui.painter().rect_filled(rect, 0.0, egui::Color32::BLUE);
@@ -122,7 +122,6 @@ impl<'a> egui::Widget for Model<'a> {
                             self.params.range.set_start(origin.range.start());
                             self.params.range.set_end(origin.range.end());
                             (
-                                
                                 ui.add(regionfilter::RegionFilter::FadeInOut(FadeInOut::new(
                                     param.as_ref(),
                                     origin.as_ref(),

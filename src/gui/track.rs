@@ -1,8 +1,8 @@
-use std::sync::mpsc;
 use crate::action::Action;
 use crate::data;
 use crate::gui;
 use crate::gui::menu;
+use std::sync::mpsc;
 pub struct State {
     regions: Vec<gui::region::State>,
     // new_array_count: u32,
@@ -106,7 +106,7 @@ impl<'a> egui::Widget for Model<'a> {
                     .as_ref()
                     .map_or(30.0, |rs| rs.response.rect.right());
                 let new_rect = egui::Rect::from_center_size(
-                    egui::pos2(region_right_x , top + gui::TRACK_HEIGHT / 2.0),
+                    egui::pos2(region_right_x, top + gui::TRACK_HEIGHT / 2.0),
                     egui::vec2(button_w, gui::TRACK_HEIGHT),
                 );
 
@@ -116,8 +116,8 @@ impl<'a> egui::Widget for Model<'a> {
                     ui.set_min_width(40.);
                     ui.set_height(gui::TRACK_HEIGHT);
                     let position = self.get_position_to_add();
-                    let menues = ui.centered_and_justified(|ui|{
-                       menu::add_region_button(self.id, position, &self.action_tx, ui);
+                    let menues = ui.centered_and_justified(|ui| {
+                        menu::add_region_button(self.id, position, &self.action_tx, ui);
                     });
                     menues
                 });

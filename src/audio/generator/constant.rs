@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
-use crate::audio::PlaybackInfo;
 use super::Component;
-use crate::parameter::{Parameter,FloatParameter};
+use crate::audio::PlaybackInfo;
+use crate::parameter::{FloatParameter, Parameter};
 #[derive(Clone, Debug)]
 pub struct Constant(pub Arc<FloatParameter>);
 impl Component for Constant {

@@ -158,11 +158,11 @@ impl AppModel {
     pub fn get_track_for_id(&self, id: usize) -> Option<&Track> {
         self.project.tracks.get(id)
     }
-    pub fn consume_actions(&mut self) ->bool{
+    pub fn consume_actions(&mut self) -> bool {
         let mut ui_need_update = false;
-        for action_received in self.action_rx.try_iter(){
+        for action_received in self.action_rx.try_iter() {
             let _res = self.history.apply(&mut self.project, action_received);
-            ui_need_update=true;
+            ui_need_update = true;
         }
         ui_need_update
     }

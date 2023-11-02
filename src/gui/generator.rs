@@ -134,14 +134,19 @@ impl<'a> Generator<'a> {
         //     .into_iter()
         //     .chain(points_lower)
         //     .collect::<Vec<Pos2>>();
-        let points_to_draw = self.get_samples().iter().enumerate().map(|(i,s)|{
-            let x = egui::emath::remap(i as f64, from.clone(), to.clone());
-            let y = *s * y_origin * 0.5;
-            egui::pos2(x as f32, y)
-        }).collect::<Vec<Pos2>>();
+        let points_to_draw = self
+            .get_samples()
+            .iter()
+            .enumerate()
+            .map(|(i, s)| {
+                let x = egui::emath::remap(i as f64, from.clone(), to.clone());
+                let y = *s * y_origin * 0.5;
+                egui::pos2(x as f32, y)
+            })
+            .collect::<Vec<Pos2>>();
         let visu = style.visuals.widgets.active;
         // let pathshape =
-            // PathShape::convex_polygon(points_to_draw, visu.fg_stroke.color, visu.fg_stroke);
+        // PathShape::convex_polygon(points_to_draw, visu.fg_stroke.color, visu.fg_stroke);
         self.state.shape = Shape::line(points_to_draw, visu.fg_stroke);
     }
 }
