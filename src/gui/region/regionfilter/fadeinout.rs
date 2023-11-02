@@ -85,7 +85,7 @@ impl<'a> FadeInOut<'a> {
         };
 
         painter.line_segment(points, egui::Stroke::new(1.0, c));
-        painter.rect_stroke(paint_rect, 0.0, ui.style().visuals.window_stroke);
+        // painter.rect_stroke(paint_rect, 0.0, ui.style().visuals.window_stroke);
         painter.rect_filled(handle_area, 0.0, egui::Color32::RED);
 
         ui_handle
