@@ -1,6 +1,7 @@
-use crate::audio::{Component, PlaybackInfo};
+use crate::audio::{Component, PlaybackInfo, RenderCtx};
 use crate::data;
 use std::sync::Arc;
+
 #[derive(Debug)]
 pub struct Model {
     param: data::Project,
@@ -48,7 +49,13 @@ impl Component for Model {
             track.prepare_play(info);
         }
     }
-    fn render(&mut self, input: &[f32], output: &mut [f32], info: &PlaybackInfo) {
+    fn render(
+        &mut self,
+        input: &[f32],
+        output: &mut [f32],
+        info: &PlaybackInfo,
+        ctx: &mut RenderCtx,
+    ) {
         output.fill(0.0);
         assert_eq!(
             output.len(),
@@ -57,7 +64,7 @@ impl Component for Model {
 
         assert_eq!(output.len(), self.tmp_buffer.len());
         for track in self.tracks.iter_mut() {
-            track.render(input, self.tmp_buffer.as_mut_slice(), info);
+            track.render(input, self.tmp_buffer.as_mut_slice(), info, ctx);
             output
                 .iter_mut()
                 .zip(self.tmp_buffer.iter())

@@ -1,5 +1,7 @@
 //! The interpreter implementations for audio rendering.
 
+use crate::data::expr::EvalEnv;
+
 pub const DEFAULT_BUFFER_LEN: usize = 2048;
 
 #[derive(Clone)]
@@ -19,11 +21,30 @@ impl PlaybackInfo {
     }
 }
 
+#[derive(Clone)]
+pub struct RenderCtx {
+    pub env: EvalEnv,
+}
+
+impl RenderCtx {
+    pub fn new() -> Self {
+        Self {
+            env: EvalEnv::new(),
+        }
+    }
+}
+
 pub trait Component: std::fmt::Debug {
     fn get_input_channels(&self) -> u64;
     fn get_output_channels(&self) -> u64;
     fn prepare_play(&mut self, info: &PlaybackInfo);
-    fn render(&mut self, input: &[f32], output: &mut [f32], info: &PlaybackInfo);
+    fn render(
+        &mut self,
+        input: &[f32],
+        output: &mut [f32],
+        info: &PlaybackInfo,
+        ctx: &mut RenderCtx,
+    );
 }
 
 pub mod generator;

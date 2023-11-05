@@ -7,6 +7,8 @@ use cpal::{self, Stream};
 use ringbuf::{HeapConsumer, HeapProducer, HeapRb};
 use std::sync::{Arc, Mutex};
 
+use super::RenderCtx;
+
 pub trait RendererBase<E>
 where
     E: Component + Send + Sync + 'static,
@@ -177,7 +179,8 @@ fn pass_out(
             frame_per_buffer,
         };
         // todo:if  channels are different?
-        model.effector.render(&buf, buffer, &info);
+        let mut ctx = RenderCtx::new();//TODO
+        model.effector.render(&buf, buffer, &info, &mut ctx);
         model.current_time.store(t + frame_per_buffer);
     }
 }

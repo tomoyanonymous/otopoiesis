@@ -1,4 +1,4 @@
-use crate::audio::{Component, PlaybackInfo};
+use crate::audio::{Component, PlaybackInfo,RenderCtx};
 use crate::data;
 
 #[derive(Debug)]
@@ -35,7 +35,8 @@ impl Model {
                 .map(|region| {
                     //temporary moves value to
                     let model = super::region::Model::new(region.clone(), channels);
-                    super::region::render_region_offline_async(model, info)
+                    let mut ctx = RenderCtx::new();//TODO
+                    super::region::render_region_offline_async(model, info,&mut ctx)
                 })
                 .map(move |h| h.join().expect("hoge"))
                 .collect::<Vec<super::region::Model>>()
@@ -65,7 +66,13 @@ impl Component for Model {
     fn prepare_play(&mut self, info: &PlaybackInfo) {
         self.renew_regions(info);
     }
-    fn render(&mut self, _input: &[f32], output: &mut [f32], info: &PlaybackInfo) {
+    fn render(
+        &mut self,
+        _input: &[f32],
+        output: &mut [f32],
+        info: &PlaybackInfo,
+        ctx: &mut RenderCtx,
+    ) {
         //後に入ってるリージョンで基本は上書きする
         //channel is tekitou
         let chs = 2;

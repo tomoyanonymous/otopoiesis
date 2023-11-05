@@ -5,6 +5,7 @@ pub mod constant;
 pub mod fileplayer;
 pub mod noise;
 pub mod oscillator;
+mod script;
 
 use constant::Constant;
 use noise::Noise;
@@ -28,7 +29,13 @@ where
     fn prepare_play(&mut self, _info: &PlaybackInfo) {
         self.reset_phase();
     }
-    fn render(&mut self, _input: &[f32], output: &mut [f32], info: &PlaybackInfo) {
+    fn render(
+        &mut self,
+        _input: &[f32],
+        output: &mut [f32],
+        info: &PlaybackInfo,
+        ctx: &mut RenderCtx,
+    ) {
         for (_count, out_per_channel) in output
             .chunks_mut(self.get_output_channels() as usize)
             .enumerate()
@@ -57,6 +64,7 @@ pub fn get_component_for_generator(kind: &data::Generator) -> Box<dyn Component 
             data::OscillatorFun::Triangular => oscillator::triangle(param.clone()),
         }),
         data::Generator::Constant(param) => Box::new(Constant(param.clone())),
+        data::Generator::Script(e) => {Box::new(generator::script::Script(e.clone()) )}
         data::Generator::Noise() => Box::new(Noise {}),
         #[cfg(not(feature = "web"))]
         data::Generator::FilePlayer(param) => Box::new(fileplayer::FilePlayer::new(param.clone())),

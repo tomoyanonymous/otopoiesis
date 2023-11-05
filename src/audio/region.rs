@@ -5,13 +5,21 @@ use crate::data::{self, Region};
 use crate::utils::{AtomicRange, SimpleAtomic};
 use std::ops::RangeInclusive;
 use std::sync::Arc;
+
+use super::RenderCtx;
 // 基本はオフラインレンダリング
 
 /// Interface for offline rendering.
 pub trait RangedComponent: std::fmt::Debug {
     fn get_range(&self) -> RangeInclusive<f64>;
     fn get_output_channels(&self) -> u64;
-    fn render_offline(&mut self, dest: &mut [f32], sample_rate: u32, channels: u64);
+    fn render_offline(
+        &mut self,
+        dest: &mut [f32],
+        sample_rate: u32,
+        channels: u64,
+        ctx: &mut RenderCtx,
+    );
 }
 
 #[derive(Debug)]
@@ -36,10 +44,16 @@ impl RangedComponent for FadeModel {
     fn get_output_channels(&self) -> u64 {
         2
     }
-    fn render_offline(&mut self, dest: &mut [f32], sample_rate: u32, channels: u64) {
+    fn render_offline(
+        &mut self,
+        dest: &mut [f32],
+        sample_rate: u32,
+        channels: u64,
+        ctx: &mut RenderCtx,
+    ) {
         // resize should be the caller.
         // dest.resize(self.origin.interleaved_samples_cache.len(), 0.0);
-        self.origin.render_offline(sample_rate, channels);
+        self.origin.render_offline(sample_rate, channels, ctx);
         assert_eq!(self.origin.interleaved_samples_cache.len(), dest.len());
         let chs = self.get_output_channels() as usize;
         let in_time = (self.param.time_in.load() as f64 * sample_rate as f64) as usize;
@@ -116,7 +130,13 @@ impl RangedComponent for RegionArray {
         2
     }
 
-    fn render_offline(&mut self, dest: &mut [f32], sample_rate: u32, channels: u64) {
+    fn render_offline(
+        &mut self,
+        dest: &mut [f32],
+        sample_rate: u32,
+        channels: u64,
+        ctx: &mut RenderCtx,
+    ) {
         //todo: asynchrounous render
         self.0.iter_mut().for_each(|region| {
             let range = &region.params.range;
@@ -125,7 +145,7 @@ impl RangedComponent for RegionArray {
             region
                 .interleaved_samples_cache
                 .resize(scale_to_index(range.getrange()), 0.0); // no need?
-            region.render_offline(sample_rate, channels);
+            region.render_offline(sample_rate, channels, ctx);
             assert_eq!(region.interleaved_samples_cache.len(), dest.len());
             dest.copy_from_slice(&region.interleaved_samples_cache);
         });
@@ -159,7 +179,13 @@ impl RangedComponent for RangedComponentDyn {
         self.generator.get_output_channels()
     }
 
-    fn render_offline(&mut self, dest: &mut [f32], sample_rate: u32, channels: u64) {
+    fn render_offline(
+        &mut self,
+        dest: &mut [f32],
+        sample_rate: u32,
+        channels: u64,
+        ctx: &mut RenderCtx,
+    ) {
         let info_local = PlaybackInfo {
             sample_rate,
             current_time: 0,
@@ -172,7 +198,7 @@ impl RangedComponent for RangedComponentDyn {
         // );
         let input_dummy = vec![0.0f32; 1];
         self.generator.prepare_play(&info_local);
-        self.generator.render(&input_dummy, dest, &info_local)
+        self.generator.render(&input_dummy, dest, &info_local, ctx)
     }
 }
 
@@ -226,13 +252,17 @@ impl Model {
             cache_completed: false,
         }
     }
-    pub fn render_offline(&mut self, sample_rate: u32, channels: u64) {
+    pub fn render_offline(&mut self, sample_rate: u32, channels: u64, ctx: &mut RenderCtx) {
         self.interleaved_samples_cache.resize(
             (self.params.range.getrange() * sample_rate as f64) as usize * channels as usize,
             0.0,
         );
-        self.content
-            .render_offline(&mut self.interleaved_samples_cache, sample_rate, channels);
+        self.content.render_offline(
+            &mut self.interleaved_samples_cache,
+            sample_rate,
+            channels,
+            ctx,
+        );
         self.cache_completed = true;
     }
     pub fn contains_samples(&self, range: RangeInclusive<f64>) -> bool {
@@ -250,15 +280,17 @@ impl Model {
 pub fn render_region_offline_async(
     region: Model,
     info: &PlaybackInfo,
+    ctx: &mut RenderCtx,
 ) -> std::thread::JoinHandle<Model> {
     let name = region.params.label.clone();
     let info = info.clone();
 
+    let mut ctx = ctx.clone();
     std::thread::Builder::new()
         .name(name)
         .spawn(move || {
             let mut r = region;
-            r.render_offline(info.sample_rate, info.channels);
+            r.render_offline(info.sample_rate, info.channels,&mut ctx);
             r
         })
         .expect("failed to launch thread")
@@ -370,7 +402,8 @@ mod test {
             "test_sin",
         );
         let mut model = Model::new(data, channel);
-        model.render_offline(sample_rate, channel);
+        let mut ctx = RenderCtx::new();
+        model.render_offline(sample_rate, channel, &mut ctx);
         let range_samps =
             ((range.end - range.start) * sample_rate as f64) as usize * channel as usize;
         assert_eq!(model.interleaved_samples_cache.len(), range_samps);
@@ -412,7 +445,8 @@ mod test {
             "test_sin",
         );
         let mut model = Model::new(data, channel);
-        model.render_offline(sample_rate, channel);
+        let mut ctx = RenderCtx::new();
+        model.render_offline(sample_rate, channel, &mut ctx);
         let range_samps =
             ((range.end - range.start) * sample_rate as f64) as usize * channel as usize;
         assert_eq!(model.interleaved_samples_cache.len(), range_samps);

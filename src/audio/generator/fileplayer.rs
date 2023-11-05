@@ -1,6 +1,6 @@
 use crate::app::filemanager::{self, FileManager};
 use crate::audio::region::RangedComponent;
-use crate::audio::{Component, PlaybackInfo};
+use crate::audio::{Component, PlaybackInfo, RenderCtx};
 use crate::data::FilePlayerParam;
 use crate::parameter::Parameter;
 use std::io::ErrorKind;
@@ -120,7 +120,13 @@ impl Component for FilePlayer {
         self.is_finished_playing = false;
     }
 
-    fn render(&mut self, _input: &[f32], output: &mut [f32], _info: &crate::audio::PlaybackInfo) {
+    fn render(
+        &mut self,
+        _input: &[f32],
+        output: &mut [f32],
+        _info: &crate::audio::PlaybackInfo,
+        _ctx: &mut RenderCtx,
+    ) {
         output.fill(0.0);
         // Get the next packet from the media format.
         let (mut prod, mut cons) = self.ringbuf.split_ref();
@@ -195,7 +201,13 @@ impl RangedComponent for FilePlayer {
         self.param.channels.get()
     }
 
-    fn render_offline(&mut self, dest: &mut [f32], sample_rate: u32, channels: u64) {
+    fn render_offline(
+        &mut self,
+        dest: &mut [f32],
+        sample_rate: u32,
+        channels: u64,
+        ctx: &mut RenderCtx,
+    ) {
         let info = PlaybackInfo {
             sample_rate,
             current_time: 0,
@@ -204,7 +216,7 @@ impl RangedComponent for FilePlayer {
         };
         self.prepare_play(&info);
         let input_dummy = vec![0.0f32; 1];
-        self.render(&input_dummy, dest, &info);
+        self.render(&input_dummy, dest, &info, ctx);
     }
 }
 
@@ -228,36 +240,39 @@ mod test {
     #[test]
     fn render_long_buffer() {
         let (mut player, info, len_samples) = read_prep();
+        let mut ctx = RenderCtx::new();
         player.prepare_play(&info);
         let mut output_buf = vec![0.0f32; len_samples * 2 + 1];
         let input_buf = vec![0.0f32; 512];
-        player.render(&input_buf, output_buf.as_mut_slice(), &info);
+        player.render(&input_buf, output_buf.as_mut_slice(), &info, &mut ctx);
         assert!(player.is_finished_playing());
     }
     #[test]
     fn render_long_buffer_fail() {
         let (mut player, info, len_samples) = read_prep();
+        let mut ctx = RenderCtx::new();
         player.prepare_play(&info);
         let mut output_buf = vec![0.0f32; len_samples * 2];
         let input_buf = vec![0.0f32; 512];
-        player.render(&input_buf, output_buf.as_mut_slice(), &info);
+        player.render(&input_buf, output_buf.as_mut_slice(), &info, &mut ctx);
         assert!(!player.is_finished_playing());
     }
     #[test]
     fn render_small_chunks() {
         let (mut player, mut info, len_samples) = read_prep();
+        let mut ctx = RenderCtx::new();
         player.prepare_play(&info);
         let samples = 512;
         let mut output_buf = vec![0.0f32; samples * 2];
         let input_buf = vec![0.0f32; samples * 2];
         let read_count_max = (len_samples as f32 / samples as f32).floor() as usize;
         for _i in 0..read_count_max {
-            player.render(&input_buf, output_buf.as_mut_slice(), &info);
+            player.render(&input_buf, output_buf.as_mut_slice(), &info, &mut ctx);
             info.current_time += samples;
             println!("test read {}", info.current_time);
         }
         assert!(!player.is_finished_playing());
-        player.render(&input_buf, output_buf.as_mut_slice(), &info);
+        player.render(&input_buf, output_buf.as_mut_slice(), &info, &mut ctx);
         assert!(player.is_finished_playing());
     }
 }

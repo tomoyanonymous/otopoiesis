@@ -2,6 +2,7 @@ use crate::{
     audio::{
         self,
         region::{RangedComponent, RangedComponentDyn},
+        RenderCtx,
     },
     data,
     gui::parameter::slider_from_parameter,
@@ -63,7 +64,8 @@ pub trait GeneratorUI<'a> {
             audio_component,
             AtomicRange::from(self.get_displayed_range()),
         );
-        ranged_component.render_offline(&mut buf, sample_rate, channels as u64);
+        let mut ctx = RenderCtx::new();
+        ranged_component.render_offline(&mut buf, sample_rate, channels as u64, &mut ctx);
         self.get_samples().resize(pix_len, 0.0f32);
         reduce_samples(&buf, self.get_samples());
     }
@@ -171,6 +173,7 @@ impl<'a> egui::Widget for Generator<'a> {
                         }
                         #[cfg(not(feature = "web"))]
                         data::Generator::FilePlayer(param) => ui.label(param.path.to_string()),
+                        data::Generator::Script(e) => ui.label("Script"),
                     };
                 });
             });

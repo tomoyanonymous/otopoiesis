@@ -12,6 +12,8 @@ use undo;
 
 pub mod generator;
 pub mod region;
+pub mod expr;
+pub mod types;
 
 pub use generator::*;
 pub use region::*;

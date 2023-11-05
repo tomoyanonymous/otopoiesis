@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use super::Component;
-use crate::audio::PlaybackInfo;
+use crate::audio::{PlaybackInfo, RenderCtx};
 use crate::parameter::{FloatParameter, Parameter};
 #[derive(Clone, Debug)]
 pub struct Constant(pub Arc<FloatParameter>);
@@ -14,7 +14,13 @@ impl Component for Constant {
     }
 
     fn prepare_play(&mut self, _info: &PlaybackInfo) {}
-    fn render(&mut self, _input: &[f32], output: &mut [f32], _info: &PlaybackInfo) {
+    fn render(
+        &mut self,
+        _input: &[f32],
+        output: &mut [f32],
+        _info: &PlaybackInfo,
+        _ctx: &mut RenderCtx,
+    ) {
         output.fill(self.0.get());
     }
 }

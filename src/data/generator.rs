@@ -6,6 +6,7 @@ use std::sync::Arc;
 use crate::data::atomic;
 use crate::parameter::{FloatParameter, Parameter, UIntParameter};
 use serde::{Deserialize, Serialize};
+use super::expr;
 /// Utility Parameter for oscillator with some default values.
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -72,6 +73,7 @@ pub enum Generator {
     Noise(),
     ///mostly for debugging filter.
     Constant(Arc<FloatParameter>),
+    Script(expr::Expr),
     #[cfg(not(feature = "web"))]
     FilePlayer(Arc<FilePlayerParam>),
 }
