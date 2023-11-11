@@ -7,14 +7,18 @@ use crate::utils::{atomic, AtomicRange, SimpleAtomic};
 use rfd;
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
+use std::collections::HashMap;
 use std::sync::{mpsc, Arc};
 use undo;
 
+pub mod script;
 pub mod generator;
 pub mod region;
+pub mod track;
 
 pub use generator::*;
 pub use region::*;
+pub use track::*;
 
 #[cfg(not(feature = "web"))]
 use dirs;
@@ -54,6 +58,7 @@ pub struct AppModel {
     pub history: undo::Record<action::Action>,
     pub action_tx: mpsc::Sender<action::Action>,
     pub action_rx: mpsc::Receiver<action::Action>,
+    pub builtin_fns:HashMap<&'static str,script::ExtFun>
 }
 
 impl AppModel {
@@ -79,12 +84,17 @@ impl AppModel {
             history: undo::Record::new(),
             action_tx,
             action_rx,
+            builtin_fns:script::builtin_fn::gen_default_functions()
         }
+    }
+    pub fn get_builtin_fn(&self,name:&str)->Option<&script::ExtFun>{
+        self.builtin_fns.get(name)
     }
     pub fn can_undo(&self) -> bool {
         let history = &self.history;
         history.can_undo()
     }
+
     pub fn undo(&mut self) {
         let history = &mut self.history;
         if let Some(Err(e)) = history.undo(&mut self.project) {
@@ -243,36 +253,5 @@ impl Project {
             sample_rate: atomic::U64::from(sample_rate),
             tracks: vec![],
         }
-    }
-}
-
-/// Data structure for track.
-/// The track has some input/output stream.
-#[derive(Serialize, Deserialize, Clone, Debug)]
-pub enum Track {
-    ///Contains Multiple Regions.
-    /// TODO:Change container for this to be HashedSet for the more efficient implmentation of Undo Action.
-    Regions(Vec<Region>),
-    ///Contains one audio generator(0 input).
-    Generator(Generator),
-    ///Take another track and transform it (like filter).
-    Transformer(),
-}
-
-impl Track {
-    pub fn new() -> Self {
-        Self::default()
-    }
-}
-
-impl Default for Track {
-    fn default() -> Self {
-        Track::Regions(vec![])
-    }
-}
-impl std::fmt::Display for Track {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        // write!(f, "track {}", self.label)
-        write!(f, "track")
     }
 }
