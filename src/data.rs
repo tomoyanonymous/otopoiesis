@@ -199,14 +199,17 @@ impl AppModel {
         self.project.tracks.get(id)
     }
     pub fn consume_actions(&mut self) -> bool {
-        if let Some(src) = self.source.as_mut() {
-            self.action_rx.try_iter().map(|action_received|{
-                self.history.apply(src, action_received)
-            }).all(|res| res.is_ok())
-        }else{
-            false
-        }
-
+        self
+            .action_rx
+            .try_iter()
+            .map(|action_received| {
+                if let Some(src) = self.source.as_mut() {
+                    self.history.apply(src, action_received).is_ok()
+                } else {
+                    false
+                }
+            })
+            .any(|v| v == true)
     }
 
     pub fn compile(&mut self) -> bool {
