@@ -1,12 +1,12 @@
 use super::{EvalError, ExtFun, ExtFunT, Value};
 use std::collections::HashMap;
-use std::sync::Arc;
+
 
 #[derive(Clone, Debug)]
 pub struct ArrayReverse {}
 
 impl ExtFunT for ArrayReverse {
-    fn exec(&self, _app: &mut crate::data::AppModel, v: &Value) -> Result<Value, EvalError> {
+    fn exec(&self, _app: & crate::data::AppModel, v: &Value) -> Result<Value, EvalError> {
         match v {
             Value::Array(a, t) => {
                 let mut res = a.clone();

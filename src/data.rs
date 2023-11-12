@@ -11,9 +11,9 @@ use std::collections::HashMap;
 use std::sync::{mpsc, Arc};
 use undo;
 
-pub mod script;
 pub mod generator;
 pub mod region;
+pub mod script;
 pub mod track;
 
 pub use generator::*;
@@ -22,6 +22,8 @@ pub use track::*;
 
 #[cfg(not(feature = "web"))]
 use dirs;
+
+use self::script::{Environment, Expr, Value};
 
 pub struct LaunchArg {
     pub file: Option<String>,
@@ -46,19 +48,37 @@ impl Default for LaunchArg {
         }
     }
 }
+pub struct ConversionError {}
+
+impl TryFrom<&Value> for Project {
+    type Error = ConversionError;
+    fn try_from(value: &Value) -> Result<Self, Self::Error> {
+        match value {
+            Value::Project(sr, tr) => {
+                let tracks: Vec<Track> = tr.iter().map(|t| Track::try_from(t)).try_collect()?;
+                Ok(Project {
+                    sample_rate: (*sr as u64).into(),
+                    tracks: tracks,
+                })
+            }
+            _ => Err(ConversionError {}),
+        }
+    }
+}
 
 // #[derive(Serialize, Deserialize, Clone)]
 pub struct AppModel {
     pub transport: Arc<Transport>,
     pub global_setting: GlobalSetting,
     pub launch_arg: LaunchArg,
+    pub source: Option<script::Expr>,
     pub project: Project,
     pub project_str: String,
     pub project_file: Option<String>,
     pub history: undo::Record<action::Action>,
     pub action_tx: mpsc::Sender<action::Action>,
     pub action_rx: mpsc::Receiver<action::Action>,
-    pub builtin_fns:HashMap<&'static str,script::ExtFun>
+    pub builtin_fns: HashMap<&'static str, script::ExtFun>,
 }
 
 impl AppModel {
@@ -73,21 +93,23 @@ impl AppModel {
         if let Some(file) = project_file.clone() {
             let _ = filemanager::get_global_file_manager().read_to_string(file, &mut project_str);
         }
+        let source = Some(Expr::Literal(Value::Project(44100., vec![])));
         let (action_tx, action_rx) = mpsc::channel();
         Self {
             transport,
             global_setting,
             launch_arg,
+            source,
             project: Project::new(44100),
             project_str,
             project_file,
             history: undo::Record::new(),
             action_tx,
             action_rx,
-            builtin_fns:script::builtin_fn::gen_default_functions()
+            builtin_fns: script::builtin_fn::gen_default_functions(),
         }
     }
-    pub fn get_builtin_fn(&self,name:&str)->Option<&script::ExtFun>{
+    pub fn get_builtin_fn(&self, name: &str) -> Option<&script::ExtFun> {
         self.builtin_fns.get(name)
     }
     pub fn can_undo(&self) -> bool {
@@ -97,8 +119,13 @@ impl AppModel {
 
     pub fn undo(&mut self) {
         let history = &mut self.history;
-        if let Some(Err(e)) = history.undo(&mut self.project) {
-            eprintln!("{}", e)
+        if let Some(_res) = self.source.as_mut().map(|src| {
+            if let Some(Err(e)) = history.undo(src) {
+                eprintln!("{}", e)
+            }
+        }) {
+            self.compile();
+            self.ui_to_code();
         }
     }
     pub fn can_redo(&self) -> bool {
@@ -107,7 +134,10 @@ impl AppModel {
     }
     pub fn redo(&mut self) {
         let history = &mut self.history;
-        let _ = history.redo(&mut self.project).unwrap();
+        if let Some(_res) = self.source.as_mut().map(|src| history.redo(src)).flatten() {
+            self.compile();
+            self.ui_to_code();
+        }
     }
 
     pub fn open_file(&mut self) {
@@ -150,7 +180,7 @@ impl AppModel {
         }
     }
     pub fn ui_to_code(&mut self) {
-        let json = serde_json::to_string_pretty(&self.project);
+        let json = serde_json::to_string_pretty(&self.source);
         let json_str = json.unwrap_or_else(|e| {
             println!("{}", e);
             "failed to print".to_string()
@@ -158,8 +188,8 @@ impl AppModel {
         self.project_str = json_str;
     }
     pub fn code_to_ui(&mut self) -> Result<(), serde_json::Error> {
-        serde_json::from_str::<Project>(&self.project_str).map(|proj| {
-            self.project = proj.clone();
+        serde_json::from_str::<Expr>(&self.project_str).map(|expr| {
+            self.source = Some(expr);
         })
     }
     pub fn get_track_for_id_mut(&mut self, id: usize) -> Option<&mut Track> {
@@ -169,12 +199,35 @@ impl AppModel {
         self.project.tracks.get(id)
     }
     pub fn consume_actions(&mut self) -> bool {
-        let mut ui_need_update = false;
-        for action_received in self.action_rx.try_iter() {
-            let _res = self.history.apply(&mut self.project, action_received);
-            ui_need_update = true;
+        if let Some(src) = self.source.as_mut() {
+            self.action_rx.try_iter().map(|action_received|{
+                self.history.apply(src, action_received)
+            }).all(|res| res.is_ok())
+        }else{
+            false
         }
-        ui_need_update
+
+    }
+
+    pub fn compile(&mut self) -> bool {
+        let env = script::Environment(vec![]);
+        let res = self
+            .source
+            .as_ref()
+            .map(|src| {
+                src.eval(&env, self)
+                    .ok()
+                    .map(|v| Project::try_from(&v).ok())
+            })
+            .flatten()
+            .flatten();
+        match res {
+            Some(pj) => {
+                self.project = pj;
+                true
+            }
+            None => false,
+        }
     }
 }
 

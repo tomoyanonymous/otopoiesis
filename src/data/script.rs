@@ -7,7 +7,7 @@ use crate::data;
 pub mod builtin_fn;
 // use serde::{Deserialize, Serialize};
 pub trait ExtFunT: std::fmt::Debug {
-    fn exec(&self, app: &mut data::AppModel, v: &Value) -> Result<Value, EvalError>;
+    fn exec(&self, app: & data::AppModel, v: &Value) -> Result<Value, EvalError>;
 }
 
 pub trait MixerT: std::fmt::Debug {
@@ -64,8 +64,8 @@ pub enum Value {
     Function(Vec<Id>, Box<Expr>),
     ExtFunction(Id),
     Track(Box<Value>, Type), //input type, output type
-    Region(Type),
-    Project(Vec<Value>), //todo:reducer
+    Region(f64,f64,Box<Value>,Id,Type),//start,dur,content,label,type
+    Project(f64,Vec<Value>), //todo:reducer
 }
 
 impl Value {
@@ -93,8 +93,8 @@ impl Value {
             Value::Function(a, v) => todo!(),
             Value::ExtFunction(f) => Type::Function(Type::Unknown.into(), Type::Unknown.into()), //cannot infer?
             Value::Track(input, output) => todo!(),
-            Value::Region(t) => todo!(),
-            Value::Project(_) => todo!(),
+            Value::Region(_start,_dur,_,_label,_) => todo!(),
+            Value::Project(_sr,_tracks) => todo!(),
         }
     }
 }
@@ -106,7 +106,7 @@ pub enum Expr {
     App(Box<Expr>, Box<Expr>), //currently only single argument
 }
 
-pub struct Environment<T>(Vec<(Id, T)>);
+pub struct Environment<T>(pub Vec<(Id, T)>);
 
 impl<T> Environment<T> {
     // pub fn lookup()
@@ -120,7 +120,7 @@ impl Expr {
     pub fn eval(
         &self,
         env: &Environment<Value>,
-        app: &mut data::AppModel,
+        app: & data::AppModel,
     ) -> Result<Value, EvalError> {
         match self {
             Expr::Literal(v) => Ok(v.clone()),

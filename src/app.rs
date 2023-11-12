@@ -2,18 +2,25 @@ use atomic::SimpleAtomic;
 use std::sync::{Arc, Mutex};
 
 use crate::audio::renderer::{Renderer, RendererBase};
+use crate::data::Project;
 use crate::{audio, data, gui, utils::atomic};
 
 pub(crate) mod filemanager;
 
 extern crate eframe;
 extern crate serde_json;
+enum EditorMode {
+    Code,
+    Result,
+}
+
 pub struct Model {
     app: Arc<Mutex<data::AppModel>>,
     audio: Renderer<audio::timeline::Model>,
     compile_err: Option<serde_json::Error>,
     ui: gui::app::State,
     editor_open: bool,
+    editor_mode: EditorMode,
 }
 
 fn new_renderer(app: &data::AppModel) -> Renderer<audio::timeline::Model> {
@@ -45,6 +52,7 @@ impl Model {
             compile_err: None,
             ui,
             editor_open: false,
+            editor_mode: EditorMode::Code,
         }
     }
 
@@ -89,6 +97,8 @@ impl eframe::App for Model {
             let mut app = self.app.lock().unwrap();
             let need_update = app.consume_actions();
             if need_update {
+                app.compile();
+                app.ui_to_code();
                 self.ui.sync_state(&app.project.tracks);
             }
 
@@ -144,7 +154,7 @@ impl eframe::App for Model {
             ctx.request_repaint();
         }
 
-        let _panel = egui::panel::SidePanel::right("JSON viewer")
+        let _panel = egui::panel::SidePanel::right("Code Viewer")
             .default_width(400.)
             .max_width(1920.)
             .resizable(true)
@@ -152,10 +162,15 @@ impl eframe::App for Model {
                 egui::ScrollArea::vertical().show(ui, |ui| {
                     let should_refresh_audio = if let Ok(mut app) = self.app.lock() {
                         let _ = ui.label("Code Editor");
-                        let editor = ui.add_sized(
-                            ui.available_size(),
-                            egui::TextEdit::multiline(&mut app.project_str).code_editor(),
-                        );
+                        let mut txt =
+                            serde_json::to_string_pretty::<Project>(&app.project).unwrap();
+                        let widget = match self.editor_mode {
+                            EditorMode::Code => {
+                                egui::TextEdit::multiline(&mut app.project_str).code_editor()
+                            }
+                            EditorMode::Result => egui::TextEdit::multiline(&mut txt).code_editor(),
+                        };
+                        let editor = ui.add_sized(ui.available_size(), widget);
                         if editor.gained_focus() {
                             app.ui_to_code();
                         }
@@ -180,6 +195,12 @@ impl eframe::App for Model {
                             );
                         }
                         ui.horizontal(|ui| {
+                            if ui.button("Code⇆Result").clicked() {
+                                self.editor_mode = match self.editor_mode {
+                                    EditorMode::Code => EditorMode::Result,
+                                    EditorMode::Result => EditorMode::Code,
+                                }
+                            }
                             if ui.button("Open").clicked() {
                                 app.open_file();
                             }

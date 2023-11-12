@@ -1,5 +1,7 @@
 //! Otopoiesis is a constructive audio editing environment.
 //!
+#![feature(box_patterns)]
+#![feature(iterator_try_collect)]
 
 extern crate eframe;
 extern crate egui;

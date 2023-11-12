@@ -1,6 +1,6 @@
-use serde::{Deserialize,Serialize};
-use super::{Region,Generator};
-
+use super::script::Value;
+use super::{ConversionError, Generator, Region};
+use serde::{Deserialize, Serialize};
 /// Data structure for track.
 /// The track has some input/output stream.
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -29,5 +29,25 @@ impl std::fmt::Display for Track {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         // write!(f, "track {}", self.label)
         write!(f, "track")
+    }
+}
+
+impl TryFrom<&Value> for Track {
+    type Error = ConversionError;
+
+    fn try_from(value: &Value) -> Result<Self, Self::Error> {
+        match value {
+            Value::Track(box Value::Array(regions, _), t) => {
+                let regions: Vec<Region> = regions
+                    .iter()
+                    .map(|rg| {
+                        let region: Result<Region, ConversionError> = Region::try_from(rg);
+                        region
+                    })
+                    .try_collect()?;
+                Ok(Self::Regions(regions))
+            }
+            _ => Err(ConversionError {}),
+        }
     }
 }

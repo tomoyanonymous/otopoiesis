@@ -1,5 +1,12 @@
-use super::generator::*;
-use crate::data::{atomic, AtomicRange};
+use super::{
+    generator::*,
+    script::{Expr, Value},
+    ConversionError,
+};
+use crate::{
+    data::{atomic, AtomicRange},
+    utils::atomic::{Bool, F32},
+};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
@@ -7,6 +14,14 @@ use std::sync::Arc;
 pub struct FadeParam {
     pub time_in: atomic::F32,
     pub time_out: atomic::F32,
+}
+impl FadeParam {
+    pub fn new() -> Self {
+        Self {
+            time_in: 0.0.into(),
+            time_out: 0.0.into(),
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, Default, Debug)]
@@ -33,6 +48,52 @@ pub enum RegionFilter {
 pub enum Content {
     Generator(Generator),
     Transformer(RegionFilter, Box<Region>),
+}
+impl TryFrom<&Value> for Content {
+    type Error = ConversionError;
+
+    fn try_from(value: &Value) -> Result<Self, Self::Error> {
+        match value {
+            //||{FadeInOut(Region) }
+            Value::ExtFunction(fname) => match fname.as_str() {
+                "sinewave" => {
+                    let kind = OscillatorFun::SineWave;
+                    let param = OscillatorParam::default();
+                    Ok(Content::Generator(Generator::Oscillator(
+                        kind,
+                        Arc::new(param),
+                    )))
+                }
+                "sawtooth" => {
+                    let kind = OscillatorFun::SawTooth(Arc::new(Bool::new(true)));
+                    let param = OscillatorParam::default();
+                    Ok(Content::Generator(Generator::Oscillator(
+                        kind,
+                        Arc::new(param),
+                    )))
+                }
+                "rect" => {
+                    let kind = OscillatorFun::Rectanglular(Arc::new(F32::new(0.5)));
+                    let param = OscillatorParam::default();
+                    Ok(Content::Generator(Generator::Oscillator(
+                        kind,
+                        Arc::new(param),
+                    )))
+                }
+                "triangular" => {
+                    let kind = OscillatorFun::Triangular;
+                    let param = OscillatorParam::default();
+                    Ok(Content::Generator(Generator::Oscillator(
+                        kind,
+                        Arc::new(param),
+                    )))
+                }
+
+                _ => Err(ConversionError {}),
+            },
+            _ => Err(ConversionError {}),
+        }
+    }
 }
 
 /// Data structure for region.
@@ -69,46 +130,6 @@ impl Region {
             origin.label,
         )
     }
-    // pub fn interpret(&self) -> Self {
-    //     match &self.content {
-    //         Content::Transformer(p, origin) if matches!(p, RegionFilter::Replicate(_)) => {
-    //             if let RegionFilter::Replicate(param) = p {
-    //                 let mut range = origin.range.clone();
-    //                 let mut len = range.getrange();
-    //                 let mut last = 0;
-    //                 todo!()
-    //                 // let arr = Content::Array(
-    //                 //     (0..param.count.load())
-    //                 //         .into_iter()
-    //                 //         .map(|_| {
-    //                 //             //とりあえず位置をずらして複製
-    //                 //             range = Arc::new(AtomicRange<i64>::new(last, last + len));
-    //                 //             len = range.getrange();
-    //                 //             last = range.end();
-    //                 //             range.clone()
-    //                 //         })
-    //                 //         .enumerate()
-    //                 //         .map(|(i, newrange)| {
-    //                 //             Arc::new(Region::new(
-    //                 //                 newrange.as_ref().clone(),
-    //                 //                 origin.content.clone(),
-    //                 //                 format!("{}_rep_{}", origin.label, i),
-    //                 //             ))
-    //                 //         })
-    //                 //         .collect(),
-    //                 // );
-    //                 Self::new(
-    //                     AtomicRange<i64>::new(origin.range.start(), last),
-    //                     arr,
-    //                     format!("{}_arr", origin.label),
-    //                 )
-    //             } else {
-    //                 unreachable!()
-    //             }
-    //         }
-    //         _ => self.clone(),
-    //     }
-    // }
 }
 
 impl std::default::Default for Region {
@@ -124,5 +145,47 @@ impl std::default::Default for Region {
 impl std::fmt::Display for Region {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "region {}", self.label)
+    }
+}
+fn make_region_from_param(
+    start: f64,
+    dur: f64,
+    content: &Value,
+    label: &str,
+) -> Result<Region, ConversionError> {
+    let range = AtomicRange::new(start, start + dur);
+    let content: Result<Content, ConversionError> = Content::try_from(content);
+    let res = Region::new(range, content?, label);
+    Ok(res)
+}
+
+impl TryFrom<&Value> for Region {
+    type Error = ConversionError;
+
+    fn try_from(value: &Value) -> Result<Self, Self::Error> {
+        match value {
+            Value::Region(start, dur, content, label, _) => {
+                make_region_from_param(*start, *dur, content, label)
+            }
+            Value::Function(
+                id,
+                box Expr::App(
+                    box Expr::Literal(Value::ExtFunction(regionfilter)),
+                    box Expr::Literal(region),
+                ),
+            ) => match regionfilter.as_str() {
+                "fadeinout" => {
+                    let rg = Region::try_from(region)?;
+                    let range = rg.range.clone();
+                    let label = rg.label.clone();
+                    let param = Arc::new(FadeParam::new());
+                    let content =
+                        Content::Transformer(RegionFilter::FadeInOut(param), Box::new(rg));
+                    Ok(Region::new(range, content, label))
+                }
+                _ => Err(ConversionError {}),
+            },
+            _ => Err(ConversionError {}),
+        }
     }
 }
