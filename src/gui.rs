@@ -1,9 +1,6 @@
 //! GUI Definitions for parameter control and visualization for application.
-//! Currently implemented on [`egui`].
+//! Currently implemented on [`egui`];
 
-use crate::parameter::{FloatParameter, Parameter};
-
-use serde_json;
 pub mod parameter;
 pub mod app;
 pub mod generator;

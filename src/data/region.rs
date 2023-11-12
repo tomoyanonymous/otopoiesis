@@ -5,6 +5,7 @@ use super::{
 };
 use crate::{
     data::{atomic, AtomicRange},
+    parameter::{FloatParameter, Parameter},
     utils::atomic::{Bool, F32},
 };
 use serde::{Deserialize, Serialize};
@@ -12,15 +13,18 @@ use std::sync::Arc;
 
 #[derive(Serialize, Deserialize, Clone, Default, Debug)]
 pub struct FadeParam {
-    pub time_in: atomic::F32,
-    pub time_out: atomic::F32,
+    pub time_in: Arc<FloatParameter>,
+    pub time_out: Arc<FloatParameter>,
 }
 impl FadeParam {
     pub fn new() -> Self {
         Self {
-            time_in: 0.0.into(),
-            time_out: 0.0.into(),
+            time_in: Arc::new(FloatParameter::new(0.0, 0.0..=1000.0, "in_time")),
+            time_out: Arc::new(FloatParameter::new(0.0, 0.0..=1000.0, "out_time")),
         }
+    }
+    pub fn new_with(time_in: Arc<FloatParameter>, time_out: Arc<FloatParameter>) -> Self {
+        Self { time_in, time_out }
     }
 }
 
@@ -39,7 +43,7 @@ impl From<u32> for ReplicateParam {
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub enum RegionFilter {
     Gain,
-    FadeInOut(Arc<FadeParam>),
+    FadeInOut(FadeParam),
     Reverse,
     Replicate(ReplicateParam),
 }
@@ -121,10 +125,7 @@ impl Region {
         Self::new(
             AtomicRange::<f64>::new(origin.range.start(), origin.range.end()),
             Content::Transformer(
-                RegionFilter::FadeInOut(Arc::new(FadeParam {
-                    time_in: 0.1.into(),
-                    time_out: 0.1.into(),
-                })),
+                RegionFilter::FadeInOut(FadeParam::new()),
                 Box::new(origin.clone()),
             ),
             origin.label,
@@ -168,17 +169,25 @@ impl TryFrom<&Value> for Region {
                 make_region_from_param(*start, *dur, content, label)
             }
             Value::Function(
-                id,
-                box Expr::App(
-                    box Expr::Literal(Value::ExtFunction(regionfilter)),
-                    box Expr::Literal(region),
-                ),
-            ) => match regionfilter.as_str() {
-                "fadeinout" => {
+                _ids,
+                box Expr::App(box Expr::Literal(Value::ExtFunction(regionfilter)), args),
+            ) if args.len() == 3 => match (
+                regionfilter.as_str(),
+                args.get(0).unwrap(),
+                args.get(1).unwrap(),
+                args.get(2).unwrap(),
+            ) {
+                (
+                    "fadeinout",
+                    Expr::Literal(region),
+                    Expr::Literal(Value::Parameter(time_in)),
+                    Expr::Literal(Value::Parameter(time_out)),
+                ) => {
+                    //todo:need to eval region for non-literal expression
                     let rg = Region::try_from(region)?;
                     let range = rg.range.clone();
                     let label = rg.label.clone();
-                    let param = Arc::new(FadeParam::new());
+                    let param = FadeParam::new_with(time_in.clone(),time_out.clone());
                     let content =
                         Content::Transformer(RegionFilter::FadeInOut(param), Box::new(rg));
                     Ok(Region::new(range, content, label))

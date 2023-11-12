@@ -2,6 +2,7 @@ use atomic::SimpleAtomic;
 use std::sync::{Arc, Mutex};
 
 use crate::audio::renderer::{Renderer, RendererBase};
+use crate::data::script::Expr;
 use crate::data::Project;
 use crate::{audio, data, gui, utils::atomic};
 
@@ -162,13 +163,20 @@ impl eframe::App for Model {
                 egui::ScrollArea::vertical().show(ui, |ui| {
                     let should_refresh_audio = if let Ok(mut app) = self.app.lock() {
                         let _ = ui.label("Code Editor");
-                        let mut txt =
-                            serde_json::to_string_pretty::<Project>(&app.project).unwrap();
+                        let mut txt = String::new();
                         let widget = match self.editor_mode {
                             EditorMode::Code => {
-                                egui::TextEdit::multiline(&mut app.project_str).code_editor()
+                                txt = app.source.as_ref().map_or("".to_string(), |src| {
+                                    serde_json::to_string_pretty::<Expr>(&src).unwrap()
+                                });
+                                app.project_str = txt.clone();
+                                egui::TextEdit::multiline(&mut txt).code_editor()
                             }
-                            EditorMode::Result => egui::TextEdit::multiline(&mut txt).code_editor(),
+                            EditorMode::Result => {
+                                txt =
+                                    serde_json::to_string_pretty::<Project>(&app.project).unwrap();
+                                egui::TextEdit::multiline(&mut txt).code_editor()
+                            }
                         };
                         let editor = ui.add_sized(ui.available_size(), widget);
                         if editor.gained_focus() {

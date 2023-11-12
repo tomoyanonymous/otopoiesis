@@ -2,12 +2,12 @@ use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 
-use crate::data;
+use crate::{data, parameter::FloatParameter};
 
 pub mod builtin_fn;
 // use serde::{Deserialize, Serialize};
 pub trait ExtFunT: std::fmt::Debug {
-    fn exec(&self, app: & data::AppModel, v: &Value) -> Result<Value, EvalError>;
+    fn exec(&self, app: &data::AppModel, v: &Vec<Value>) -> Result<Value, EvalError>;
 }
 
 pub trait MixerT: std::fmt::Debug {
@@ -59,13 +59,14 @@ impl Type {
 pub enum Value {
     None,
     Number(f64),
+    Parameter(Arc<FloatParameter>),
     String(String),
     Array(Vec<Value>, Type), //typed array
     Function(Vec<Id>, Box<Expr>),
     ExtFunction(Id),
-    Track(Box<Value>, Type), //input type, output type
-    Region(f64,f64,Box<Value>,Id,Type),//start,dur,content,label,type
-    Project(f64,Vec<Value>), //todo:reducer
+    Track(Box<Value>, Type),                //input type, output type
+    Region(f64, f64, Box<Value>, Id, Type), //start,dur,content,label,type
+    Project(f64, Vec<Value>),               //todo:reducer
 }
 
 impl Value {
@@ -83,18 +84,18 @@ impl Value {
     pub fn get_type(&self) -> Type {
         match self {
             Value::None => Type::Unit,
-            Value::Number(_) => Type::Number,
+            Value::Number(_) | Value::Parameter(_) => Type::Number,
             Value::String(_) => Type::String,
             Value::Array(v, t) => {
                 // let _t_elem = v.get(0).map_or(Type::Unknown, |v| v.get_type()).into();
                 // assert_eq!(t, _t_elem);
                 Type::Array(Box::new(t.clone()), v.len() as u64)
             }
-            Value::Function(a, v) => todo!(),
-            Value::ExtFunction(f) => Type::Function(Type::Unknown.into(), Type::Unknown.into()), //cannot infer?
-            Value::Track(input, output) => todo!(),
-            Value::Region(_start,_dur,_,_label,_) => todo!(),
-            Value::Project(_sr,_tracks) => todo!(),
+            Value::Function(_a,_v) => todo!(),
+            Value::ExtFunction(_f) => Type::Function(Type::Unknown.into(), Type::Unknown.into()), //cannot infer?
+            Value::Track(_input, _output) => todo!(),
+            Value::Region(_start, _dur, _, _label, _) => todo!(),
+            Value::Project(_sr, _tracks) => todo!(),
         }
     }
 }
@@ -103,7 +104,7 @@ impl Value {
 pub enum Expr {
     Literal(Value),
     Var(Id),
-    App(Box<Expr>, Box<Expr>), //currently only single argument
+    App(Box<Expr>, Vec<Expr>), //currently only single argument
 }
 
 pub struct Environment<T>(pub Vec<(Id, T)>);
@@ -114,20 +115,25 @@ impl<T> Environment<T> {
 pub enum EvalError {
     TypeMismatch(String),
     NotFound,
+    InvalidNumArgs(usize,usize)//expected,actual
 }
 
 impl Expr {
-    pub fn eval(
-        &self,
-        env: &Environment<Value>,
-        app: & data::AppModel,
-    ) -> Result<Value, EvalError> {
+    pub fn eval(&self, env: &Environment<Value>, app: &data::AppModel) -> Result<Value, EvalError> {
         match self {
             Expr::Literal(v) => Ok(v.clone()),
             Expr::Var(_) => todo!(),
-            Expr::App(fe, arg) => {
+            Expr::App(fe, args) => {
                 let f = fe.eval(env, app)?;
-                let a = arg.eval(env, app)?;
+                let mut arg_res= vec![];
+                for a in args.iter(){
+                    match a.eval(env, app){
+                        Ok(res)=>{arg_res.push(res);}
+                        Err(e)=>{
+                            return Err(e)
+                        }
+                    }
+                }
                 match f {
                     Value::Function(_ids, _body) => {
                         todo!()
@@ -137,7 +143,7 @@ impl Expr {
                             .get_builtin_fn(&fname)
                             .ok_or(EvalError::NotFound)?
                             .clone();
-                        f.0.exec(app, &a)
+                        f.0.exec(app, &arg_res)
                     }
                     _ => Err(EvalError::TypeMismatch("Not a Function".into())),
                 }

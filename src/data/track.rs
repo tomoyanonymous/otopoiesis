@@ -37,7 +37,7 @@ impl TryFrom<&Value> for Track {
 
     fn try_from(value: &Value) -> Result<Self, Self::Error> {
         match value {
-            Value::Track(box Value::Array(regions, _), t) => {
+            Value::Track(box Value::Array(regions, _), _t) => {
                 let regions: Vec<Region> = regions
                     .iter()
                     .map(|rg| {

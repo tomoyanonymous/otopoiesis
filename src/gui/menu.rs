@@ -2,10 +2,9 @@ use crate::action::{self, Action};
 use crate::data::{
     self,
     script::{Expr, Type, Value},
-    Content, OscillatorFun, Region,
 };
 
-use crate::utils::{atomic, AtomicRange};
+use crate::parameter::{FloatParameter, Parameter};
 use std::sync::{mpsc, Arc};
 
 fn make_region(trackid: usize, pos: f64, c: String) -> Value {
@@ -21,7 +20,19 @@ fn make_region(trackid: usize, pos: f64, c: String) -> Value {
         vec![],
         Expr::App(
             Expr::Literal(Value::ExtFunction("fadeinout".to_string())).into(),
-            Expr::Literal(region).into(),
+            vec![
+                Expr::Literal(region),
+                Expr::Literal(Value::Parameter(Arc::new(FloatParameter::new(
+                    0.1,
+                    0.0..=1000.,
+                    "time_in",
+                )))),
+                Expr::Literal(Value::Parameter(Arc::new(FloatParameter::new(
+                    0.1,
+                    0.0..=1000.,
+                    "time_out",
+                )))),
+            ],
         )
         .into(),
     )
@@ -60,6 +71,7 @@ pub fn add_region_button(
         }
         if addfile.clicked() {
             let (file, _len) = data::generator::FilePlayerParam::new_test_file();
+            //todo!
             let content = data::Content::Generator(data::Generator::FilePlayer(Arc::new(file)));
             let region = make_region(trackid, pos, "audiofile".to_string());
             let _ = sender.send(action::AddRegion::new(region, trackid).into());

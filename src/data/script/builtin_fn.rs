@@ -6,8 +6,11 @@ use std::collections::HashMap;
 pub struct ArrayReverse {}
 
 impl ExtFunT for ArrayReverse {
-    fn exec(&self, _app: & crate::data::AppModel, v: &Value) -> Result<Value, EvalError> {
-        match v {
+    fn exec(&self, _app: & crate::data::AppModel, v: &Vec<Value>) -> Result<Value, EvalError> {
+        if v.len()!=1{
+            return Err(EvalError::InvalidNumArgs(1, v.len()))
+        }
+        match v.get(0).unwrap() {
             Value::Array(a, t) => {
                 let mut res = a.clone();
                 res.reverse();

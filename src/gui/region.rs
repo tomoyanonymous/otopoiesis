@@ -123,7 +123,7 @@ impl<'a> egui::Widget for Model<'a> {
                             self.params.range.set_end(origin.range.end());
                             (
                                 ui.add(regionfilter::RegionFilter::FadeInOut(FadeInOut::new(
-                                    param.as_ref(),
+                                    param,
                                     origin.as_ref(),
                                     s,
                                 ))),

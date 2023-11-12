@@ -2,9 +2,9 @@ use crate::audio::{Component, PlaybackInfo};
 
 // use crate::parameter::UIntParameter
 use crate::data::{self, Region};
+use crate::parameter::Parameter;
 use crate::utils::{AtomicRange, SimpleAtomic};
 use std::ops::RangeInclusive;
-use std::sync::Arc;
 // 基本はオフラインレンダリング
 
 /// Interface for offline rendering.
@@ -16,11 +16,11 @@ pub trait RangedComponent: std::fmt::Debug {
 
 #[derive(Debug)]
 pub struct FadeModel {
-    pub param: Arc<data::FadeParam>,
+    pub param: data::FadeParam,
     pub origin: Box<Model>,
 }
 impl FadeModel {
-    fn new(p: Arc<data::FadeParam>, origin: data::Region) -> Self {
+    fn new(p: data::FadeParam, origin: data::Region) -> Self {
         Self {
             param: p,
             origin: Box::new(Model::new(origin, 2)),
@@ -42,8 +42,8 @@ impl RangedComponent for FadeModel {
         self.origin.render_offline(sample_rate, channels);
         assert_eq!(self.origin.interleaved_samples_cache.len(), dest.len());
         let chs = self.get_output_channels() as usize;
-        let in_time = (self.param.time_in.load() as f64 * sample_rate as f64) as usize;
-        let out_time = (self.param.time_out.load() as f64 * sample_rate as f64) as usize;
+        let in_time = (self.param.time_in.get() as f64 * sample_rate as f64) as usize;
+        let out_time = (self.param.time_out.get() as f64 * sample_rate as f64) as usize;
 
         let slice = &self.origin.interleaved_samples_cache[0..dest.len()];
         dest.copy_from_slice(slice);
@@ -266,6 +266,8 @@ pub fn render_region_offline_async(
 
 #[cfg(test)]
 mod test {
+    use std::sync::Arc;
+
     use crate::parameter::{FloatParameter, Parameter};
 
     use super::*;
@@ -390,10 +392,10 @@ mod test {
     }
 
     fn run_fade_region(in_time: f32, out_time: f32) {
-        let fade_param = Arc::new(data::region::FadeParam {
-            time_in: in_time.into(),
-            time_out: out_time.into(),
-        });
+        let fade_param = data::region::FadeParam::new_with(
+            Arc::new(FloatParameter::new(in_time, 0.0..=1000.0, "time_in")),
+            Arc::new(FloatParameter::new(out_time, 0.0..=1000.0, "time_out")),
+        );
         let channel = 2;
         let sample_rate = 48000;
         let range = 0.1..0.2;
@@ -422,8 +424,8 @@ mod test {
         gen_constant(answer.as_mut_slice(), channel as u32);
         apply_fadeinout(
             answer.as_mut_slice(),
-            fade_param.time_in.load().into(),
-            fade_param.time_out.load().into(),
+            fade_param.time_in.get().into(),
+            fade_param.time_out.get().into(),
             sample_rate,
             channel as u32,
         );

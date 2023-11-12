@@ -3,7 +3,7 @@
 
 use crate::data::{
     self,
-    script::{Environment, Expr, Value},
+    script::{Expr, Value},
 };
 use std::sync::{MutexGuard, PoisonError};
 use undo;
@@ -119,7 +119,7 @@ impl undo::Action for AddRegion {
 
     fn apply(&mut self, target: &mut Self::Target) -> undo::Result<Self> {
         match target {
-            Expr::Literal(Value::Project(sr, tracks)) => {
+            Expr::Literal(Value::Project(_sr, tracks)) => {
                 match tracks.get_mut(self.track_num).unwrap() {
                     Value::Track(box Value::Array(regions, _t), _tracktype) => {
                         regions.push(self.elem.clone());
@@ -136,7 +136,7 @@ impl undo::Action for AddRegion {
 
     fn undo(&mut self, target: &mut Self::Target) -> undo::Result<Self> {
         match target {
-            Expr::Literal(Value::Project(sr, tracks)) => {
+            Expr::Literal(Value::Project(_sr, tracks)) => {
                 match tracks.get_mut(self.track_num).unwrap() {
                     Value::Track(box Value::Array(regions, _t), _tracktype) => {
                         if regions.is_empty() {
@@ -178,7 +178,7 @@ impl undo::Action for AddTrack {
 
     fn apply(&mut self, target: &mut Self::Target) -> undo::Result<Self> {
         match target {
-            Expr::Literal(Value::Project(sr, tracks)) => {
+            Expr::Literal(Value::Project(_sr, tracks)) => {
                 tracks.push(self.elem.clone().into());
                 self.pos = tracks.len() - 1;
                 Ok(())
@@ -189,7 +189,7 @@ impl undo::Action for AddTrack {
 
     fn undo(&mut self, target: &mut Self::Target) -> undo::Result<Self> {
         match target {
-            Expr::Literal(Value::Project(sr, tracks)) => {
+            Expr::Literal(Value::Project(_sr, tracks)) => {
                 if tracks.is_empty() {
                     Err(Error::ContainerEmpty)
                 } else {
