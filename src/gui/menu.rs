@@ -45,15 +45,20 @@ pub fn add_region_button(
     ui: &mut egui::Ui,
 ) -> egui::Response {
     ui.menu_button("+", |ui| {
-        let mut osckind_str = "sinewave".to_string();
-        let addosc = ui
+        let id = ui.auto_id_with("osckind");
+        let mut osckind = 
+        ui.ctx().data_mut(|d| d.get_persisted(id)).unwrap_or("sinewave".to_string());
+        let (addosc, osckind) = ui
             .horizontal(|ui| {
                 let addosc = ui.button("~ Add oscillator");
-                let _ = ui.radio_value(&mut osckind_str, "sinewave".to_string(), "SineWave");
-                let _ = ui.radio_value(&mut osckind_str, "sawtooth".to_string(), "SawTooth");
-                let _ = ui.radio_value(&mut osckind_str, "rectangular".to_string(), "Rectangular");
-                let _ = ui.radio_value(&mut osckind_str, "triangular".to_string(), "Triangular");
-                addosc
+                let _ = ui.radio_value(&mut osckind, "sinewave".to_string(), "SineWave");
+                let _ = ui.radio_value(&mut osckind, "sawtooth".to_string(), "SawTooth");
+                let _ = ui.radio_value(&mut osckind, "rectangular".to_string(), "Rectangular");
+                let _ = ui.radio_value(&mut osckind, "triangular".to_string(), "Triangular");
+                ui.ctx().data_mut(|d| {
+                    d.insert_persisted(id, osckind.clone());
+                });
+                (addosc, osckind)
             })
             .inner;
         let addfile = ui.button("💾 Load File");
@@ -66,7 +71,7 @@ pub fn add_region_button(
             })
             .inner;
         if addosc.clicked() {
-            let region = make_region(trackid, pos, osckind_str);
+            let region = make_region(trackid, pos, osckind);
             let _ = sender.send(action::AddRegion::new(region, trackid).into());
         }
         if addfile.clicked() {

@@ -52,8 +52,7 @@ impl<'a> FadeInOut<'a> {
         is_start: bool,
     ) -> egui::Response {
         let radius = 10.0;
-        ui.painter()
-            .debug_rect(*target_rect, egui::Color32::RED, "fade");
+        // ui.painter().debug_rect(*target_rect, egui::Color32::RED, "fade");
 
         let top = target_rect.top();
 
