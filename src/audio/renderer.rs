@@ -78,7 +78,6 @@ where
             };
             assert_eq!(oconfig.channels, 2);
             oconfig.buffer_size = cpal::BufferSize::Fixed(super::DEFAULT_BUFFER_LEN as u32);
-
             let oc = oconfig.clone();
             let out_stream = device.build_output_stream(
                 &oconfig,
