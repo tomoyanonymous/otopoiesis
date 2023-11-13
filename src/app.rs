@@ -98,7 +98,8 @@ impl eframe::App for Model {
             let mut app = self.app.lock().unwrap();
             let need_update = app.consume_actions();
             if need_update {
-                app.compile();
+                let newsrc = app.source.as_ref().unwrap().clone();
+                app.compile(newsrc);
                 app.ui_to_code();
                 self.ui.sync_state(&app.project.tracks);
             }

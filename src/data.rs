@@ -124,7 +124,7 @@ impl AppModel {
                 eprintln!("{}", e)
             }
         }) {
-            self.compile();
+            self.compile(self.source.as_ref().unwrap().clone());
             self.ui_to_code();
         }
     }
@@ -135,7 +135,7 @@ impl AppModel {
     pub fn redo(&mut self) {
         let history = &mut self.history;
         if let Some(_res) = self.source.as_mut().map(|src| history.redo(src)).flatten() {
-            self.compile();
+            self.compile(self.source.as_ref().unwrap().clone());
             self.ui_to_code();
         }
     }
@@ -199,8 +199,7 @@ impl AppModel {
         self.project.tracks.get(id)
     }
     pub fn consume_actions(&mut self) -> bool {
-        self
-            .action_rx
+        self.action_rx
             .try_iter()
             .map(|action_received| {
                 if let Some(src) = self.source.as_mut() {
@@ -212,17 +211,12 @@ impl AppModel {
             .any(|v| v == true)
     }
 
-    pub fn compile(&mut self) -> bool {
-        let env = script::Environment(vec![]);
-        let res = self
-            .source
-            .as_ref()
-            .map(|src| {
-                src.eval(&env, self)
-                    .ok()
-                    .map(|v| Project::try_from(&v).ok())
-            })
-            .flatten()
+    pub fn compile(&mut self, source: Expr) -> bool {
+        let env = Arc::new(script::Environment::new());
+        let res = source
+            .eval(env, self)
+            .ok()
+            .map(|v| Project::try_from(&v).ok())
             .flatten();
         match res {
             Some(pj) => {
