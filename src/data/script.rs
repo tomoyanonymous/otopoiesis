@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
@@ -73,6 +72,9 @@ pub enum Value {
 }
 
 impl Value {
+    pub fn new_lazy(expr:Expr)->Self{
+        Self::Function(vec![],Box::new(expr))
+    }
     pub fn audio_track(channels: u64) -> Self {
         let t = Type::IVec(
             Type::Array(Type::Number.into(), channels).into(),

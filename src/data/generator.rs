@@ -4,22 +4,24 @@ use std::sync::Arc;
 /// These generators are loaded from Region or Track.
 ///
 use crate::data::atomic;
-use crate::parameter::{FloatParameter, Parameter, UIntParameter, RangedNumeric};
+use crate::parameter::{FloatParameter, Parameter, RangedNumeric, UIntParameter};
 use serde::{Deserialize, Serialize};
 /// Utility Parameter for oscillator with some default values.
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct OscillatorParam {
-    pub amp: FloatParameter,
-    pub freq: FloatParameter,
-    pub phase: FloatParameter,
+    pub freq: Arc<FloatParameter>,
+    pub amp: Arc<FloatParameter>,
+    pub phase: Arc<FloatParameter>,
 }
 impl Default for OscillatorParam {
     fn default() -> Self {
         Self {
-            amp: FloatParameter::new(1.0, "amp").set_range( 0.0..=1.0),
-            freq: FloatParameter::new(440.0, "freq").set_range( 0.01..=20000.0),
-            phase: FloatParameter::new(0.0, "phase").set_range( 0.0..=std::f32::consts::PI * 2.0),
+            freq: Arc::new(FloatParameter::new(440.0, "freq").set_range(0.01..=20000.0)),
+            amp: Arc::new(FloatParameter::new(1.0, "amp").set_range(0.0..=1.0)),
+            phase: Arc::new(
+                FloatParameter::new(0.0, "phase").set_range(0.0..=std::f32::consts::PI * 2.0),
+            ),
         }
     }
 }
@@ -58,8 +60,8 @@ impl FilePlayerParam {
             Self {
                 path,
                 channels: UIntParameter::new(2, "channels").set_range(0..=2),
-                start_sec: FloatParameter::new(0.0, "start").set_range( 0.0..=10.0),
-                duration: FloatParameter::new(1.0, "duration").set_range( 0.0..=10.0),
+                start_sec: FloatParameter::new(0.0, "start").set_range(0.0..=10.0),
+                duration: FloatParameter::new(1.0, "duration").set_range(0.0..=10.0),
             },
             length_in_samples,
         )

@@ -3,7 +3,7 @@ use crate::{
         self,
         region::{RangedComponent, RangedComponentDyn},
     },
-    data,
+    data::script::{self, Expr, Value},
     gui::parameter::slider_from_parameter,
     utils::AtomicRange,
 };
@@ -43,7 +43,7 @@ fn reduce_samples(input: &[f32], output: &mut [f32]) {
         });
 }
 pub trait GeneratorUI<'a> {
-    fn get_generator(&self) -> &data::Generator;
+    fn get_generator(&self) -> &script::Value;
     fn get_samples(&mut self) -> &mut Vec<f32>;
     fn get_displayed_range(&self) -> RangeInclusive<f64>;
 
@@ -58,7 +58,7 @@ pub trait GeneratorUI<'a> {
         let channels = 2;
         let numsamples = (sample_rate as f64 * self.get_displayed_duration()).ceil() as usize;
         let mut buf = vec![0.0f32; numsamples * channels];
-        let audio_component = audio::generator::get_component_for_generator(self.get_generator());
+        let audio_component = audio::generator::get_component_for_value(self.get_generator());
         let mut ranged_component = RangedComponentDyn::new(
             audio_component,
             AtomicRange::from(self.get_displayed_range()),
@@ -70,13 +70,13 @@ pub trait GeneratorUI<'a> {
 }
 
 pub struct Generator<'a> {
-    param: &'a data::Generator,
+    param: &'a script::Value,
     displayed_range: &'a AtomicRange<f64>,
     state: &'a mut State,
 }
 
 impl<'a> GeneratorUI<'a> for Generator<'a> {
-    fn get_generator(&self) -> &data::Generator {
+    fn get_generator(&self) -> &script::Value {
         self.param
     }
 
@@ -91,7 +91,7 @@ impl<'a> GeneratorUI<'a> for Generator<'a> {
 
 impl<'a> Generator<'a> {
     pub fn new(
-        param: &'a data::Generator,
+        param: &'a script::Value,
         displayed_range: &'a AtomicRange<f64>,
         state: &'a mut State,
     ) -> Self {
@@ -145,13 +145,23 @@ impl<'a> egui::Widget for Generator<'a> {
                 egui::menu::menu_button(ui, "parameter", |ui| {
                     //  ui.collapsing("parameter", |ui| {
                     match &self.param {
-                        data::Generator::Oscillator(_kind, osc) => {
+                        Value::Function(
+                            _,
+                            box Expr::App(box Expr::Literal(Value::ExtFunction(fname)), args),
+                        ) => {
                             let response = ui
                                 .vertical(|ui| {
-                                    let f = slider_from_parameter(&osc.freq, true, ui);
-                                    let a = slider_from_parameter(&osc.amp, false, ui);
-                                    let p = slider_from_parameter(&osc.phase, false, ui);
-                                    f.union(a.union(p))
+                                    ui.label(fname.as_str());
+                                    args.iter()
+                                        .map(|a| {
+                                            if let Expr::Literal(Value::Parameter(param)) = a {
+                                                slider_from_parameter(param, false, ui)
+                                            } else {
+                                                ui.label("Invalid Parameter")
+                                            }
+                                        })
+                                        .reduce(|acc, b| acc.union(b))
+                                        .unwrap()
                                 })
                                 .inner;
                             if (response.clicked() || response.drag_released())
@@ -159,19 +169,11 @@ impl<'a> egui::Widget for Generator<'a> {
                             {
                                 self.update_shape(&ui.ctx().style());
                             }
-                            response
                         }
-                        data::Generator::Noise() => ui.label("Noise"),
-                        data::Generator::Constant(param) => {
-                            let slider = slider_from_parameter(&param, true, ui);
-                            if slider.drag_released() && response.changed() {
-                                self.update_shape(&ui.ctx().style());
-                            }
-                            slider
+                        _ => {
+                            ui.label("no matching ui for generator");
                         }
-                        #[cfg(not(feature = "web"))]
-                        data::Generator::FilePlayer(param) => ui.label(param.path.to_string()),
-                    };
+                    }
                 });
             });
             response

@@ -1,12 +1,10 @@
 use super::{
-    generator::*,
     script::{Expr, Value},
     ConversionError,
 };
 use crate::{
     data::{atomic, AtomicRange},
     parameter::{FloatParameter, Parameter, RangedNumeric},
-    utils::atomic::{Bool, F32},
 };
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -50,54 +48,8 @@ pub enum RegionFilter {
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub enum Content {
-    Generator(Generator),
+    Generator(Value),
     Transformer(RegionFilter, Box<Region>),
-}
-impl TryFrom<&Value> for Content {
-    type Error = ConversionError;
-
-    fn try_from(value: &Value) -> Result<Self, Self::Error> {
-        match value {
-            //||{FadeInOut(Region) }
-            Value::ExtFunction(fname) => match fname.as_str() {
-                "sinewave" => {
-                    let kind = OscillatorFun::SineWave;
-                    let param = OscillatorParam::default();
-                    Ok(Content::Generator(Generator::Oscillator(
-                        kind,
-                        Arc::new(param),
-                    )))
-                }
-                "sawtooth" => {
-                    let kind = OscillatorFun::SawTooth(Arc::new(Bool::new(true)));
-                    let param = OscillatorParam::default();
-                    Ok(Content::Generator(Generator::Oscillator(
-                        kind,
-                        Arc::new(param),
-                    )))
-                }
-                "rect" => {
-                    let kind = OscillatorFun::Rectanglular(Arc::new(F32::new(0.5)));
-                    let param = OscillatorParam::default();
-                    Ok(Content::Generator(Generator::Oscillator(
-                        kind,
-                        Arc::new(param),
-                    )))
-                }
-                "triangular" => {
-                    let kind = OscillatorFun::Triangular;
-                    let param = OscillatorParam::default();
-                    Ok(Content::Generator(Generator::Oscillator(
-                        kind,
-                        Arc::new(param),
-                    )))
-                }
-
-                _ => Err(ConversionError {}),
-            },
-            _ => Err(ConversionError {}),
-        }
-    }
 }
 
 /// Data structure for region.
@@ -137,7 +89,7 @@ impl std::default::Default for Region {
     fn default() -> Self {
         Self {
             range: AtomicRange::<f64>::new(0.0, 0.0),
-            content: Content::Generator(Generator::default()),
+            content: Content::Generator(Value::None),
             label: "".to_string(),
         }
     }
@@ -155,8 +107,8 @@ fn make_region_from_param(
     label: &str,
 ) -> Result<Region, ConversionError> {
     let range = AtomicRange::new(start, start + dur);
-    let content: Result<Content, ConversionError> = Content::try_from(content);
-    let res = Region::new(range, content?, label);
+    let content = Content::Generator(content.clone());
+    let res = Region::new(range, content, label);
     Ok(res)
 }
 

@@ -1,4 +1,5 @@
 use crate::data;
+use crate::data::script;
 use crate::gui;
 use crate::utils::atomic::SimpleAtomic;
 mod region_handle;
@@ -12,7 +13,7 @@ use self::regionfilter::{fadeinout, replicate};
 
 pub enum ContentModel {
     RegionFilter(regionfilter::RegionFilterState),
-    Generator(data::Generator, super::generator::State),
+    Generator(script::Value, super::generator::State),
 }
 
 pub struct State {

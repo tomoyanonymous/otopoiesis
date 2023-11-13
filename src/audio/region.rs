@@ -210,7 +210,7 @@ impl Model {
 
         let content: Box<dyn RangedComponent + Send + Sync> = match &params.content {
             data::Content::Generator(g) => {
-                let c = super::generator::get_component_for_generator(g);
+                let c = super::generator::get_component_for_value(g);
                 let ranged_component = RangedComponentDyn::new(c, params.range.clone());
                 Box::new(ranged_component)
             }
@@ -268,7 +268,14 @@ pub fn render_region_offline_async(
 mod test {
     use std::sync::Arc;
 
-    use crate::parameter::{FloatParameter, Parameter, RangedNumeric};
+    use crate::{
+        data::{
+            script::{Expr, Value},
+            Content,
+        },
+        param_float,
+        parameter::{FloatParameter, Parameter, RangedNumeric},
+    };
 
     use super::*;
 
@@ -365,10 +372,14 @@ mod test {
         let osc_param = data::generator::OscillatorParam::default();
         let data = data::Region::new(
             AtomicRange::<f64>::new(range.start, range.end),
-            data::Content::Generator(data::generator::Generator::Oscillator(
-                data::generator::OscillatorFun::SineWave,
-                Arc::new(osc_param.clone()),
-            )),
+            data::Content::Generator(Value::new_lazy(Expr::App(
+                Box::new(Expr::Literal(Value::ExtFunction("sinewave".into()))),
+                vec![Expr::Literal(Value::Parameter(Arc::new(param_float!(
+                    440.0,
+                    "freq",
+                    20.0..=20000.0
+                ))))],
+            ))),
             "test_sin",
         );
         let mut model = Model::new(data, channel);
@@ -400,16 +411,28 @@ mod test {
         let sample_rate = 48000;
         let range = 0.1..0.2;
 
-        let generator = data::Content::Generator(data::Generator::Constant(Arc::new(
-            FloatParameter::new(1.0, "test").set_range(0.0..=1.0),
-        )));
+        // let generator = data::Content::Generator(data::Generator::Constant(Arc::new(
+        //     FloatParameter::new(1.0, "test").set_range(0.0..=1.0),
+        // )));
+        let generator = Value::new_lazy(Expr::App(
+            Expr::Literal(Value::ExtFunction("constant".to_string())).into(),
+            vec![Expr::Literal(Value::Parameter(Arc::new(param_float!(
+                1.0,
+                "test",
+                0.0..=1.0
+            ))))],
+        ));
         let range_atomic = AtomicRange::<f64>::new(range.start, range.end);
 
         let data = data::Region::new(
             range_atomic.clone(),
             data::Content::Transformer(
                 data::RegionFilter::FadeInOut(fade_param.clone()),
-                Box::new(data::Region::new(range_atomic, generator, "generator")),
+                Box::new(data::Region::new(
+                    range_atomic,
+                    Content::Generator(generator),
+                    "generator",
+                )),
             ),
             "test_sin",
         );

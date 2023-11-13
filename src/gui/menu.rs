@@ -6,16 +6,7 @@ use crate::data::{
 
 use crate::parameter::{FloatParameter, Parameter, RangedNumeric};
 use std::sync::{mpsc, Arc};
-
-fn make_region(trackid: usize, pos: f64, c: String) -> Value {
-    let region = Value::Region(
-        pos,
-        pos + 1.0,
-        Value::ExtFunction(c).into(),
-        format!("region{}", trackid + 1),
-        Type::Unknown,
-    );
-
+fn with_fade(region:Value)->Value{
     Value::Function(
         vec![],
         Expr::App(
@@ -33,6 +24,49 @@ fn make_region(trackid: usize, pos: f64, c: String) -> Value {
         .into(),
     )
 }
+fn make_region(trackid: usize, pos: f64, c: String) -> Value {
+    let generator = Value::new_lazy(Expr::App(
+        Expr::Literal(Value::ExtFunction(c)).into(),
+        vec![
+            Expr::Literal(Value::Parameter(Arc::new(
+                FloatParameter::new(440., "freq").set_range(10.0..=20000.),
+            ))),
+            Expr::Literal(Value::Parameter(Arc::new(
+                FloatParameter::new(1.0, "amp").set_range(0.0..=1.0),
+            ))),
+            Expr::Literal(Value::Parameter(Arc::new(
+                FloatParameter::new(0.0, "phase").set_range(0.0..=1.0),
+            ))),
+        ],
+    ));
+    let region = Value::Region(
+        pos,
+        pos + 1.0,
+        generator.into(),
+        format!("region{}", trackid + 1),
+        Type::Unknown,
+    );
+
+    with_fade(region)
+}
+
+fn make_region_file(trackid: usize, pos: f64, path: String) -> Value {
+    let generator = Value::new_lazy(Expr::App(
+        Expr::Literal(Value::ExtFunction("fileplayer".to_string())).into(),
+        vec![
+            Expr::Literal(Value::String(path)),
+        ],
+    ));
+    let region = Value::Region(
+        pos,
+        pos + 1.0,
+        generator.into(),
+        format!("region{}", trackid + 1),
+        Type::Unknown,
+    );
+    with_fade(region)
+}
+
 
 pub fn add_region_button(
     trackid: usize,
@@ -75,8 +109,8 @@ pub fn add_region_button(
         if addfile.clicked() {
             let (file, _len) = data::generator::FilePlayerParam::new_test_file();
             //todo!
-            let content = data::Content::Generator(data::Generator::FilePlayer(Arc::new(file)));
-            let region = make_region(trackid, pos, "audiofile".to_string());
+
+            let region = make_region_file(trackid, pos, file.path);
             let _ = sender.send(action::AddRegion::new(region, trackid).into());
         }
         if addarray.clicked() {
