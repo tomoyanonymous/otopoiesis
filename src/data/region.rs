@@ -5,7 +5,7 @@ use super::{
 };
 use crate::{
     data::{atomic, AtomicRange},
-    parameter::{FloatParameter, Parameter},
+    parameter::{FloatParameter, Parameter, RangedNumeric},
     utils::atomic::{Bool, F32},
 };
 use serde::{Deserialize, Serialize};
@@ -19,8 +19,8 @@ pub struct FadeParam {
 impl FadeParam {
     pub fn new() -> Self {
         Self {
-            time_in: Arc::new(FloatParameter::new(0.0, 0.0..=1000.0, "in_time")),
-            time_out: Arc::new(FloatParameter::new(0.0, 0.0..=1000.0, "out_time")),
+            time_in: Arc::new(FloatParameter::new(0.0, "in_time").set_range( 0.0..=1000.0)),
+            time_out: Arc::new(FloatParameter::new(0.0, "out_time").set_range( 0.0..=1000.0)),
         }
     }
     pub fn new_with(time_in: Arc<FloatParameter>, time_out: Arc<FloatParameter>) -> Self {

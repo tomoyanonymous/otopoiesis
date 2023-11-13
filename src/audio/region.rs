@@ -268,7 +268,7 @@ pub fn render_region_offline_async(
 mod test {
     use std::sync::Arc;
 
-    use crate::parameter::{FloatParameter, Parameter};
+    use crate::parameter::{FloatParameter, Parameter, RangedNumeric};
 
     use super::*;
 
@@ -393,15 +393,15 @@ mod test {
 
     fn run_fade_region(in_time: f32, out_time: f32) {
         let fade_param = data::region::FadeParam::new_with(
-            Arc::new(FloatParameter::new(in_time, 0.0..=1000.0, "time_in")),
-            Arc::new(FloatParameter::new(out_time, 0.0..=1000.0, "time_out")),
+            Arc::new(FloatParameter::new(in_time, "time_in").set_range(0.0..=1000.0)),
+            Arc::new(FloatParameter::new(out_time, "time_out").set_range(0.0..=1000.0)),
         );
         let channel = 2;
         let sample_rate = 48000;
         let range = 0.1..0.2;
 
         let generator = data::Content::Generator(data::Generator::Constant(Arc::new(
-            FloatParameter::new(1.0, 0.0..=1.0, "test"),
+            FloatParameter::new(1.0, "test").set_range(0.0..=1.0),
         )));
         let range_atomic = AtomicRange::<f64>::new(range.start, range.end);
 

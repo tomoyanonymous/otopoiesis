@@ -4,7 +4,7 @@ use crate::data::{
     script::{Expr, Type, Value},
 };
 
-use crate::parameter::{FloatParameter, Parameter};
+use crate::parameter::{FloatParameter, Parameter, RangedNumeric};
 use std::sync::{mpsc, Arc};
 
 fn make_region(trackid: usize, pos: f64, c: String) -> Value {
@@ -22,16 +22,12 @@ fn make_region(trackid: usize, pos: f64, c: String) -> Value {
             Expr::Literal(Value::ExtFunction("fadeinout".to_string())).into(),
             vec![
                 Expr::Literal(region),
-                Expr::Literal(Value::Parameter(Arc::new(FloatParameter::new(
-                    0.1,
-                    0.0..=1000.,
-                    "time_in",
-                )))),
-                Expr::Literal(Value::Parameter(Arc::new(FloatParameter::new(
-                    0.1,
-                    0.0..=1000.,
-                    "time_out",
-                )))),
+                Expr::Literal(Value::Parameter(Arc::new(
+                    FloatParameter::new(0.1, "time_in").set_range(0.0..=1000.),
+                ))),
+                Expr::Literal(Value::Parameter(Arc::new(
+                    FloatParameter::new(0.1, "time_out").set_range(0.0..=1000.),
+                ))),
             ],
         )
         .into(),
@@ -46,8 +42,10 @@ pub fn add_region_button(
 ) -> egui::Response {
     ui.menu_button("+", |ui| {
         let id = ui.auto_id_with("osckind");
-        let mut osckind = 
-        ui.ctx().data_mut(|d| d.get_persisted(id)).unwrap_or("sinewave".to_string());
+        let mut osckind = ui
+            .ctx()
+            .data_mut(|d| d.get_persisted(id))
+            .unwrap_or("sinewave".to_string());
         let (addosc, osckind) = ui
             .horizontal(|ui| {
                 let addosc = ui.button("~ Add oscillator");
