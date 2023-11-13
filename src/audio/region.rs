@@ -378,6 +378,14 @@ mod test {
                     440.0,
                     "freq",
                     20.0..=20000.0
+                )))),Expr::Literal(Value::Parameter(Arc::new(param_float!(
+                    1.0,
+                    "amp",
+                    0.0..=1.0
+                )))),Expr::Literal(Value::Parameter(Arc::new(param_float!(
+                    0.0,
+                    "phase",
+                    0.0..=1.0
                 ))))],
             ))),
             "test_sin",
