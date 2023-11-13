@@ -13,9 +13,10 @@ description = "a constructive audio programming environment with timeline-based 
 crate-type = ["cdylib", "rlib"]
 
 [features]
-default = ["native"]
+default = ["web"]
 native = ["dep:clap", "dep:dirs"]
 web = [
+    "dep:wasm-bindgen",
     "dep:wasm-bindgen-futures",
     "dep:wee_alloc",
     "dep:console_error_panic_hook",
@@ -31,7 +32,8 @@ serde_json = "*"
 serde_with = "2.1.0"
 undo = "0.47.*"
 rfd = "0.11"
-rand = "0.8.5"
+# need to disable "getrandom" feature
+rand = { version = "0.8.5", default-features = false, features = ["std_rng"] }
 
 egui = "0.23.*"
 eframe = { version = "0.23.*" }
@@ -42,12 +44,13 @@ web-sys = { version = "0.3.60", features = ["console"] }
 cpal = { version = "0.15.2" }
 symphonia = { version = "0.5.2", features = ["wav"] }
 dirs = { version = "5.0", optional = true }
-[target.'cfg(target_os = "macos")'.dependencies]
-coreaudio-sys = "0.2.12"
-
+wasm-bindgen = { version = "0.2.88", optional = true }
 console_error_panic_hook = { version = "0.1.6", optional = true }
-wasm-bindgen-futures = { version = "0.4.33", optional = true }
+wasm-bindgen-futures = { version = "0.4.38", optional = true }
 wee_alloc = { version = "0.4.5", optional = true }
+
 
 [dev-dependencies]
 wasm-bindgen-test = { version = "0.2" }
+[target.'cfg(target_os = "macos")'.dependencies]
+coreaudio-sys = "0.2.12"

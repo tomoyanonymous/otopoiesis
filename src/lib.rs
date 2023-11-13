@@ -19,34 +19,53 @@ pub mod utils;
 pub mod cli;
 
 #[cfg(feature = "web")]
-use eframe::wasm_bindgen::{self, prelude::*};
-
+use wasm_bindgen::prelude::*;
 #[cfg(feature = "web")]
-extern crate wee_alloc;
+use wasm_bindgen_futures;
+#[cfg(feature = "web")]
+use console_error_panic_hook;
+
+// #[cfg(feature = "web")]
+// extern crate wee_alloc;
 
 // Use `wee_alloc` as the global allocator.
-#[cfg(feature = "web")]
-#[global_allocator]
-static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
+// #[cfg(feature = "web")]
+// #[global_allocator]
+// static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 
+#[derive(Clone)]
 #[cfg(feature = "web")]
 #[wasm_bindgen]
 pub struct WebHandle {
     #[allow(dead_code)]
-    handle: eframe::web::AppRunnerRef,
+    runner: eframe::WebRunner,
 }
 
-/// Call this once from the HTML.
-#[cfg(feature = "web")]
-#[wasm_bindgen]
-pub async fn start(canvas_id: &str) -> Result<WebHandle, eframe::wasm_bindgen::JsValue> {
-    console_error_panic_hook::set_once();
-    let web_options = eframe::WebOptions::default();
-    eframe::start_web(
-        canvas_id,
-        web_options,
-        Box::new(|cc| Box::new(app::Model::new(cc, None))),
-    )
-    .await
-    .map(|handle| WebHandle { handle })
-}
+// #[cfg(feature = "web")]
+// #[wasm_bindgen]
+// impl WebHandle {
+//     /// Installs a panic hook, then returns.
+//     #[allow(clippy::new_without_default)]
+//     #[wasm_bindgen(constructor)]
+//     pub fn new() -> Self {
+//         console_error_panic_hook::set_once();
+//         // Redirect [`log`] message to `console.log` and friends:
+//         // eframe::web::WebLogger::init(log::LevelFilter::Debug).ok();
+
+//         Self {
+//             runner: eframe::WebRunner::new(),
+//         }
+//     }
+
+//     /// Call this once from JavaScript to start your app.
+//     #[wasm_bindgen]
+//     pub async fn start(&self, canvas_id: &str) -> Result<(), wasm_bindgen::JsValue> {
+//         self.runner
+//             .start(
+//                 canvas_id,
+//                 eframe::WebOptions::default(),
+//                 Box::new(|cc| Box::new(app::Model::new(cc, None))),
+//             )
+//             .await
+//     }
+// }
