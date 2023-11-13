@@ -1,10 +1,8 @@
 //! The definitions of un/redo-able actions for applications.
 //! Todo: fix an inconsistensy after code-app translation because serializing/deserializing refreshes Arc references.
 
-use crate::data::{
-    self,
-    script::{Expr, Value},
-};
+use crate::data;
+use crate::script::{Expr, Value};
 use std::sync::{MutexGuard, PoisonError};
 use undo;
 

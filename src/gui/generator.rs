@@ -3,8 +3,8 @@ use crate::{
         self,
         region::{RangedComponent, RangedComponentDyn},
     },
-    data::script::{self, Expr, Value},
     gui::parameter::slider_from_parameter,
+    script::{self, Expr, Value},
     utils::AtomicRange,
 };
 use egui::{epaint::Shape, Pos2, Sense, Vec2};

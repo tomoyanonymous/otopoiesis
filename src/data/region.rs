@@ -1,7 +1,5 @@
-use super::{
-    script::{Expr, Value},
-    ConversionError,
-};
+use super::ConversionError;
+use crate::script::{Expr, Value};
 use crate::{
     data::{atomic, AtomicRange},
     parameter::{FloatParameter, Parameter, RangedNumeric},
@@ -17,8 +15,8 @@ pub struct FadeParam {
 impl FadeParam {
     pub fn new() -> Self {
         Self {
-            time_in: Arc::new(FloatParameter::new(0.0, "in_time").set_range( 0.0..=1000.0)),
-            time_out: Arc::new(FloatParameter::new(0.0, "out_time").set_range( 0.0..=1000.0)),
+            time_in: Arc::new(FloatParameter::new(0.0, "in_time").set_range(0.0..=1000.0)),
+            time_out: Arc::new(FloatParameter::new(0.0, "out_time").set_range(0.0..=1000.0)),
         }
     }
     pub fn new_with(time_in: Arc<FloatParameter>, time_out: Arc<FloatParameter>) -> Self {
@@ -139,7 +137,7 @@ impl TryFrom<&Value> for Region {
                     let rg = Region::try_from(region)?;
                     let range = rg.range.clone();
                     let label = rg.label.clone();
-                    let param = FadeParam::new_with(time_in.clone(),time_out.clone());
+                    let param = FadeParam::new_with(time_in.clone(), time_out.clone());
                     let content =
                         Content::Transformer(RegionFilter::FadeInOut(param), Box::new(rg));
                     Ok(Region::new(range, content, label))

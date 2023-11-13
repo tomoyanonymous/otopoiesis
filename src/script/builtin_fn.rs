@@ -36,8 +36,6 @@ impl ExtFunT for Print {
 #[derive(Clone, Debug)]
 pub struct Generator {}
 
-
-
 pub fn gen_default_functions() -> HashMap<&'static str, ExtFun> {
     HashMap::from([("reverse", ExtFun::new(ArrayReverse {}))])
 }

@@ -13,17 +13,18 @@ pub mod audio;
 pub mod data;
 pub mod gui;
 pub mod parameter;
+pub mod script;
 pub mod utils;
 
 #[cfg(not(feature = "web"))]
 pub mod cli;
 
 #[cfg(feature = "web")]
+use console_error_panic_hook;
+#[cfg(feature = "web")]
 use wasm_bindgen::prelude::*;
 #[cfg(feature = "web")]
 use wasm_bindgen_futures;
-#[cfg(feature = "web")]
-use console_error_panic_hook;
 
 // #[cfg(feature = "web")]
 // extern crate wee_alloc;

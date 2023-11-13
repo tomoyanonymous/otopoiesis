@@ -1,5 +1,5 @@
-use super::script::Value;
 use super::{ConversionError, Generator, Region};
+use crate::script::Value;
 use serde::{Deserialize, Serialize};
 /// Data structure for track.
 /// The track has some input/output stream.

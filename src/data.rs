@@ -13,7 +13,6 @@ use undo;
 
 pub mod generator;
 pub mod region;
-pub mod script;
 pub mod track;
 
 pub use generator::*;
@@ -23,7 +22,7 @@ pub use track::*;
 #[cfg(not(feature = "web"))]
 use dirs;
 
-use self::script::{Environment, Expr, Value};
+use crate::script::{self, Expr, Value};
 
 pub struct LaunchArg {
     pub file: Option<String>,

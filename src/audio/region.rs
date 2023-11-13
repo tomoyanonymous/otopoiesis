@@ -269,12 +269,10 @@ mod test {
     use std::sync::Arc;
 
     use crate::{
-        data::{
-            script::{Expr, Value},
-            Content,
-        },
+        data::Content,
         param_float,
         parameter::{FloatParameter, Parameter, RangedNumeric},
+        script::{Expr, Value},
     };
 
     use super::*;
@@ -374,19 +372,23 @@ mod test {
             AtomicRange::<f64>::new(range.start, range.end),
             data::Content::Generator(Value::new_lazy(Expr::App(
                 Box::new(Expr::Literal(Value::ExtFunction("sinewave".into()))),
-                vec![Expr::Literal(Value::Parameter(Arc::new(param_float!(
-                    440.0,
-                    "freq",
-                    20.0..=20000.0
-                )))),Expr::Literal(Value::Parameter(Arc::new(param_float!(
-                    1.0,
-                    "amp",
-                    0.0..=1.0
-                )))),Expr::Literal(Value::Parameter(Arc::new(param_float!(
-                    0.0,
-                    "phase",
-                    0.0..=1.0
-                ))))],
+                vec![
+                    Expr::Literal(Value::Parameter(Arc::new(param_float!(
+                        440.0,
+                        "freq",
+                        20.0..=20000.0
+                    )))),
+                    Expr::Literal(Value::Parameter(Arc::new(param_float!(
+                        1.0,
+                        "amp",
+                        0.0..=1.0
+                    )))),
+                    Expr::Literal(Value::Parameter(Arc::new(param_float!(
+                        0.0,
+                        "phase",
+                        0.0..=1.0
+                    )))),
+                ],
             ))),
             "test_sin",
         );

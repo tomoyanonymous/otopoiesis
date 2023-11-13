@@ -2,8 +2,8 @@ use atomic::SimpleAtomic;
 use std::sync::{Arc, Mutex};
 
 use crate::audio::renderer::{Renderer, RendererBase};
-use crate::data::script::Expr;
 use crate::data::Project;
+use crate::script::Expr;
 use crate::{audio, data, gui, utils::atomic};
 
 pub(crate) mod filemanager;

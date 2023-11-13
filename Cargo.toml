@@ -13,7 +13,7 @@ description = "a constructive audio programming environment with timeline-based 
 crate-type = ["cdylib", "rlib"]
 
 [features]
-default = ["web"]
+default = ["native"]
 native = ["dep:clap", "dep:dirs"]
 web = [
     "dep:wasm-bindgen",

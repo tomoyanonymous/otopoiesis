@@ -97,7 +97,7 @@ impl NumericParameter for FloatParameter {}
 #[macro_export]
 macro_rules! param_float {
     ($init:expr,$label:literal,$range:expr) => {
-        FloatParameter::new($init,$label).set_range($range)
+        FloatParameter::new($init, $label).set_range($range)
     };
 }
 

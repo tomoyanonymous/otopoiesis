@@ -1,7 +1,7 @@
 use crate::action::{Action, AddTrack};
 use crate::data;
-use crate::data::script::{Type, Value};
 use crate::gui;
+use crate::script::{Type, Value};
 use crate::utils::atomic::{self, SimpleAtomic};
 use std::sync::Arc;
 

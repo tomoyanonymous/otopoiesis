@@ -2,11 +2,9 @@ use std::sync::Arc;
 
 use super::*;
 use crate::{
-    data::{
-        script::{self, Expr, Value},
-        FilePlayerParam, OscillatorParam,
-    },
+    data::{FilePlayerParam, OscillatorParam},
     parameter::{FloatParameter, Parameter, RangedNumeric, UIntParameter},
+    script::{self, Expr, Value},
 };
 pub mod constant;
 #[cfg(not(feature = "web"))]

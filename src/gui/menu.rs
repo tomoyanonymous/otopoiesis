@@ -1,12 +1,10 @@
 use crate::action::{self, Action};
-use crate::data::{
-    self,
-    script::{Expr, Type, Value},
-};
+use crate::data;
+use crate::script::{Expr, Type, Value};
 
 use crate::parameter::{FloatParameter, Parameter, RangedNumeric};
 use std::sync::{mpsc, Arc};
-fn with_fade(region:Value)->Value{
+fn with_fade(region: Value) -> Value {
     Value::Function(
         vec![],
         Expr::App(
@@ -53,9 +51,7 @@ fn make_region(trackid: usize, pos: f64, c: String) -> Value {
 fn make_region_file(trackid: usize, pos: f64, path: String) -> Value {
     let generator = Value::new_lazy(Expr::App(
         Expr::Literal(Value::ExtFunction("fileplayer".to_string())).into(),
-        vec![
-            Expr::Literal(Value::String(path)),
-        ],
+        vec![Expr::Literal(Value::String(path))],
     ));
     let region = Value::Region(
         pos,
@@ -66,7 +62,6 @@ fn make_region_file(trackid: usize, pos: f64, path: String) -> Value {
     );
     with_fade(region)
 }
-
 
 pub fn add_region_button(
     trackid: usize,
