@@ -213,7 +213,7 @@ impl AppModel {
     pub fn compile(&mut self, source: Expr) -> bool {
         let env = Arc::new(script::Environment::new());
         let res = source
-            .eval(env, self)
+            .eval(env, &mut Some(self))
             .ok()
             .map(|v| Project::try_from(&v).ok())
             .flatten();

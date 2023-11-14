@@ -15,7 +15,11 @@ pub use {
 // mod test;
 // use serde::{Deserialize, Serialize};
 pub trait ExtFunT: std::fmt::Debug {
-    fn exec(&self, app: &mut data::AppModel, v: &Vec<Value>) -> Result<Value, EvalError>;
+    fn exec(
+        &self,
+        app: &mut Option<&mut data::AppModel>,
+        v: &Vec<Value>,
+    ) -> Result<Value, EvalError>;
 }
 
 pub trait MixerT: std::fmt::Debug {

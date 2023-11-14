@@ -19,7 +19,7 @@ impl Expr {
     pub fn eval(
         &self,
         env: Arc<Environment<Value>>,
-        app: &mut data::AppModel,
+        app: &mut Option<&mut data::AppModel>,
     ) -> Result<Value, EvalError> {
         match self {
             Expr::Literal(v) => Ok(v.clone()),
@@ -27,8 +27,10 @@ impl Expr {
             Expr::Lambda(ids, body) => Ok(Value::Closure(ids.clone(), env.clone(), body.clone())),
             Expr::Let(id, body, then) => {
                 let mut newenv = extend_env(env.clone());
+
                 let body_v = body.eval(env, app)?;
                 newenv.bind(id, body_v);
+
                 then.eval(Arc::new(newenv), app)
             }
             Expr::App(fe, args) => {
@@ -54,11 +56,13 @@ impl Expr {
                         body.eval(Arc::new(newenv), app)
                     }
                     Value::ExtFunction(fname) => {
-                        let f = app
-                            .get_builtin_fn(&fname)
-                            .ok_or(EvalError::NotFound)?
-                            .clone();
-                        f.0.exec(app, &arg_res)
+                        if app.is_some() {
+                            let mut a = app.as_ref().unwrap();
+                            let f = a.get_builtin_fn(&fname).ok_or(EvalError::NotFound)?.clone();
+                            f.0.exec(app, &arg_res)
+                        } else {
+                            Err(EvalError::NotFound)
+                        }
                     }
                     _ => Err(EvalError::TypeMismatch("Not a Function".into())),
                 }

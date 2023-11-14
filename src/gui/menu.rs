@@ -1,6 +1,6 @@
 use crate::action::{self, Action};
 use crate::data;
-use crate::script::{Expr, Type, Value};
+use crate::script::{Environment, Expr, Type, Value};
 
 use crate::parameter::{FloatParameter, Parameter, RangedNumeric};
 use std::sync::{mpsc, Arc};

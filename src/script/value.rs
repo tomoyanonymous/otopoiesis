@@ -17,7 +17,14 @@ pub enum Value {
 
 impl Value {
     pub fn new_lazy(expr: Expr) -> Self {
-        Self::Function(vec![], Box::new(expr))
+        //wrap expression with function without arguments
+        Self::Closure(vec![], Arc::new(Environment::new()), Box::new(expr))
+    }
+    pub fn eval_closure(&self) -> Result<Self, EvalError> {
+        match self {
+            Self::Closure(ids, env, expr) => expr.eval(env.clone(), &mut None),
+            _ => Err(EvalError::TypeMismatch("Not a Closure".into())),
+        }
     }
     pub fn audio_track(channels: u64) -> Self {
         let t = Type::IVec(

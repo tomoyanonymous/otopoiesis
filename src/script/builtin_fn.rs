@@ -1,3 +1,5 @@
+use crate::data::AppModel;
+
 use super::{EvalError, ExtFun, ExtFunT, Value};
 use std::collections::HashMap;
 
@@ -5,7 +7,7 @@ use std::collections::HashMap;
 pub struct ArrayReverse {}
 
 impl ExtFunT for ArrayReverse {
-    fn exec(&self, _app: &mut crate::data::AppModel, v: &Vec<Value>) -> Result<Value, EvalError> {
+    fn exec(&self, _app: &mut Option<&mut AppModel>, v: &Vec<Value>) -> Result<Value, EvalError> {
         if v.len() != 1 {
             return Err(EvalError::InvalidNumArgs(1, v.len()));
         }
@@ -24,7 +26,7 @@ impl ExtFunT for ArrayReverse {
 pub struct Print {}
 
 impl ExtFunT for Print {
-    fn exec(&self, _app: &mut crate::data::AppModel, v: &Vec<Value>) -> Result<Value, EvalError> {
+    fn exec(&self, _app: &mut Option<&mut AppModel>, v: &Vec<Value>) -> Result<Value, EvalError> {
         let str = v
             .iter()
             .fold(String::new(), |acc, b| format!("{}, {:?}", acc, b));

@@ -1,6 +1,6 @@
 use super::Component;
 use crate::audio::PlaybackInfo;
-use rand;
+
 #[derive(Clone, Debug)]
 pub struct Noise {}
 impl Component for Noise {
