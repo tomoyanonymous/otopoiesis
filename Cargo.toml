@@ -14,7 +14,7 @@ crate-type = ["cdylib", "rlib"]
 
 [features]
 default = ["native"]
-native = ["dep:clap", "dep:dirs", "deps:rand"]
+native = ["dep:clap", "dep:dirs", "dep:rand"]
 web = [
     "dep:wasm-bindgen",
     "dep:wasm-bindgen-futures",
