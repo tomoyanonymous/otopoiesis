@@ -1,7 +1,8 @@
 //! The definitions of un/redo-able actions for applications.
 //! Todo: fix an inconsistensy after code-app translation because serializing/deserializing refreshes Arc references.
 
-use crate::data::{self};
+use crate::data;
+use crate::script::{Expr, Value};
 use std::sync::{MutexGuard, PoisonError};
 use undo;
 
@@ -13,6 +14,7 @@ pub enum Error {
     ContainerEmpty,
     InvalidTrackType,
     NothingToBeAdded, // _Never(PhantomData<T>),
+    InvalidConversion,
 }
 pub type FailedToLockError<'a, T> = PoisonError<MutexGuard<'a, T>>;
 
@@ -28,6 +30,7 @@ impl std::fmt::Display for Error {
             Self::NothingToBeAdded => write!(f, "Nothing to be Added"),
             Self::FailToLock(msg) => write!(f, "{msg}"),
             Self::InvalidTrackType => write!(f, "Track type was not an array of regions"),
+            Self::InvalidConversion => write!(f, "Failed to convert"),
         }
     }
 }
@@ -39,17 +42,15 @@ impl<T> From<FailedToLockError<'_, Vec<T>>> for Error {
 }
 
 trait DisplayableAction:
-    undo::Action<Target = data::Project, Output = (), Error = Error>
-    + std::fmt::Display
-    + std::fmt::Debug
+    undo::Action<Target = Expr, Output = (), Error = Error> + std::fmt::Display + std::fmt::Debug
 {
 }
 
-pub struct Action(Box<dyn DisplayableAction<Target = data::Project, Output = (), Error = Error>>);
+pub struct Action(Box<dyn DisplayableAction<Target = Expr, Output = (), Error = Error>>);
 
 impl<T> From<T> for Action
 where
-    T: DisplayableAction<Target = data::Project, Output = (), Error = Error> + 'static,
+    T: DisplayableAction<Target = Expr, Output = (), Error = Error> + 'static,
 {
     fn from(v: T) -> Self {
         Self(Box::new(v))
@@ -62,13 +63,13 @@ pub enum Target {
 }
 
 impl undo::Action for Action {
-    type Target = data::Project;
+    type Target = Expr;
     type Output = ();
     type Error = Error;
-    fn apply(&mut self, target: &mut data::Project) -> undo::Result<Self> {
+    fn apply(&mut self, target: &mut Expr) -> undo::Result<Self> {
         self.0.apply(target)
     }
-    fn undo(&mut self, target: &mut data::Project) -> undo::Result<Self> {
+    fn undo(&mut self, target: &mut Expr) -> undo::Result<Self> {
         self.0.undo(target)
     }
 }
@@ -86,13 +87,13 @@ impl std::fmt::Display for Action {
 // }
 
 #[derive(Debug)]
-struct AddRegion {
-    elem: data::Region,
+pub struct AddRegion {
+    elem: Value,
     track_num: usize,
     pos: usize,
 }
 impl AddRegion {
-    pub fn new(elem: data::Region, track_num: usize) -> Self {
+    pub fn new(elem: Value, track_num: usize) -> Self {
         Self {
             elem,
             track_num,
@@ -108,37 +109,47 @@ impl std::fmt::Display for AddRegion {
 }
 
 impl undo::Action for AddRegion {
-    type Target = data::Project;
+    type Target = Expr;
 
     type Output = ();
 
     type Error = Error;
 
     fn apply(&mut self, target: &mut Self::Target) -> undo::Result<Self> {
-        match target.tracks.get_mut(self.track_num).unwrap() {
-            data::Track::Regions(regions) => {
-                regions.push(self.elem.clone());
-                assert!(!regions.is_empty());
-                self.pos = regions.len() - 1;
-                Ok(())
+        match target {
+            Expr::Literal(Value::Project(_sr, tracks)) => {
+                match tracks.get_mut(self.track_num).unwrap() {
+                    Value::Track(box Value::Array(regions, _t), _tracktype) => {
+                        regions.push(self.elem.clone());
+                        assert!(!regions.is_empty());
+                        self.pos = regions.len() - 1;
+                        Ok(())
+                    }
+                    _ => Err(Error::InvalidTrackType),
+                }
             }
-            _ => Err(Error::InvalidTrackType),
+            _ => Err(Error::InvalidConversion),
         }
     }
 
     fn undo(&mut self, target: &mut Self::Target) -> undo::Result<Self> {
-        match target.tracks.get_mut(self.track_num).unwrap() {
-            data::Track::Regions(regions) => {
-                if regions.is_empty() {
-                    Err(Error::ContainerEmpty)
-                } else if regions.len() < self.pos {
-                    Err(Error::InvalidIndex(regions.len(), self.pos as i64))
-                } else {
-                    regions.remove(self.pos);
-                    Ok(())
+        match target {
+            Expr::Literal(Value::Project(_sr, tracks)) => {
+                match tracks.get_mut(self.track_num).unwrap() {
+                    Value::Track(box Value::Array(regions, _t), _tracktype) => {
+                        if regions.is_empty() {
+                            Err(Error::ContainerEmpty)
+                        } else if regions.len() < self.pos {
+                            Err(Error::InvalidIndex(regions.len(), self.pos as i64))
+                        } else {
+                            regions.remove(self.pos);
+                            Ok(())
+                        }
+                    }
+                    _ => Err(Error::InvalidTrackType),
                 }
             }
-            _ => Err(Error::InvalidTrackType),
+            _ => Err(Error::InvalidConversion),
         }
     }
 }
@@ -146,35 +157,45 @@ impl undo::Action for AddRegion {
 impl DisplayableAction for AddRegion {}
 
 #[derive(Debug)]
-struct AddTrack {
-    elem: data::Track,
+pub struct AddTrack {
+    elem: Value,
     pos: usize,
 }
 
 impl AddTrack {
-    fn new(elem: data::Track) -> Self {
+    pub fn new(elem: Value) -> Self {
         Self { elem, pos: 0 }
     }
 }
 impl undo::Action for AddTrack {
-    type Target = data::Project;
+    type Target = Expr;
 
     type Output = ();
 
     type Error = Error;
 
     fn apply(&mut self, target: &mut Self::Target) -> undo::Result<Self> {
-        target.tracks.push(self.elem.clone());
-        self.pos = target.tracks.len() - 1;
-        Ok(())
+        match target {
+            Expr::Literal(Value::Project(_sr, tracks)) => {
+                tracks.push(self.elem.clone());
+                self.pos = tracks.len() - 1;
+                Ok(())
+            }
+            _ => Err(Error::InvalidConversion),
+        }
     }
 
     fn undo(&mut self, target: &mut Self::Target) -> undo::Result<Self> {
-        if target.tracks.is_empty() {
-            Err(Error::ContainerEmpty)
-        } else {
-            target.tracks.remove(self.pos);
-            Ok(())
+        match target {
+            Expr::Literal(Value::Project(_sr, tracks)) => {
+                if tracks.is_empty() {
+                    Err(Error::ContainerEmpty)
+                } else {
+                    tracks.remove(self.pos);
+                    Ok(())
+                }
+            }
+            _ => Err(Error::InvalidConversion),
         }
     }
 }
@@ -185,17 +206,17 @@ impl std::fmt::Display for AddTrack {
 }
 impl DisplayableAction for AddTrack {}
 
-pub fn add_region(
-    app: &mut data::AppModel,
-    track_num: usize,
-    region: data::Region,
-) -> Result<(), Error> {
-    app.history.apply(
-        &mut app.project,
-        Action::from(AddRegion::new(region, track_num)),
-    )
-}
-pub fn add_track(app: &mut data::AppModel, track: data::Track) -> Result<(), Error> {
-    app.history
-        .apply(&mut app.project, Action::from(AddTrack::new(track)))
-}
+// pub fn add_region(
+//     app: &mut data::AppModel,
+//     track_num: usize,
+//     region: data::Region,
+// ) -> Result<(), Error> {
+//     app.history.apply(
+//         &mut app.project,
+//         Action::from(AddRegion::new(region, track_num)),
+//     )
+// }
+// pub fn add_track(app: &mut data::AppModel, track: data::Track) -> Result<(), Error> {
+//     app.history
+//         .apply(&mut app.project, Action::from(AddTrack::new(track)))
+// }

@@ -2,9 +2,9 @@ use crate::audio::{Component, PlaybackInfo};
 
 // use crate::parameter::UIntParameter
 use crate::data::{self, Region};
+use crate::parameter::Parameter;
 use crate::utils::{AtomicRange, SimpleAtomic};
 use std::ops::RangeInclusive;
-use std::sync::Arc;
 // 基本はオフラインレンダリング
 
 /// Interface for offline rendering.
@@ -16,11 +16,11 @@ pub trait RangedComponent: std::fmt::Debug {
 
 #[derive(Debug)]
 pub struct FadeModel {
-    pub param: Arc<data::FadeParam>,
+    pub param: data::FadeParam,
     pub origin: Box<Model>,
 }
 impl FadeModel {
-    fn new(p: Arc<data::FadeParam>, origin: data::Region) -> Self {
+    fn new(p: data::FadeParam, origin: data::Region) -> Self {
         Self {
             param: p,
             origin: Box::new(Model::new(origin, 2)),
@@ -42,9 +42,9 @@ impl RangedComponent for FadeModel {
         self.origin.render_offline(sample_rate, channels);
         assert_eq!(self.origin.interleaved_samples_cache.len(), dest.len());
         let chs = self.get_output_channels() as usize;
-        let in_time = (self.param.time_in.load() as f64 * sample_rate as f64) as usize;
-        let out_time = (self.param.time_out.load() as f64 * sample_rate as f64) as usize;
-        let len = (self.origin.params.range.getrange() * sample_rate as f64) as usize;
+        let in_time = (self.param.time_in.get() as f64 * sample_rate as f64) as usize;
+        let out_time = (self.param.time_out.get() as f64 * sample_rate as f64) as usize;
+
         let slice = &self.origin.interleaved_samples_cache[0..dest.len()];
         dest.copy_from_slice(slice);
 
@@ -187,7 +187,6 @@ impl TransformerModel {
             data::RegionFilter::Reverse => todo!(),
             data::RegionFilter::Replicate(c) => Box::new(RegionArray(
                 (0..c.count.load())
-                    .into_iter()
                     .map(|_| Model::new(origin.clone(), 2))
                     .collect::<Vec<_>>(),
             )),
@@ -211,14 +210,13 @@ impl Model {
 
         let content: Box<dyn RangedComponent + Send + Sync> = match &params.content {
             data::Content::Generator(g) => {
-                let c = super::generator::get_component_for_generator(g);
+                let c = super::generator::get_component_for_value(g);
                 let ranged_component = RangedComponentDyn::new(c, params.range.clone());
                 Box::new(ranged_component)
             }
-            data::Content::AudioFile(_) => todo!(),
             data::Content::Transformer(filter, origin) => {
                 TransformerModel::new(filter, *origin.clone()).0
-            } // data::Content::Array(vec) => Box::new(RegionArray::new(vec)),
+            }
         };
         Self {
             params,
@@ -248,6 +246,7 @@ impl Model {
 }
 
 #[cfg(not(target_arch = "wasm32"))]
+
 pub fn render_region_offline_async(
     region: Model,
     info: &PlaybackInfo,
@@ -267,30 +266,38 @@ pub fn render_region_offline_async(
 
 #[cfg(test)]
 mod test {
-    use crate::parameter::Parameter;
+    use std::sync::Arc;
+
+    use crate::{
+        data::Content,
+        param_float,
+        parameter::{FloatParameter, Parameter, RangedNumeric},
+        script::{Expr, Value},
+    };
 
     use super::*;
 
     fn gen_sinewave(
         arr: &mut [f32],
         osc_param: &data::OscillatorParam,
-        phase: &mut f32,
+        phase_init: f32,
         sample_rate: u32,
         channel: u32,
     ) {
+        let mut phase = phase_init;
+        let twopi = std::f32::consts::PI * 2.0;
         arr.chunks_mut(channel as usize)
             .enumerate()
             .for_each(|(_count, o_per_channel)| {
                 // let now = count as f64 / sample_rate as f64;
-                let twopi = std::f32::consts::PI * 2.0;
                 o_per_channel.iter_mut().enumerate().for_each(|(ch, o)| {
                     if ch == 0 {
-                        *o = phase.sin() * osc_param.amp.get();
+                        *o = (phase * twopi).sin() * osc_param.amp.get();
                     } else {
                         *o = 0.0;
                     }
                 });
-                *phase = (*phase + twopi * osc_param.freq.get() / (sample_rate as f32)) % twopi;
+                phase = (phase + osc_param.freq.get() / (sample_rate as f32)) % 1.0;
             });
     }
     fn gen_constant(arr: &mut [f32], channel: u32) {
@@ -363,10 +370,26 @@ mod test {
         let osc_param = data::generator::OscillatorParam::default();
         let data = data::Region::new(
             AtomicRange::<f64>::new(range.start, range.end),
-            data::Content::Generator(data::generator::Generator::Oscillator(
-                data::generator::OscillatorFun::SineWave,
-                Arc::new(osc_param.clone()),
-            )),
+            data::Content::Generator(Value::new_lazy(Expr::App(
+                Box::new(Expr::Literal(Value::ExtFunction("sinewave".into()))),
+                vec![
+                    Expr::Literal(Value::Parameter(Arc::new(param_float!(
+                        440.0,
+                        "freq",
+                        20.0..=20000.0
+                    )))),
+                    Expr::Literal(Value::Parameter(Arc::new(param_float!(
+                        1.0,
+                        "amp",
+                        0.0..=1.0
+                    )))),
+                    Expr::Literal(Value::Parameter(Arc::new(param_float!(
+                        0.0,
+                        "phase",
+                        0.0..=1.0
+                    )))),
+                ],
+            ))),
             "test_sin",
         );
         let mut model = Model::new(data, channel);
@@ -376,12 +399,12 @@ mod test {
         assert_eq!(model.interleaved_samples_cache.len(), range_samps);
 
         let mut answer = vec![0.0f32; range_samps];
-        let mut phase = osc_param.phase.get();
+        let phase = osc_param.phase.get();
         assert_eq!(phase.sin(), 0.0);
         gen_sinewave(
             answer.as_mut_slice(),
             &osc_param,
-            &mut phase,
+            phase,
             sample_rate,
             channel as u32,
         );
@@ -390,22 +413,36 @@ mod test {
     }
 
     fn run_fade_region(in_time: f32, out_time: f32) {
-        let fade_param = Arc::new(data::region::FadeParam {
-            time_in: in_time.into(),
-            time_out: out_time.into(),
-        });
+        let fade_param = data::region::FadeParam::new_with(
+            Arc::new(FloatParameter::new(in_time, "time_in").set_range(0.0..=1000.0)),
+            Arc::new(FloatParameter::new(out_time, "time_out").set_range(0.0..=1000.0)),
+        );
         let channel = 2;
         let sample_rate = 48000;
         let range = 0.1..0.2;
 
-        let generator = data::Content::Generator(data::Generator::Constant);
+        // let generator = data::Content::Generator(data::Generator::Constant(Arc::new(
+        //     FloatParameter::new(1.0, "test").set_range(0.0..=1.0),
+        // )));
+        let generator = Value::new_lazy(Expr::App(
+            Expr::Literal(Value::ExtFunction("constant".to_string())).into(),
+            vec![Expr::Literal(Value::Parameter(Arc::new(param_float!(
+                1.0,
+                "test",
+                0.0..=1.0
+            ))))],
+        ));
         let range_atomic = AtomicRange::<f64>::new(range.start, range.end);
 
         let data = data::Region::new(
             range_atomic.clone(),
             data::Content::Transformer(
                 data::RegionFilter::FadeInOut(fade_param.clone()),
-                Box::new(data::Region::new(range_atomic, generator, "generator")),
+                Box::new(data::Region::new(
+                    range_atomic,
+                    Content::Generator(generator),
+                    "generator",
+                )),
             ),
             "test_sin",
         );
@@ -415,13 +452,13 @@ mod test {
             ((range.end - range.start) * sample_rate as f64) as usize * channel as usize;
         assert_eq!(model.interleaved_samples_cache.len(), range_samps);
 
-        let mut answer = vec![0.0f32; range_samps];
+        let mut answer = vec![1.0f32; range_samps];
 
         gen_constant(answer.as_mut_slice(), channel as u32);
         apply_fadeinout(
             answer.as_mut_slice(),
-            fade_param.time_in.load().into(),
-            fade_param.time_out.load().into(),
+            fade_param.time_in.get().into(),
+            fade_param.time_out.get().into(),
             sample_rate,
             channel as u32,
         );

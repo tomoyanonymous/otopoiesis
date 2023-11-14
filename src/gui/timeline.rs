@@ -1,8 +1,9 @@
-use crate::action;
+use crate::action::{Action, AddTrack};
 use crate::data;
 use crate::gui;
+use crate::script::{Type, Value};
 use crate::utils::atomic::{self, SimpleAtomic};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 pub struct State {
     track: Vec<gui::track::State>,
@@ -23,7 +24,8 @@ impl State {
 }
 
 pub struct Model<'a> {
-    pub app: Arc<Mutex<data::AppModel>>,
+    // pub action_sender: mpsc::Sender<Action>,
+    app: &'a mut data::AppModel,
     state: &'a mut State,
 }
 
@@ -36,7 +38,7 @@ fn param_to_track(track_p: &[data::Track]) -> Vec<gui::track::State> {
 }
 
 impl<'a> Model<'a> {
-    pub fn new(app: Arc<Mutex<data::AppModel>>, state: &'a mut State) -> Self {
+    pub fn new(app: &'a mut data::AppModel, state: &'a mut State) -> Self {
         Self { app, state }
     }
 
@@ -62,19 +64,16 @@ impl<'a> Model<'a> {
         let x = (self.get_current_time_in_sample() as f64 * gui::PIXELS_PER_SEC_DEFAULT as f64
             / sr as f64) as f32
             + rect.left();
-        painter.line_segment(
-            [
-                [x as f32, rect.top()].into(),
-                [x as f32, rect.bottom()].into(),
-            ],
-            stroke,
-        );
+        painter.line_segment([[x, rect.top()].into(), [x, rect.bottom()].into()], stroke);
     }
-    fn add_track(&mut self) {
-        if let Ok(mut app) = self.app.lock() {
-            let _res = action::add_track(&mut app, data::Track::new());
-            self.state.track = param_to_track(&app.project.tracks);
-        }
+    fn add_track(&self) {
+        let _ = self
+            .app
+            .action_tx
+            .send(Action::from(AddTrack::new(Value::Track(
+                Value::Array(vec![], Type::Unknown).into(),
+                Type::Unknown,
+            ))));
     }
 }
 
@@ -84,17 +83,22 @@ impl<'a> egui::Widget for Model<'a> {
             let res = ui
                 .vertical(|ui| {
                     for (i, state) in self.state.track.iter_mut().enumerate() {
-                        ui.add(gui::track::Model::new(i, self.app.clone(), state));
+                        ui.add(gui::track::Model::new(
+                            i,
+                            self.app.action_tx.clone(),
+                            self.app.get_track_for_id_mut(i).unwrap(),
+                            state,
+                        ));
+                        ui.add_space(30.0);
                     }
                 })
                 .response;
-            let add_track_button = ui.button("add track");
+            let add_track_button = ui.button("+").on_hover_text("Add new Track");
             if add_track_button.clicked() {
                 self.add_track();
             }
 
             let painter = ui.painter_at(ui.clip_rect());
-            self.draw_frame(&painter, ui.style());
             self.draw_current_time(&painter, ui.style());
 
             res

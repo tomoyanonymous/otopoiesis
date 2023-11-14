@@ -1,6 +1,6 @@
 use crate::{data, gui};
 pub struct RegionContent<'a> {
-    param: &'a mut data::Region,
+    param: &'a data::Region,
     state: &'a mut super::region::State,
 }
 
@@ -15,7 +15,6 @@ pub struct State {
 impl State {
     pub fn new(origin: &data::Region, count: u64) -> Self {
         let regions = (0..count)
-            .into_iter()
             .map(|i| {
                 let is_editable = i == 0;
                 super::region::State::new(origin, origin.label.clone(), is_editable)
@@ -27,14 +26,14 @@ impl State {
 
 pub struct Replicate<'a> {
     pub param: &'a data::ReplicateParam,
-    pub origin: &'a mut data::Region,
+    pub origin: &'a data::Region,
     state: &'a mut State,
 }
 
 impl<'a> Replicate<'a> {
     pub fn new(
         param: &'a data::ReplicateParam,
-        origin: &'a mut data::Region,
+        origin: &'a data::Region,
         state: &'a mut State,
     ) -> Self {
         Self {

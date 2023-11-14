@@ -51,6 +51,7 @@ where
                     pass_in(imodel.clone(), data, c.clone())
                 },
                 |_e| {},
+                None,
             );
             let _ = in_stream.as_ref().map(|i| i.pause());
             // if let Err(e) = &in_stream {
@@ -62,6 +63,7 @@ where
         };
 
         let odevice = host.default_output_device();
+        log::debug!("device {:?}", odevice.as_ref().map(|d| d.name()));
         let (oconfig, ostream) = if let Some(device) = odevice.as_ref() {
             let oconfig_builder = device
                 .supported_output_configs()
@@ -77,7 +79,6 @@ where
             };
             assert_eq!(oconfig.channels, 2);
             oconfig.buffer_size = cpal::BufferSize::Fixed(super::DEFAULT_BUFFER_LEN as u32);
-
             let oc = oconfig.clone();
             let out_stream = device.build_output_stream(
                 &oconfig,
@@ -85,6 +86,7 @@ where
                     pass_out(omodel.clone(), data, oc.clone())
                 },
                 |_e| {},
+                None,
             );
             // if let Err(e) = &out_stream {
             //     web_sys::console::log_1(&e.to_string().into())
@@ -94,7 +96,7 @@ where
         } else {
             (None, None)
         };
-
+        assert!(oconfig.is_some());
         self.set_streams(istream, ostream, iconfig, oconfig);
     }
     fn prepare_play(&mut self);
@@ -176,7 +178,7 @@ fn pass_out(
         };
         // todo:if  channels are different?
         model.effector.render(&buf, buffer, &info);
-        model.current_time.store(t + frame_per_buffer as u64);
+        model.current_time.store(t + frame_per_buffer);
     }
 }
 
@@ -245,7 +247,7 @@ where
     }
 
     fn prepare_play(&mut self) {
-        if let Ok(_model) = self.imodel.lock() {
+        if let Ok(_model) = self.imodel.try_lock() {
             //do nothing
         }
         let config = self.oconfig.as_ref().unwrap();
@@ -254,7 +256,7 @@ where
             cpal::BufferSize::Fixed(s) => s as usize,
         } * config.channels as usize;
 
-        if let Ok(mut model) = self.omodel.lock() {
+        if let Ok(mut model) = self.omodel.try_lock() {
             let info = PlaybackInfo {
                 sample_rate: config.sample_rate.0,
                 current_time: 0,

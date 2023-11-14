@@ -42,15 +42,28 @@ impl<'a> Model<'a> {
                 ui.label("otopoiesis");
                 ui.horizontal(|ui| {
                     ui.menu_button("File", |ui| {
-                        #[cfg(debug_assertions)]
+                        if let Ok(mut app) = self.app.try_lock() {
+                            if ui.button("Open").clicked() {
+                                app.open_file();
+                            }
+                            ui.add_enabled_ui(app.project_file.is_some(), |ui| {
+                                if ui.button("Save").clicked() {
+                                    app.save_as_file();
+                                }
+                            });
+                            if ui.button("Save as").clicked() {
+                                app.save_as_file();
+                            }
+                        }
                         if ui.button("Force Sync Ui State(Debug)").clicked() {
+                            #[cfg(debug_assertions)]
                             self.state
                                 .timeline
-                                .sync_state(&self.app.lock().unwrap().project.tracks);
+                                .sync_state(&self.app.try_lock().unwrap().project.tracks);
                         }
                     });
                     ui.menu_button("Edit", |ui| {
-                        if let Ok(mut app) = self.app.lock() {
+                        if let Ok(mut app) = self.app.try_lock() {
                             let undo_sk =
                                 egui::KeyboardShortcut::new(egui::Modifiers::COMMAND, egui::Key::Z);
                             let redo_sk = egui::KeyboardShortcut::new(
@@ -91,10 +104,12 @@ impl<'a> Model<'a> {
         });
         egui::CentralPanel::default().show(ctx, |ui| {
             egui::ScrollArea::both().show(ui, |ui| {
-                ui.add(super::timeline::Model::new(
-                    self.app.clone(),
-                    &mut self.state.timeline,
-                ));
+                if let Ok(mut app) = self.app.try_lock() {
+                    ui.add(super::timeline::Model::new(
+                        &mut app,
+                        &mut self.state.timeline,
+                    ));
+                }
                 egui::panel::TopBottomPanel::bottom("footer")
                     .show(ctx, |ui| ui.add(&mut self.state.transport));
             });

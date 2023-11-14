@@ -61,7 +61,8 @@ npm start
 
 - [ ] project file export/import
 - [ ] Wav file loading
-  - [ ] file io streaming(wasm compatibility??) / caching system
+  - [ ] file io streaming / caching system
+    - [x] open wav file in native app
   - [ ] thumbnail generation for audio files
   - [ ] drug & drop of file?
 - [ ] Channel adaptation between different configurations of channels

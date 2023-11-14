@@ -1,7 +1,7 @@
 use super::GeneratorComponent;
 use crate::audio::PlaybackInfo;
 use crate::data::OscillatorParam;
-use crate::utils::{atomic, SimpleAtomic};
+use crate::parameter::FloatParameter;
 use crate::{data, parameter::Parameter};
 use std::f32::consts::PI;
 use std::sync::Arc;
@@ -29,13 +29,13 @@ impl<T: Oscillator> GeneratorComponent for T {
     fn render_sample(&mut self, out: &mut f32, info: &PlaybackInfo) {
         *out = self.map(self.phase()) * self.get_params().amp.get();
         self.set_phase(
-            (self.phase() + TWOPI * self.get_params().freq.get() / info.sample_rate as f32) % TWOPI,
+            (self.phase() + self.get_params().freq.get() / info.sample_rate as f32) % 1.0,
         );
     }
 }
 
 pub struct GenericOscillator {
-    pub params: Arc<data::OscillatorParam>,
+    pub params: data::OscillatorParam,
     phase_internal: f32,
     map_fn: Arc<dyn Fn(f32) -> f32 + 'static + Send + Sync>,
 }
@@ -61,12 +61,12 @@ impl std::fmt::Debug for GenericOscillator {
 }
 
 impl GenericOscillator {
-    pub fn new<F>(params: Arc<data::OscillatorParam>, map_fn: F) -> Self
+    pub fn new<F>(params: data::OscillatorParam, map_fn: F) -> Self
     where
         F: Fn(f32) -> f32 + 'static + Send + Sync,
     {
         Self {
-            params: Arc::clone(&params),
+            params: params.clone(),
             phase_internal: params.phase.get(),
             map_fn: Arc::new(map_fn),
         }
@@ -75,7 +75,7 @@ impl GenericOscillator {
 
 impl Oscillator for GenericOscillator {
     fn get_params(&self) -> &OscillatorParam {
-        self.params.as_ref()
+        &self.params
     }
 
     fn set_phase(&mut self, init: f32) {
@@ -91,19 +91,20 @@ impl Oscillator for GenericOscillator {
     }
 }
 
-pub fn sinewave(params: Arc<data::OscillatorParam>) -> GenericOscillator {
-    GenericOscillator::new(params, move |phase: f32| phase.sin())
+pub fn sinewave(params: data::OscillatorParam) -> GenericOscillator {
+    GenericOscillator::new(params, move |phase: f32| (phase * TWOPI).sin())
 }
-pub fn saw(params: Arc<data::OscillatorParam>, direction: Arc<atomic::Bool>) -> GenericOscillator {
+pub fn saw(params: data::OscillatorParam, direction: Arc<FloatParameter>) -> GenericOscillator {
     GenericOscillator::new(params, move |phase: f32| {
-        (phase * 2.0 - 1.0) * if direction.load() { 1.0 } else { -1.0 }
+        let dir = direction.get() > 1.0;
+        (phase * 2.0 - 1.0) * if dir { 1.0 } else { -1.0 }
     })
 }
-pub fn rect(params: Arc<data::OscillatorParam>, duty: Arc<atomic::F32>) -> GenericOscillator {
+pub fn rect(params: data::OscillatorParam, duty: Arc<FloatParameter>) -> GenericOscillator {
     GenericOscillator::new(
         params,
         move |phase: f32| {
-            if phase > duty.load() {
+            if phase > duty.get() {
                 1.0
             } else {
                 -1.0
@@ -111,7 +112,7 @@ pub fn rect(params: Arc<data::OscillatorParam>, duty: Arc<atomic::F32>) -> Gener
         },
     )
 }
-pub fn triangle(params: Arc<data::OscillatorParam>) -> GenericOscillator {
+pub fn triangle(params: data::OscillatorParam) -> GenericOscillator {
     GenericOscillator::new(params, move |phase: f32| {
         (phase * 2.0 - 1.0).abs() * 2.0 - 1.0
     })

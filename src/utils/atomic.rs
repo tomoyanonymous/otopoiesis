@@ -75,6 +75,11 @@ macro_rules! impl_simple_atomic {
             type Atomic = $a;
             type Composed = $name;
         }
+        impl PartialEq for $name {
+            fn eq(&self, other: &Self) -> bool {
+                self.load() == other.load()
+            }
+        }
     };
 }
 macro_rules! impl_is_num {
