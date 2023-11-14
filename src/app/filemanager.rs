@@ -12,8 +12,8 @@ pub trait FileManager {
     fn save_file<C: AsRef<[u8]>>(&self, path: impl ToString, content: C)
         -> Result<(), Self::Error>;
 }
-#[cfg(not(feature = "web"))]
 
+#[cfg(not(target_arch = "wasm32"))]
 mod native {
     use std::io::Read;
 
@@ -44,8 +44,8 @@ mod native {
         }
     }
 }
-#[cfg(feature = "web")]
 
+#[cfg(target_arch = "wasm32")]
 pub mod web {
     use super::*;
     pub struct WebMediaSource {}
@@ -105,10 +105,10 @@ pub mod web {
     }
 }
 
-#[cfg(not(feature = "web"))]
+#[cfg(not(target_arch = "wasm32"))]
 
 pub static GLOBAL_FILE_MANAGER: native::NativeFileManager = native::NativeFileManager {};
-#[cfg(feature = "web")]
+#[cfg(target_arch = "wasm32")]
 
 pub static GLOBAL_FILE_MANAGER: web::WebFileManager = web::WebFileManager {};
 

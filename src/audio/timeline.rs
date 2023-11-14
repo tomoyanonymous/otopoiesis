@@ -54,8 +54,8 @@ impl Component for Model {
             output.len(),
             (info.channels * info.frame_per_buffer) as usize
         );
-
-        assert_eq!(output.len(), self.tmp_buffer.len());
+        //sometimes buffer size at first block is shorter than the specified size
+        // assert_eq!(output.len(), self.tmp_buffer.len());
         for track in self.tracks.iter_mut() {
             track.render(input, self.tmp_buffer.as_mut_slice(), info);
             output

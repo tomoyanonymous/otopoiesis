@@ -3,10 +3,10 @@ use otopoiesis::*;
 extern crate eframe;
 extern crate egui;
 
-#[cfg(not(feature = "web"))]
+#[cfg(not(target_arch = "wasm32"))]
 use crate::cli::{self, Parser};
 
-#[cfg(not(feature = "web"))]
+#[cfg(not(target_arch = "wasm32"))]
 fn main() {
     let native_options = eframe::NativeOptions {
         initial_window_size: Some(egui::vec2(1200., 900.)),
@@ -21,7 +21,6 @@ fn main() {
     .ok();
 }
 
-#[cfg(feature = "web")]
-
 ///binary crate for web does nothing.
+#[cfg(target_arch = "wasm32")]
 fn main() {}

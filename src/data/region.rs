@@ -1,12 +1,27 @@
-use super::generator::*;
-use crate::data::{atomic, AtomicRange};
+use super::ConversionError;
+use crate::script::{Expr, Value};
+use crate::{
+    data::{atomic, AtomicRange},
+    parameter::{FloatParameter, Parameter, RangedNumeric},
+};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
 #[derive(Serialize, Deserialize, Clone, Default, Debug)]
 pub struct FadeParam {
-    pub time_in: atomic::F32,
-    pub time_out: atomic::F32,
+    pub time_in: Arc<FloatParameter>,
+    pub time_out: Arc<FloatParameter>,
+}
+impl FadeParam {
+    pub fn new() -> Self {
+        Self {
+            time_in: Arc::new(FloatParameter::new(0.0, "in_time").set_range(0.0..=1000.0)),
+            time_out: Arc::new(FloatParameter::new(0.0, "out_time").set_range(0.0..=1000.0)),
+        }
+    }
+    pub fn new_with(time_in: Arc<FloatParameter>, time_out: Arc<FloatParameter>) -> Self {
+        Self { time_in, time_out }
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, Default, Debug)]
@@ -24,14 +39,14 @@ impl From<u32> for ReplicateParam {
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub enum RegionFilter {
     Gain,
-    FadeInOut(Arc<FadeParam>),
+    FadeInOut(FadeParam),
     Reverse,
     Replicate(ReplicateParam),
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub enum Content {
-    Generator(Generator),
+    Generator(Value),
     Transformer(RegionFilter, Box<Region>),
 }
 
@@ -60,62 +75,19 @@ impl Region {
         Self::new(
             AtomicRange::<f64>::new(origin.range.start(), origin.range.end()),
             Content::Transformer(
-                RegionFilter::FadeInOut(Arc::new(FadeParam {
-                    time_in: 0.1.into(),
-                    time_out: 0.1.into(),
-                })),
+                RegionFilter::FadeInOut(FadeParam::new()),
                 Box::new(origin.clone()),
             ),
             origin.label,
         )
     }
-    // pub fn interpret(&self) -> Self {
-    //     match &self.content {
-    //         Content::Transformer(p, origin) if matches!(p, RegionFilter::Replicate(_)) => {
-    //             if let RegionFilter::Replicate(param) = p {
-    //                 let mut range = origin.range.clone();
-    //                 let mut len = range.getrange();
-    //                 let mut last = 0;
-    //                 todo!()
-    //                 // let arr = Content::Array(
-    //                 //     (0..param.count.load())
-    //                 //         .into_iter()
-    //                 //         .map(|_| {
-    //                 //             //とりあえず位置をずらして複製
-    //                 //             range = Arc::new(AtomicRange<i64>::new(last, last + len));
-    //                 //             len = range.getrange();
-    //                 //             last = range.end();
-    //                 //             range.clone()
-    //                 //         })
-    //                 //         .enumerate()
-    //                 //         .map(|(i, newrange)| {
-    //                 //             Arc::new(Region::new(
-    //                 //                 newrange.as_ref().clone(),
-    //                 //                 origin.content.clone(),
-    //                 //                 format!("{}_rep_{}", origin.label, i),
-    //                 //             ))
-    //                 //         })
-    //                 //         .collect(),
-    //                 // );
-    //                 Self::new(
-    //                     AtomicRange<i64>::new(origin.range.start(), last),
-    //                     arr,
-    //                     format!("{}_arr", origin.label),
-    //                 )
-    //             } else {
-    //                 unreachable!()
-    //             }
-    //         }
-    //         _ => self.clone(),
-    //     }
-    // }
 }
 
 impl std::default::Default for Region {
     fn default() -> Self {
         Self {
             range: AtomicRange::<f64>::new(0.0, 0.0),
-            content: Content::Generator(Generator::default()),
+            content: Content::Generator(Value::None),
             label: "".to_string(),
         }
     }
@@ -124,5 +96,56 @@ impl std::default::Default for Region {
 impl std::fmt::Display for Region {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "region {}", self.label)
+    }
+}
+fn make_region_from_param(
+    start: f64,
+    dur: f64,
+    content: &Value,
+    label: &str,
+) -> Result<Region, ConversionError> {
+    let range = AtomicRange::new(start, start + dur);
+    let content = Content::Generator(content.clone());
+    let res = Region::new(range, content, label);
+    Ok(res)
+}
+
+impl TryFrom<&Value> for Region {
+    type Error = ConversionError;
+
+    fn try_from(value: &Value) -> Result<Self, Self::Error> {
+        match value {
+            Value::Region(start, dur, content, label, _) => {
+                make_region_from_param(*start, *dur, content, label)
+            }
+            Value::Closure(
+                _ids,
+                _env,
+                box Expr::App(box Expr::Literal(Value::ExtFunction(regionfilter)), args),
+            ) if args.len() == 3 => match (
+                regionfilter.as_str(),
+                args.get(0).unwrap(),
+                args.get(1).unwrap(),
+                args.get(2).unwrap(),
+            ) {
+                (
+                    "fadeinout",
+                    Expr::Literal(region),
+                    Expr::Literal(Value::Parameter(time_in)),
+                    Expr::Literal(Value::Parameter(time_out)),
+                ) => {
+                    //todo:need to eval region for non-literal expression
+                    let rg = Region::try_from(region)?;
+                    let range = rg.range.clone();
+                    let label = rg.label.clone();
+                    let param = FadeParam::new_with(time_in.clone(), time_out.clone());
+                    let content =
+                        Content::Transformer(RegionFilter::FadeInOut(param), Box::new(rg));
+                    Ok(Region::new(range, content, label))
+                }
+                _ => Err(ConversionError {}),
+            },
+            _ => Err(ConversionError {}),
+        }
     }
 }

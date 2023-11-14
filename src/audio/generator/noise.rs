@@ -1,6 +1,6 @@
 use super::Component;
 use crate::audio::PlaybackInfo;
-use rand;
+
 #[derive(Clone, Debug)]
 pub struct Noise {}
 impl Component for Noise {
@@ -13,8 +13,9 @@ impl Component for Noise {
 
     fn prepare_play(&mut self, _info: &PlaybackInfo) {}
     fn render(&mut self, _input: &[f32], output: &mut [f32], _info: &PlaybackInfo) {
+        #[cfg(not(target_arch = "wasm32"))]
         for o in output.iter_mut() {
-            *o = rand::random();
+            *o = rand::random::<f32>();
         }
         output.fill(1.0);
     }

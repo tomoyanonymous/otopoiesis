@@ -1,5 +1,6 @@
 use crate::data;
 use crate::gui;
+use crate::script;
 use crate::utils::atomic::SimpleAtomic;
 mod region_handle;
 pub mod regionfilter;
@@ -12,7 +13,7 @@ use self::regionfilter::{fadeinout, replicate};
 
 pub enum ContentModel {
     RegionFilter(regionfilter::RegionFilterState),
-    Generator(data::Generator, super::generator::State),
+    Generator(script::Value, super::generator::State),
 }
 
 pub struct State {
@@ -123,7 +124,7 @@ impl<'a> egui::Widget for Model<'a> {
                             self.params.range.set_end(origin.range.end());
                             (
                                 ui.add(regionfilter::RegionFilter::FadeInOut(FadeInOut::new(
-                                    param.as_ref(),
+                                    param,
                                     origin.as_ref(),
                                     s,
                                 ))),
@@ -147,35 +148,40 @@ impl<'a> egui::Widget for Model<'a> {
                     }
                 }
                 (data::Content::Generator(param), ContentModel::Generator(_genmodel, genstate)) => {
-                    let main = ui.group(|ui| {
-                        ui.add_space(-bar_width);
-                        let mut handle_start = UiBar::new(
-                            &self.params.range.0,
-                            &mut self.state.range_handles[0],
-                            HandleMode::Start,
-                        );
-                        handle_start.set_limit(min_start..=end);
-                        let startui = ui.add_sized(bar_size, handle_start);
-                        let gen =
-                            super::generator::Generator::new(param, &self.params.range, genstate);
-                        let main = ui.add(gen);
-                        let mut handle_end = UiBar::new(
-                            &self.params.range.1,
-                            &mut self.state.range_handles[1],
-                            HandleMode::End,
-                        );
-                        handle_end.set_limit(start..=max_end);
-                        let endui = ui.add_sized(bar_size, handle_end);
-                        if startui.union(endui).drag_released() {
-                            let mut gen = super::generator::Generator::new(
+                    let main = ui
+                        .group(|ui| {
+                            ui.add_space(-bar_width);
+                            let mut handle_start = UiBar::new(
+                                &self.params.range.0,
+                                &mut self.state.range_handles[0],
+                                HandleMode::Start,
+                            );
+                            handle_start.set_limit(min_start..=end);
+                            let startui = ui.add_sized(bar_size, handle_start);
+                            let gen = super::generator::Generator::new(
                                 param,
                                 &self.params.range,
                                 genstate,
                             );
-                            gen.update_shape(&ui.ctx().style());
-                        }
-                        main
-                    }).inner;
+                            let main = ui.add(gen);
+                            let mut handle_end = UiBar::new(
+                                &self.params.range.1,
+                                &mut self.state.range_handles[1],
+                                HandleMode::End,
+                            );
+                            handle_end.set_limit(start..=max_end);
+                            let endui = ui.add_sized(bar_size, handle_end);
+                            if startui.union(endui).drag_released() {
+                                let mut gen = super::generator::Generator::new(
+                                    param,
+                                    &self.params.range,
+                                    genstate,
+                                );
+                                gen.update_shape(&ui.ctx().style());
+                            }
+                            main
+                        })
+                        .inner;
                     (main, true)
                 }
                 _ => unreachable!(),

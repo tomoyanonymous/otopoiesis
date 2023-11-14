@@ -1,6 +1,7 @@
 use crate::action::{Action, AddTrack};
 use crate::data;
 use crate::gui;
+use crate::script::{Type, Value};
 use crate::utils::atomic::{self, SimpleAtomic};
 use std::sync::Arc;
 
@@ -69,7 +70,10 @@ impl<'a> Model<'a> {
         let _ = self
             .app
             .action_tx
-            .send(Action::from(AddTrack::new(data::Track::new())));
+            .send(Action::from(AddTrack::new(Value::Track(
+                Value::Array(vec![], Type::Unknown).into(),
+                Type::Unknown,
+            ))));
     }
 }
 

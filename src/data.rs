@@ -7,17 +7,22 @@ use crate::utils::{atomic, AtomicRange, SimpleAtomic};
 use rfd;
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
+use std::collections::HashMap;
 use std::sync::{mpsc, Arc};
 use undo;
 
 pub mod generator;
 pub mod region;
+pub mod track;
 
 pub use generator::*;
 pub use region::*;
+pub use track::*;
 
-#[cfg(not(feature = "web"))]
+#[cfg(not(target_arch = "wasm32"))]
 use dirs;
+
+use crate::script::{self, Expr, Value};
 
 pub struct LaunchArg {
     pub file: Option<String>,
@@ -27,12 +32,12 @@ pub struct LaunchArg {
 }
 impl Default for LaunchArg {
     fn default() -> Self {
-        #[cfg(not(feature = "web"))]
+        #[cfg(not(target_arch = "wasm32"))]
         let config_dir = dirs::home_dir().map(|mut p| {
             p.push(std::path::PathBuf::from(".otopoiesis"));
             p.to_str().unwrap_or("").to_string()
         });
-        #[cfg(feature = "web")]
+        #[cfg(target_arch = "wasm32")]
         let config_dir = None;
         Self {
             file: None,
@@ -42,18 +47,37 @@ impl Default for LaunchArg {
         }
     }
 }
+pub struct ConversionError {}
+
+impl TryFrom<&Value> for Project {
+    type Error = ConversionError;
+    fn try_from(value: &Value) -> Result<Self, Self::Error> {
+        match value {
+            Value::Project(sr, tr) => {
+                let tracks: Vec<Track> = tr.iter().map(Track::try_from).try_collect()?;
+                Ok(Project {
+                    sample_rate: (*sr as u64).into(),
+                    tracks: tracks,
+                })
+            }
+            _ => Err(ConversionError {}),
+        }
+    }
+}
 
 // #[derive(Serialize, Deserialize, Clone)]
 pub struct AppModel {
     pub transport: Arc<Transport>,
     pub global_setting: GlobalSetting,
     pub launch_arg: LaunchArg,
+    pub source: Option<script::Expr>,
     pub project: Project,
     pub project_str: String,
     pub project_file: Option<String>,
     pub history: undo::Record<action::Action>,
     pub action_tx: mpsc::Sender<action::Action>,
     pub action_rx: mpsc::Receiver<action::Action>,
+    pub builtin_fns: HashMap<&'static str, script::ExtFun>,
 }
 
 impl AppModel {
@@ -68,27 +92,39 @@ impl AppModel {
         if let Some(file) = project_file.clone() {
             let _ = filemanager::get_global_file_manager().read_to_string(file, &mut project_str);
         }
+        let source = Some(Expr::Literal(Value::Project(44100., vec![])));
         let (action_tx, action_rx) = mpsc::channel();
         Self {
             transport,
             global_setting,
             launch_arg,
+            source,
             project: Project::new(44100),
             project_str,
             project_file,
             history: undo::Record::new(),
             action_tx,
             action_rx,
+            builtin_fns: script::builtin_fn::gen_default_functions(),
         }
+    }
+    pub fn get_builtin_fn(&self, name: &str) -> Option<&script::ExtFun> {
+        self.builtin_fns.get(name)
     }
     pub fn can_undo(&self) -> bool {
         let history = &self.history;
         history.can_undo()
     }
+
     pub fn undo(&mut self) {
         let history = &mut self.history;
-        if let Some(Err(e)) = history.undo(&mut self.project) {
-            eprintln!("{}", e)
+        if let Some(_res) = self.source.as_mut().map(|src| {
+            if let Some(Err(e)) = history.undo(src) {
+                eprintln!("{}", e)
+            }
+        }) {
+            self.compile(self.source.as_ref().unwrap().clone());
+            self.ui_to_code();
         }
     }
     pub fn can_redo(&self) -> bool {
@@ -97,11 +133,14 @@ impl AppModel {
     }
     pub fn redo(&mut self) {
         let history = &mut self.history;
-        let _ = history.redo(&mut self.project).unwrap();
+        if let Some(_res) = self.source.as_mut().and_then(|src| history.redo(src)) {
+            self.compile(self.source.as_ref().unwrap().clone());
+            self.ui_to_code();
+        }
     }
 
     pub fn open_file(&mut self) {
-        #[cfg(not(feature = "web"))]
+        #[cfg(not(target_arch = "wasm32"))]
         {
             let dir = self.project_file.clone().unwrap_or("~/".to_string());
             let file = rfd::FileDialog::new()
@@ -126,7 +165,7 @@ impl AppModel {
         }
     }
     pub fn save_as_file(&mut self) {
-        #[cfg(not(feature = "web"))]
+        #[cfg(not(target_arch = "wasm32"))]
         {
             let dir = self.project_file.clone().unwrap_or("~/".to_string());
             let file = rfd::FileDialog::new()
@@ -140,7 +179,7 @@ impl AppModel {
         }
     }
     pub fn ui_to_code(&mut self) {
-        let json = serde_json::to_string_pretty(&self.project);
+        let json = serde_json::to_string_pretty(&self.source);
         let json_str = json.unwrap_or_else(|e| {
             println!("{}", e);
             "failed to print".to_string()
@@ -148,8 +187,8 @@ impl AppModel {
         self.project_str = json_str;
     }
     pub fn code_to_ui(&mut self) -> Result<(), serde_json::Error> {
-        serde_json::from_str::<Project>(&self.project_str).map(|proj| {
-            self.project = proj.clone();
+        serde_json::from_str::<Expr>(&self.project_str).map(|expr| {
+            self.source = Some(expr);
         })
     }
     pub fn get_track_for_id_mut(&mut self, id: usize) -> Option<&mut Track> {
@@ -159,12 +198,31 @@ impl AppModel {
         self.project.tracks.get(id)
     }
     pub fn consume_actions(&mut self) -> bool {
-        let mut ui_need_update = false;
-        for action_received in self.action_rx.try_iter() {
-            let _res = self.history.apply(&mut self.project, action_received);
-            ui_need_update = true;
+        self.action_rx
+            .try_iter()
+            .map(|action_received| {
+                if let Some(src) = self.source.as_mut() {
+                    self.history.apply(src, action_received).is_ok()
+                } else {
+                    false
+                }
+            })
+            .any(|v| v)
+    }
+
+    pub fn compile(&mut self, source: Expr) -> bool {
+        let env = Arc::new(script::Environment::new());
+        let res = source
+            .eval(env, &mut Some(self))
+            .ok()
+            .and_then(|v| Project::try_from(&v).ok());
+        match res {
+            Some(pj) => {
+                self.project = pj;
+                true
+            }
+            None => false,
         }
-        ui_need_update
     }
 }
 
@@ -243,36 +301,5 @@ impl Project {
             sample_rate: atomic::U64::from(sample_rate),
             tracks: vec![],
         }
-    }
-}
-
-/// Data structure for track.
-/// The track has some input/output stream.
-#[derive(Serialize, Deserialize, Clone, Debug)]
-pub enum Track {
-    ///Contains Multiple Regions.
-    /// TODO:Change container for this to be HashedSet for the more efficient implmentation of Undo Action.
-    Regions(Vec<Region>),
-    ///Contains one audio generator(0 input).
-    Generator(Generator),
-    ///Take another track and transform it (like filter).
-    Transformer(),
-}
-
-impl Track {
-    pub fn new() -> Self {
-        Self::default()
-    }
-}
-
-impl Default for Track {
-    fn default() -> Self {
-        Track::Regions(vec![])
-    }
-}
-impl std::fmt::Display for Track {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        // write!(f, "track {}", self.label)
-        write!(f, "track")
     }
 }
