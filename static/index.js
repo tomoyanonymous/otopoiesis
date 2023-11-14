@@ -1,3 +1,4 @@
 import("../pkg/index.js").then(module =>{
-    module.main();
+    let mod = new module.WebHandle();
+    mod.start("main_canvas")
  });

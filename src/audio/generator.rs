@@ -7,7 +7,7 @@ use crate::{
     script::{self, Expr, Value},
 };
 pub mod constant;
-#[cfg(not(feature = "web"))]
+#[cfg(not(target_arch = "wasm32"))]
 pub mod fileplayer;
 pub mod noise;
 pub mod oscillator;
@@ -61,7 +61,7 @@ where
 //         }),
 //         data::Generator::Constant(param) => Box::new(Constant(param.clone())),
 //         data::Generator::Noise() => Box::new(Noise {}),
-//         #[cfg(not(feature = "web"))]
+//         #[cfg(not(target_arch = "wasm32"))]
 //         data::Generator::FilePlayer(param) => Box::new(fileplayer::FilePlayer::new(param.clone())),
 //     }
 // }
@@ -110,6 +110,7 @@ pub fn get_component_for_value(v: &script::Value) -> Box<dyn Component + Send + 
                 ("constant", &[Expr::Literal(Value::Parameter(val))]) => {
                     Box::new(constant::Constant(val.clone()))
                 }
+                #[cfg(not(target_arch = "wasm32"))]
                 ("fileplayer", &[Expr::Literal(Value::String(path))]) => {
                     let p = FilePlayerParam {
                         path: path.clone(),

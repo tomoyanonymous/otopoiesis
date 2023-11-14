@@ -13,7 +13,7 @@ pub trait FileManager {
         -> Result<(), Self::Error>;
 }
 
-#[cfg(not(feature = "web"))]
+#[cfg(not(target_arch = "wasm32"))]
 mod native {
     use std::io::Read;
 
@@ -45,7 +45,7 @@ mod native {
     }
 }
 
-#[cfg(feature = "web")]
+#[cfg(target_arch = "wasm32")]
 pub mod web {
     use super::*;
     pub struct WebMediaSource {}
@@ -105,10 +105,10 @@ pub mod web {
     }
 }
 
-#[cfg(not(feature = "web"))]
+#[cfg(not(target_arch = "wasm32"))]
 
 pub static GLOBAL_FILE_MANAGER: native::NativeFileManager = native::NativeFileManager {};
-#[cfg(feature = "web")]
+#[cfg(target_arch = "wasm32")]
 
 pub static GLOBAL_FILE_MANAGER: web::WebFileManager = web::WebFileManager {};
 

@@ -1925,12 +1925,9 @@ dependencies = [
 
 [[package]]
 name = "log"
-version = "0.4.17"
+version = "0.4.20"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "abb12e687cfb44aa40f41fc3978ef76448f9b6038cad6aef4259d3c095a2382e"
-dependencies = [
- "cfg-if 1.0.0",
-]
+checksum = "b5e6163cb8c49088c2c36f57875e58ccd8c87c7427f7fbd50ea6710b2f3f2e8f"
 
 [[package]]
 name = "mach2"
@@ -2319,6 +2316,7 @@ dependencies = [
  "eframe",
  "egui",
  "egui_extras",
+ "log",
  "rand",
  "rfd",
  "ringbuf",
@@ -2330,7 +2328,6 @@ dependencies = [
  "wasm-bindgen",
  "wasm-bindgen-futures 0.4.38",
  "wasm-bindgen-test",
- "web-sys",
  "wee_alloc",
 ]
 

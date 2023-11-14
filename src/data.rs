@@ -19,7 +19,7 @@ pub use generator::*;
 pub use region::*;
 pub use track::*;
 
-#[cfg(not(feature = "web"))]
+#[cfg(not(target_arch = "wasm32"))]
 use dirs;
 
 use crate::script::{self, Expr, Value};
@@ -32,12 +32,12 @@ pub struct LaunchArg {
 }
 impl Default for LaunchArg {
     fn default() -> Self {
-        #[cfg(not(feature = "web"))]
+        #[cfg(not(target_arch = "wasm32"))]
         let config_dir = dirs::home_dir().map(|mut p| {
             p.push(std::path::PathBuf::from(".otopoiesis"));
             p.to_str().unwrap_or("").to_string()
         });
-        #[cfg(feature = "web")]
+        #[cfg(target_arch = "wasm32")]
         let config_dir = None;
         Self {
             file: None,
@@ -140,7 +140,7 @@ impl AppModel {
     }
 
     pub fn open_file(&mut self) {
-        #[cfg(not(feature = "web"))]
+        #[cfg(not(target_arch = "wasm32"))]
         {
             let dir = self.project_file.clone().unwrap_or("~/".to_string());
             let file = rfd::FileDialog::new()
@@ -165,7 +165,7 @@ impl AppModel {
         }
     }
     pub fn save_as_file(&mut self) {
-        #[cfg(not(feature = "web"))]
+        #[cfg(not(target_arch = "wasm32"))]
         {
             let dir = self.project_file.clone().unwrap_or("~/".to_string());
             let file = rfd::FileDialog::new()

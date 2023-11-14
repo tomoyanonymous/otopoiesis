@@ -9,22 +9,11 @@ description = "a constructive audio programming environment with timeline-based 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 
+
 [lib]
 crate-type = ["cdylib", "rlib"]
-
-[features]
-default = ["native"]
-native = ["dep:clap", "dep:dirs", "dep:rand"]
-web = [
-    "dep:wasm-bindgen",
-    "dep:wasm-bindgen-futures",
-    "dep:wee_alloc",
-    "dep:console_error_panic_hook",
-]
-
 [dependencies]
 # mimium-rs = { git = "https://github.com/tomoyanonymous/mimium-rs.git", branch = "otopoiesis" }
-clap = { version = "4.3.19", features = ["derive"], optional = true }
 ringbuf = "*"
 atomic_float = "*"
 serde = { version = "*", features = ["rc"] }
@@ -32,23 +21,29 @@ serde_json = "*"
 serde_with = "2.1.0"
 undo = "0.47.*"
 rfd = "0.11"
-# need to disable "getrandom" feature
-rand = { version = "0.8.5", optional = true }
 
 egui = "0.23.*"
 eframe = { version = "0.23.*" }
 egui_extras = { version = "0.23.*", features = ["image"] }
-# to resolve conflict versions used between egui and nannou_audio(cpal)
-web-sys = { version = "0.3.60", features = ["console"] }
-
-cpal = { version = "0.15.2" }
 symphonia = { version = "0.5.2", features = ["wav"] }
-dirs = { version = "5.0", optional = true }
-wasm-bindgen = { version = "0.2.88", optional = true }
-console_error_panic_hook = { version = "0.1.6", optional = true }
-wasm-bindgen-futures = { version = "0.4.38", optional = true }
-wee_alloc = { version = "0.4.5", optional = true }
+log = "0.4.20"
 
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+cpal = { version = "0.15.2" }
+clap = { version = "4.3.19", features = ["derive"] }
+rand = "0.8.5"
+dirs = "5.0"
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+cpal = { version = "0.15.2" ,features = ["wasm-bindgen"]}
+wasm-bindgen = "0.2.88"
+wasm-bindgen-futures = "0.4.38"
+wee_alloc = "0.4.5"
+
+[target.'cfg(all(target_arch = "wasm32",debug_assertions))']
+wasm-opt = false
+[target.'cfg(all(target_arch = "wasm32",debug_assertions))'.dependencies]
+console_error_panic_hook = "0.1.6"
 
 [dev-dependencies]
 wasm-bindgen-test = { version = "0.2" }

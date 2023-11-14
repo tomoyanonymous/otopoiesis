@@ -31,7 +31,6 @@ module.exports = {
   plugins: [
     new WasmPackPlugin({
       crateDirectory: __dirname,
-      extraArgs: '--features=web'
     }),
     new CopyPlugin({
       patterns: [

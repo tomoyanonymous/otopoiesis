@@ -63,6 +63,7 @@ where
         };
 
         let odevice = host.default_output_device();
+        log::info!("device {:?}", odevice.as_ref().map(|d| d.name()));
         let (oconfig, ostream) = if let Some(device) = odevice.as_ref() {
             let oconfig_builder = device
                 .supported_output_configs()
@@ -95,7 +96,7 @@ where
         } else {
             (None, None)
         };
-
+        assert!(oconfig.is_some());
         self.set_streams(istream, ostream, iconfig, oconfig);
     }
     fn prepare_play(&mut self);
