@@ -67,7 +67,7 @@ where
 // }
 pub fn get_component_for_value(v: &script::Value) -> Box<dyn Component + Send + Sync> {
     match v {
-        Value::Function(_, box Expr::App(box Expr::Literal(Value::ExtFunction(fname)), args)) => {
+        Value::Closure(_ids, _env,box Expr::App(box Expr::Literal(Value::ExtFunction(fname)), args)) => {
             match (fname.as_str(), &args.as_slice()) {
                 (
                     "sinewave",

@@ -118,8 +118,9 @@ impl TryFrom<&Value> for Region {
             Value::Region(start, dur, content, label, _) => {
                 make_region_from_param(*start, *dur, content, label)
             }
-            Value::Function(
+            Value::Closure(
                 _ids,
+                _env,
                 box Expr::App(box Expr::Literal(Value::ExtFunction(regionfilter)), args),
             ) if args.len() == 3 => match (
                 regionfilter.as_str(),

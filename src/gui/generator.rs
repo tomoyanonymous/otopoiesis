@@ -145,8 +145,9 @@ impl<'a> egui::Widget for Generator<'a> {
                 egui::menu::menu_button(ui, "parameter", |ui| {
                     //  ui.collapsing("parameter", |ui| {
                     match &self.param {
-                        Value::Function(
+                        Value::Closure(
                             _,
+                            _env,
                             box Expr::App(box Expr::Literal(Value::ExtFunction(fname)), args),
                         ) => {
                             let response = ui

@@ -5,8 +5,9 @@ use crate::script::{Environment, Expr, Type, Value};
 use crate::parameter::{FloatParameter, Parameter, RangedNumeric};
 use std::sync::{mpsc, Arc};
 fn with_fade(region: Value) -> Value {
-    Value::Function(
+    Value::Closure(
         vec![],
+        Arc::new(Environment::new()),
         Expr::App(
             Expr::Literal(Value::ExtFunction("fadeinout".to_string())).into(),
             vec![
