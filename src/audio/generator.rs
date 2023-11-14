@@ -4,13 +4,14 @@ use super::*;
 use crate::{
     data::{FilePlayerParam, OscillatorParam},
     parameter::{FloatParameter, Parameter, RangedNumeric, UIntParameter},
-    script::{self, Expr, Value},
+    script::{self, EvalError, Expr, Value},
 };
 pub mod constant;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod fileplayer;
 pub mod noise;
 pub mod oscillator;
+
 pub trait GeneratorComponent {
     type Params;
     fn get_params(&self) -> &Self::Params;
@@ -49,82 +50,135 @@ where
     }
 }
 
-// pub fn get_component_for_generator(kind: &data::Generator) -> Box<dyn Component + Send + Sync> {
-//     match kind {
-//         data::Generator::Oscillator(fun, param) => Box::new(match fun {
-//             data::OscillatorFun::SineWave => oscillator::sinewave(*param.as_ref()),
-//             data::OscillatorFun::SawTooth(dir) => oscillator::saw(*param.as_ref(), dir.clone()),
-//             data::OscillatorFun::Rectanglular(duty) => {
-//                 oscillator::rect(*param.as_ref(), duty.clone())
-//             }
-//             data::OscillatorFun::Triangular => oscillator::triangle(param.clone().as_ref().clone()),
-//         }),
-//         data::Generator::Constant(param) => Box::new(Constant(param.clone())),
-//         data::Generator::Noise() => Box::new(Noise {}),
-//         #[cfg(not(target_arch = "wasm32"))]
-//         data::Generator::FilePlayer(param) => Box::new(fileplayer::FilePlayer::new(param.clone())),
-//     }
-// }
-pub fn get_component_for_value(v: &script::Value) -> Box<dyn Component + Send + Sync> {
-    match v {
-        Value::Closure(_ids, _env,box Expr::App(box Expr::Literal(Value::ExtFunction(fname)), args)) => {
-            match (fname.as_str(), &args.as_slice()) {
-                (
-                    "sinewave",
-                    &[Expr::Literal(Value::Parameter(freq)), Expr::Literal(Value::Parameter(amp)), Expr::Literal(Value::Parameter(phase))],
-                ) => Box::new(oscillator::sinewave(OscillatorParam {
-                    amp: amp.clone(),
-                    freq: freq.clone(),
-                    phase: phase.clone(),
-                })),
-                (
-                    "sawtooth",
-                    &[Expr::Literal(Value::Parameter(freq)), Expr::Literal(Value::Parameter(amp)), Expr::Literal(Value::Parameter(phase)), Expr::Literal(Value::Parameter(dir))],
-                ) => Box::new(oscillator::saw(
-                    OscillatorParam {
-                        amp: amp.clone(),
-                        freq: freq.clone(),
-                        phase: phase.clone(),
-                    },
-                    dir.clone(),
-                )),
-                (
-                    "rectangular",
-                    &[Expr::Literal(Value::Parameter(freq)), Expr::Literal(Value::Parameter(amp)), Expr::Literal(Value::Parameter(phase)), Expr::Literal(Value::Parameter(duty))],
-                ) => Box::new(oscillator::rect(
-                    OscillatorParam {
-                        amp: amp.clone(),
-                        freq: freq.clone(),
-                        phase: phase.clone(),
-                    },
-                    duty.clone(),
-                )),
-                (
-                    "triangular",
-                    &[Expr::Literal(Value::Parameter(freq)), Expr::Literal(Value::Parameter(amp)), Expr::Literal(Value::Parameter(phase))],
-                ) => Box::new(oscillator::sinewave(OscillatorParam {
-                    amp: amp.clone(),
-                    freq: freq.clone(),
-                    phase: phase.clone(),
-                })),
-                ("constant", &[Expr::Literal(Value::Parameter(val))]) => {
-                    Box::new(constant::Constant(val.clone()))
+#[derive(Debug)]
+pub struct ScriptGenerator {
+    val: Value,
+}
+
+impl ScriptGenerator {
+    pub fn try_new(val: &Value) -> Result<Self, EvalError> {
+        let res = match val {
+            Value::Closure(_ids, _env, box _body) => true,
+            _ => false,
+        };
+        if res {
+            Ok(Self { val: val.clone() })
+        } else {
+            Err(EvalError::TypeMismatch("not a closure".into()))
+        }
+    }
+    fn compute_sample(&self, info: &PlaybackInfo) -> f64 {
+        match &self.val {
+            Value::Closure(_ids, env, box body) => {
+                match body.eval(env.clone(), &Some(info), &mut None) {
+                    Ok(Value::Number(res)) => res,
+                    _ => 0.0,
                 }
-                #[cfg(not(target_arch = "wasm32"))]
-                ("fileplayer", &[Expr::Literal(Value::String(path))]) => {
-                    let p = FilePlayerParam {
-                        path: path.clone(),
-                        channels: UIntParameter::new(2, "channels").set_range(0..=2),
-                        start_sec: FloatParameter::new(0.0, "start").set_range(0.0..=10.0),
-                        duration: FloatParameter::new(1.0, "duration").set_range(0.0..=10.0),
-                    };
-                    Box::new(fileplayer::FilePlayer::new(Arc::new(p)))
-                }
-                (_, _) => {
-                    panic!("No matching generator")
+            }
+            _ => 0.0,
+        }
+    }
+}
+impl Component for ScriptGenerator {
+    fn get_input_channels(&self) -> u64 {
+        if let Value::Closure(ids, _env, box _body) = &self.val {
+            ids.len() as u64
+        } else {
+            0
+        }
+    }
+
+    fn get_output_channels(&self) -> u64 {
+        //todo!
+        2
+    }
+
+    fn prepare_play(&mut self, info: &PlaybackInfo) {
+        //do nothing
+    }
+
+    fn render(&mut self, input: &[f32], output: &mut [f32], info: &PlaybackInfo) {
+        let mut info = info.clone(); //todo: inefficient
+        for (_count, out_per_channel) in output
+            .chunks_mut(self.get_output_channels() as usize)
+            .enumerate()
+        {
+            info.current_time += 1;
+            for (ch, s) in out_per_channel.iter_mut().enumerate() {
+                if ch == 0 {
+                    *s = self.compute_sample(&info) as f32;
+                } else {
+                    *s = 0.0
                 }
             }
         }
-        _ => panic!("invalid components"),
     }
+}
+
+pub fn get_component_for_value(v: &script::Value) -> Box<dyn Component + Send + Sync> {
+    let generator = ScriptGenerator::try_new(v).expect("not a valid component");
+    Box::new(generator)
+    // match v {
+    //     Value::Closure(
+    //         _ids,
+    //         _env,
+    //         box Expr::App(box Expr::Literal(Value::ExtFunction(fname)), args),
+    //     ) => match (fname.as_str(), &args.as_slice()) {
+    //         (
+    //             "sinewave",
+    //             &[Expr::Literal(Value::Parameter(freq)), Expr::Literal(Value::Parameter(amp)), Expr::Literal(Value::Parameter(phase))],
+    //         ) => Box::new(oscillator::sinewave(OscillatorParam {
+    //             amp: amp.clone(),
+    //             freq: freq.clone(),
+    //             phase: phase.clone(),
+    //         })),
+    //         (
+    //             "sawtooth",
+    //             &[Expr::Literal(Value::Parameter(freq)), Expr::Literal(Value::Parameter(amp)), Expr::Literal(Value::Parameter(phase)), Expr::Literal(Value::Parameter(dir))],
+    //         ) => Box::new(oscillator::saw(
+    //             OscillatorParam {
+    //                 amp: amp.clone(),
+    //                 freq: freq.clone(),
+    //                 phase: phase.clone(),
+    //             },
+    //             dir.clone(),
+    //         )),
+    //         (
+    //             "rectangular",
+    //             &[Expr::Literal(Value::Parameter(freq)), Expr::Literal(Value::Parameter(amp)), Expr::Literal(Value::Parameter(phase)), Expr::Literal(Value::Parameter(duty))],
+    //         ) => Box::new(oscillator::rect(
+    //             OscillatorParam {
+    //                 amp: amp.clone(),
+    //                 freq: freq.clone(),
+    //                 phase: phase.clone(),
+    //             },
+    //             duty.clone(),
+    //         )),
+    //         (
+    //             "triangular",
+    //             &[Expr::Literal(Value::Parameter(freq)), Expr::Literal(Value::Parameter(amp)), Expr::Literal(Value::Parameter(phase))],
+    //         ) => Box::new(oscillator::sinewave(OscillatorParam {
+    //             amp: amp.clone(),
+    //             freq: freq.clone(),
+    //             phase: phase.clone(),
+    //         })),
+    //         ("constant", &[Expr::Literal(Value::Parameter(val))]) => {
+    //             Box::new(constant::Constant(val.clone()))
+    //         }
+    //         #[cfg(not(target_arch = "wasm32"))]
+    //         ("fileplayer", &[Expr::Literal(Value::String(path))]) => {
+    //             let p = FilePlayerParam {
+    //                 path: path.clone(),
+    //                 channels: UIntParameter::new(2, "channels").set_range(0..=2),
+    //                 start_sec: FloatParameter::new(0.0, "start").set_range(0.0..=10.0),
+    //                 duration: FloatParameter::new(1.0, "duration").set_range(0.0..=10.0),
+    //             };
+    //             Box::new(fileplayer::FilePlayer::new(Arc::new(p)))
+    //         }
+    //         (_, _) => {
+    //             panic!("No matching generator")
+    //         }
+    //     },
+    //     _ => panic!("invalid components"),
+    // }
 }

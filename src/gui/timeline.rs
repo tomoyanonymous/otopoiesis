@@ -48,6 +48,7 @@ impl<'a> Model<'a> {
     fn get_current_time_in_sample(&self) -> u64 {
         self.state.now.load()
     }
+    #[allow(dead_code)]
     fn draw_frame(&mut self, painter: &egui::Painter, style: &egui::Style) {
         let rect = painter.clip_rect();
         painter.rect_stroke(

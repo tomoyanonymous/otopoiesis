@@ -2,12 +2,13 @@
 
 use crate::action;
 use crate::app::filemanager::{self, FileManager};
+use crate::script::builtin_fn;
 use crate::utils::{atomic, AtomicRange, SimpleAtomic};
 
 use rfd;
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
-use std::collections::HashMap;
+
 use std::sync::{mpsc, Arc};
 use undo;
 
@@ -47,6 +48,7 @@ impl Default for LaunchArg {
         }
     }
 }
+#[derive(Debug)]
 pub struct ConversionError {}
 
 impl TryFrom<&Value> for Project {
@@ -77,7 +79,6 @@ pub struct AppModel {
     pub history: undo::Record<action::Action>,
     pub action_tx: mpsc::Sender<action::Action>,
     pub action_rx: mpsc::Receiver<action::Action>,
-    pub builtin_fns: HashMap<&'static str, script::ExtFun>,
 }
 
 impl AppModel {
@@ -105,11 +106,7 @@ impl AppModel {
             history: undo::Record::new(),
             action_tx,
             action_rx,
-            builtin_fns: script::builtin_fn::gen_default_functions(),
         }
-    }
-    pub fn get_builtin_fn(&self, name: &str) -> Option<&script::ExtFun> {
-        self.builtin_fns.get(name)
     }
     pub fn can_undo(&self) -> bool {
         let history = &self.history;
@@ -211,9 +208,9 @@ impl AppModel {
     }
 
     pub fn compile(&mut self, source: Expr) -> bool {
-        let env = Arc::new(script::Environment::new());
+        let env = Arc::new(builtin_fn::gen_global_env());
         let res = source
-            .eval(env, &mut Some(self))
+            .eval(env, &mut None, &mut Some(self))
             .ok()
             .and_then(|v| Project::try_from(&v).ok());
         match res {

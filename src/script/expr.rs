@@ -9,16 +9,20 @@ pub enum Expr {
     App(Box<Expr>, Vec<Expr>), //currently only single argument
 }
 
+#[derive(Debug, Clone)]
 pub enum EvalError {
     TypeMismatch(String),
     NotFound,
     InvalidNumArgs(usize, usize), //expected,actual
+    NotInPlayMode,
+    NoAppRuntime,
 }
 
 impl Expr {
     pub fn eval(
         &self,
         env: Arc<Environment<Value>>,
+        play_info: &Option<&PlaybackInfo>,
         app: &mut Option<&mut data::AppModel>,
     ) -> Result<Value, EvalError> {
         match self {
@@ -28,16 +32,16 @@ impl Expr {
             Expr::Let(id, body, then) => {
                 let mut newenv = extend_env(env.clone());
 
-                let body_v = body.eval(env, app)?;
+                let body_v = body.eval(env, play_info, app)?;
                 newenv.bind(id, body_v);
 
-                then.eval(Arc::new(newenv), app)
+                then.eval(Arc::new(newenv), play_info, app)
             }
             Expr::App(fe, args) => {
-                let f = fe.eval(env.clone(), app)?;
+                let f = fe.eval(env.clone(), play_info, app)?;
                 let mut arg_res = vec![];
                 for a in args.iter() {
-                    match a.eval(env.clone(), app) {
+                    match a.eval(env.clone(), play_info, app) {
                         Ok(res) => {
                             arg_res.push(res);
                         }
@@ -53,17 +57,9 @@ impl Expr {
                         ids.iter().zip(arg_res.iter()).for_each(|(id, a)| {
                             newenv.bind(id, a.clone());
                         });
-                        body.eval(Arc::new(newenv), app)
+                        body.eval(Arc::new(newenv), play_info, app)
                     }
-                    Value::ExtFunction(fname) => {
-                        if app.is_some() {
-                            let a = app.as_ref().unwrap();
-                            let f = a.get_builtin_fn(&fname).ok_or(EvalError::NotFound)?.clone();
-                            f.0.exec(app, &arg_res)
-                        } else {
-                            Err(EvalError::NotFound)
-                        }
-                    }
+                    Value::ExtFunction(f) => f.0.exec(app, play_info, &arg_res),
                     _ => Err(EvalError::TypeMismatch("Not a Function".into())),
                 }
             }

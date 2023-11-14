@@ -40,6 +40,7 @@ impl Model {
         let mut appmodel = data::AppModel::new(data::Transport::new(), data::GlobalSetting {}, arg);
         let _ = appmodel.code_to_ui();
         let ui = gui::app::State::new(&appmodel);
+        #[allow(clippy::arc_with_non_send_sync)]
         let app = Arc::new(Mutex::new(appmodel));
 
         let mut renderer = new_renderer(&app.try_lock().unwrap());

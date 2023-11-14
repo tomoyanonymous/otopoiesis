@@ -1,6 +1,9 @@
 use crate::data;
+use crate::data::Region;
 use crate::gui;
 use crate::script;
+use crate::script::Expr;
+use crate::script::Value;
 use crate::utils::atomic::SimpleAtomic;
 mod region_handle;
 pub mod regionfilter;
@@ -46,6 +49,30 @@ impl State {
                     data::RegionFilter::Replicate(p) => regionfilter::RegionFilterState::Replicate(
                         replicate::State::new(origin.as_ref(), p.count.load() as u64),
                     ),
+                    data::RegionFilter::Script(v) => {
+                        let (rg,_time_in, _time_out) = match v {
+                            Value::Closure(
+                                _ids,
+                                _env,
+                                box Expr::App(box Expr::Var(fname), args),
+                            ) => match (fname.as_str(), args.as_slice()) {
+                                (
+                                    "apply_fade_in_out",
+                                    [Expr::Literal(region), Expr::Literal(Value::Parameter(time_in)), Expr::Literal(Value::Parameter(time_out))],
+                                ) => (
+                                    Region::try_from(region).expect("not a function"),
+                                    time_in,
+                                    time_out,
+                                ),
+                                _ => todo!(),
+                            },
+                            _ => todo!(),
+                        };
+                        regionfilter::RegionFilterState::FadeInOut(fadeinout::State::new(
+                            &rg,
+                            rg.range.clone(),
+                        ))
+                    }
                 })
             }
         };

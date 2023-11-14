@@ -1,8 +1,9 @@
 use crate::audio::{Component, PlaybackInfo};
 
 // use crate::parameter::UIntParameter
-use crate::data::{self, Region};
+use crate::data::{self, FadeParam, Region};
 use crate::parameter::Parameter;
+use crate::script::{Expr, Value};
 use crate::utils::{AtomicRange, SimpleAtomic};
 use std::ops::RangeInclusive;
 // 基本はオフラインレンダリング
@@ -190,6 +191,27 @@ impl TransformerModel {
                     .map(|_| Model::new(origin.clone(), 2))
                     .collect::<Vec<_>>(),
             )),
+            data::RegionFilter::Script(val) => {
+                let (rg, time_in, time_out) = match val {
+                    Value::Closure(_ids, _env, box Expr::App(box Expr::Var(fname), args)) => {
+                        match (fname.as_str(), args.as_slice()) {
+                            (
+                                "apply_fade_in_out",
+                                [Expr::Literal(region), Expr::Literal(Value::Parameter(time_in)), Expr::Literal(Value::Parameter(time_out))],
+                            ) => (
+                                Region::try_from(region).expect("not a function"),
+                                time_in,
+                                time_out,
+                            ),
+                            _ => todo!(),
+                        }
+                    }
+                    _ => todo!(),
+                };
+                let param = FadeParam::new_with(time_in.clone(), time_out.clone());
+                //rg and origin should be same...
+                Box::new(FadeModel::new(param.clone(), rg))
+            }
         };
         Self(component)
     }
@@ -371,7 +393,7 @@ mod test {
         let data = data::Region::new(
             AtomicRange::<f64>::new(range.start, range.end),
             data::Content::Generator(Value::new_lazy(Expr::App(
-                Box::new(Expr::Literal(Value::ExtFunction("sinewave".into()))),
+                Box::new(Expr::Var("sinewave".into())),
                 vec![
                     Expr::Literal(Value::Parameter(Arc::new(param_float!(
                         440.0,
@@ -425,7 +447,7 @@ mod test {
         //     FloatParameter::new(1.0, "test").set_range(0.0..=1.0),
         // )));
         let generator = Value::new_lazy(Expr::App(
-            Expr::Literal(Value::ExtFunction("constant".to_string())).into(),
+            Expr::Var("constant".to_string()).into(),
             vec![Expr::Literal(Value::Parameter(Arc::new(param_float!(
                 1.0,
                 "test",

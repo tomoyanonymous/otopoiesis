@@ -1,15 +1,15 @@
 use crate::action::{self, Action};
-use crate::data;
-use crate::script::{Environment, Expr, Type, Value};
+use crate::script::{builtin_fn, Expr, Type, Value};
+use crate::{data, param_float};
 
 use crate::parameter::{FloatParameter, Parameter, RangedNumeric};
 use std::sync::{mpsc, Arc};
 fn with_fade(region: Value) -> Value {
     Value::Closure(
         vec![],
-        Arc::new(Environment::new()),
+        Arc::new(builtin_fn::gen_global_env()),
         Expr::App(
-            Expr::Literal(Value::ExtFunction("fadeinout".to_string())).into(),
+            Expr::Var("fadeinout".to_string()).into(),
             vec![
                 Expr::Literal(region),
                 Expr::Literal(Value::Parameter(Arc::new(
@@ -25,7 +25,7 @@ fn with_fade(region: Value) -> Value {
 }
 fn make_region(trackid: usize, pos: f64, c: String) -> Value {
     let generator = Value::new_lazy(Expr::App(
-        Expr::Literal(Value::ExtFunction(c)).into(),
+        Expr::Var(c).into(),
         vec![
             Expr::Literal(Value::Parameter(Arc::new(
                 FloatParameter::new(440., "freq").set_range(10.0..=20000.),
@@ -39,8 +39,8 @@ fn make_region(trackid: usize, pos: f64, c: String) -> Value {
         ],
     ));
     let region = Value::Region(
-        pos,
-        pos + 1.0,
+        Arc::new(param_float!(pos as f32, "start", 0.0..=f32::MAX)),
+        Arc::new(param_float!(pos as f32 + 1.0, "start", 0.0..=f32::MAX)),
         generator.into(),
         format!("region{}", trackid + 1),
         Type::Unknown,
@@ -51,12 +51,12 @@ fn make_region(trackid: usize, pos: f64, c: String) -> Value {
 
 fn make_region_file(trackid: usize, pos: f64, path: String) -> Value {
     let generator = Value::new_lazy(Expr::App(
-        Expr::Literal(Value::ExtFunction("fileplayer".to_string())).into(),
+        Expr::Var("fileplayer".into()).into(),
         vec![Expr::Literal(Value::String(path))],
     ));
     let region = Value::Region(
-        pos,
-        pos + 1.0,
+        Arc::new(param_float!(pos as f32, "start", 0.0..=f32::MAX)),
+        Arc::new(param_float!(pos as f32 + 1.0, "start", 0.0..=f32::MAX)),
         generator.into(),
         format!("region{}", trackid + 1),
         Type::Unknown,

@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
-use crate::{data, parameter::FloatParameter};
+use crate::{audio::PlaybackInfo, data, parameter::FloatParameter};
 
 pub mod builtin_fn;
 pub mod environment;
@@ -15,7 +15,13 @@ pub use {
 // mod test;
 // use serde::{Deserialize, Serialize};
 pub trait ExtFunT: std::fmt::Debug {
-    fn exec(&self, app: &mut Option<&mut data::AppModel>, v: &[Value]) -> Result<Value, EvalError>;
+    fn exec(
+        &self,
+        app: &mut Option<&mut data::AppModel>,
+        play_info: &Option<&PlaybackInfo>,
+        v: &[Value],
+    ) -> Result<Value, EvalError>;
+    fn get_name(&self) -> &str;
 }
 
 pub trait MixerT: std::fmt::Debug {
@@ -24,10 +30,47 @@ pub trait MixerT: std::fmt::Debug {
 
 #[derive(Debug, Clone)]
 pub struct ExtFun(Arc<dyn ExtFunT>);
+unsafe impl Send for ExtFun {}
+unsafe impl Sync for ExtFun {}
 
 impl ExtFun {
     pub fn new(e: impl ExtFunT + 'static) -> Self {
         Self(Arc::new(e))
+    }
+    pub fn get_name(&self)->&str{
+        self.0.get_name()
+    }
+}
+
+impl Serialize for ExtFun {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_str(self.0.get_name())
+    }
+}
+struct ExtFunVisitor {}
+impl<'d> serde::de::Visitor<'d> for ExtFunVisitor {
+    type Value = ExtFun;
+
+    fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+        formatter.write_str("External Fun")
+    }
+    fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+    where
+        E: serde::de::Error,
+    {
+        Ok(ExtFun(Arc::new(builtin_fn::Nop {})))
+    }
+}
+
+impl<'d> Deserialize<'d> for ExtFun {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'d>,
+    {
+        deserializer.deserialize_str(ExtFunVisitor {})
     }
 }
 

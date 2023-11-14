@@ -152,7 +152,7 @@ impl<'a> egui::Widget for Generator<'a> {
                         ) => {
                             let response = ui
                                 .vertical(|ui| {
-                                    ui.label(fname.as_str());
+                                    ui.label(fname.get_name());
                                     args.iter()
                                         .map(|a| {
                                             if let Expr::Literal(Value::Parameter(param)) = a {

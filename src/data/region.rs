@@ -42,7 +42,17 @@ pub enum RegionFilter {
     FadeInOut(FadeParam),
     Reverse,
     Replicate(ReplicateParam),
+    Script(Value),
 }
+impl TryFrom<&Value> for RegionFilter {
+    type Error=ConversionError;
+
+    fn try_from(value: &Value) -> Result<Self, Self::Error> {
+        Ok(Self::Script(value.clone()))
+    }
+}
+
+
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub enum Content {
@@ -116,35 +126,15 @@ impl TryFrom<&Value> for Region {
     fn try_from(value: &Value) -> Result<Self, Self::Error> {
         match value {
             Value::Region(start, dur, content, label, _) => {
-                make_region_from_param(*start, *dur, content, label)
+                make_region_from_param(start.get() as f64, dur.get() as f64, content, label)
             }
-            Value::Closure(
-                _ids,
-                _env,
-                box Expr::App(box Expr::Literal(Value::ExtFunction(regionfilter)), args),
-            ) if args.len() == 3 => match (
-                regionfilter.as_str(),
-                args.get(0).unwrap(),
-                args.get(1).unwrap(),
-                args.get(2).unwrap(),
-            ) {
-                (
-                    "fadeinout",
-                    Expr::Literal(region),
-                    Expr::Literal(Value::Parameter(time_in)),
-                    Expr::Literal(Value::Parameter(time_out)),
-                ) => {
-                    //todo:need to eval region for non-literal expression
-                    let rg = Region::try_from(region)?;
-                    let range = rg.range.clone();
-                    let label = rg.label.clone();
-                    let param = FadeParam::new_with(time_in.clone(), time_out.clone());
-                    let content =
-                        Content::Transformer(RegionFilter::FadeInOut(param), Box::new(rg));
-                    Ok(Region::new(range, content, label))
-                }
-                _ => Err(ConversionError {}),
-            },
+            Value::Closure(_ids, env, box body) => {
+                let converted_region = body
+                    .eval(env.clone(), &None, &mut None)
+                    .map_err(|e| Self::Error {})?;
+                Self::try_from(&converted_region)
+            }
+
             _ => Err(ConversionError {}),
         }
     }

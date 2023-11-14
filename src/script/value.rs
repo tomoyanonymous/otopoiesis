@@ -1,3 +1,5 @@
+use crate::{data::AppModel, parameter::Parameter};
+
 use super::*;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -9,21 +11,36 @@ pub enum Value {
     Array(Vec<Value>, Type), //typed array
     Function(Vec<Id>, Box<Expr>),
     Closure(Vec<Id>, Arc<Environment<Value>>, Box<Expr>),
-    ExtFunction(Id),
+    ExtFunction(ExtFun),
     Track(Box<Value>, Type),                //input type, output type
-    Region(f64, f64, Box<Value>, Id, Type), //start,dur,content,label,type
+    Region(Arc<FloatParameter>,Arc<FloatParameter>, Box<Value>, Id, Type), //start,dur,content,label,type
     Project(f64, Vec<Value>),               //todo:reducer
 }
 
 impl Value {
     pub fn new_lazy(expr: Expr) -> Self {
         //wrap expression with function without arguments
-        Self::Closure(vec![], Arc::new(Environment::new()), Box::new(expr))
+        Self::Closure(
+            vec![],
+            Arc::new(builtin_fn::gen_global_env()),
+            Box::new(expr),
+        )
     }
-    pub fn eval_closure(&self) -> Result<Self, EvalError> {
+    pub fn eval_closure(
+        &self,
+        play_info: &Option<&PlaybackInfo>,
+        app: &mut Option<&mut AppModel>,
+    ) -> Result<Self, EvalError> {
         match self {
-            Self::Closure(ids, env, expr) => expr.eval(env.clone(), &mut None),
+            Self::Closure(_ids, env, expr) => expr.eval(env.clone(), play_info, app),
             _ => Err(EvalError::TypeMismatch("Not a Closure".into())),
+        }
+    }
+    pub fn get_as_float(&self) -> Result<f64, EvalError> {
+        match self {
+            Value::Parameter(p) => Ok(p.get() as f64),
+            Value::Number(f) => Ok(*f),
+            _ => Err(EvalError::TypeMismatch("not a float".into())),
         }
     }
     pub fn audio_track(channels: u64) -> Self {
