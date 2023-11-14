@@ -42,7 +42,7 @@ impl<'a> Model<'a> {
                 ui.label("otopoiesis");
                 ui.horizontal(|ui| {
                     ui.menu_button("File", |ui| {
-                        if let Ok(mut app) = self.app.lock() {
+                        if let Ok(mut app) = self.app.try_lock() {
                             if ui.button("Open").clicked() {
                                 app.open_file();
                             }
@@ -59,11 +59,11 @@ impl<'a> Model<'a> {
                             #[cfg(debug_assertions)]
                             self.state
                                 .timeline
-                                .sync_state(&self.app.lock().unwrap().project.tracks);
+                                .sync_state(&self.app.try_lock().unwrap().project.tracks);
                         }
                     });
                     ui.menu_button("Edit", |ui| {
-                        if let Ok(mut app) = self.app.lock() {
+                        if let Ok(mut app) = self.app.try_lock() {
                             let undo_sk =
                                 egui::KeyboardShortcut::new(egui::Modifiers::COMMAND, egui::Key::Z);
                             let redo_sk = egui::KeyboardShortcut::new(

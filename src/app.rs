@@ -42,11 +42,10 @@ impl Model {
         let ui = gui::app::State::new(&appmodel);
         let app = Arc::new(Mutex::new(appmodel));
 
-        let mut renderer = new_renderer(&app.lock().unwrap());
+        let mut renderer = new_renderer(&app.try_lock().unwrap());
 
         renderer.prepare_play();
         renderer.pause();
-
         Self {
             audio: renderer,
             app: Arc::clone(&app),
@@ -67,16 +66,16 @@ impl Model {
         self.audio.pause();
     }
     fn refresh_audio(&mut self) {
-        self.audio = new_renderer(&self.app.lock().unwrap());
+        self.audio = new_renderer(&self.app.try_lock().unwrap());
         self.audio.prepare_play();
         self.audio.pause();
     }
 
     fn _respawn_ui(&mut self) {
-        self.ui = gui::app::State::new(&self.app.lock().unwrap());
+        self.ui = gui::app::State::new(&self.app.try_lock().unwrap());
     }
     fn sync_transport(&mut self) {
-        let t = self.app.lock().unwrap().transport.clone();
+        let t = self.app.try_lock().unwrap().transport.clone();
         if let Some(b) = t.ready_to_trigger() {
             match b {
                 data::PlayOp::Play => self.play(),
@@ -95,7 +94,7 @@ impl Model {
 impl eframe::App for Model {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         {
-            let mut app = self.app.lock().unwrap();
+            let mut app = self.app.try_lock().unwrap();
             let need_update = app.consume_actions();
             if need_update {
                 let newsrc = app.source.as_ref().unwrap().clone();
@@ -162,7 +161,7 @@ impl eframe::App for Model {
             .resizable(true)
             .show_animated(ctx, self.editor_open, |ui| {
                 egui::ScrollArea::vertical().show(ui, |ui| {
-                    let should_refresh_audio = if let Ok(mut app) = self.app.lock() {
+                    let should_refresh_audio = if let Ok(mut app) = self.app.try_lock() {
                         let _ = ui.label("Code Editor");
                         let mut txt = String::new();
                         let widget = match self.editor_mode {
@@ -236,7 +235,7 @@ impl eframe::App for Model {
             .resizable(false)
             .show(ctx, |ui| {
                 ui.horizontal_centered(|ui| {
-                    if let Ok(mut app) = self.app.lock() {
+                    if let Ok(mut app) = self.app.try_lock() {
                         let text = if self.editor_open { "📕" } else { "📖" };
                         let button = ui.button(text);
                         if button.clicked() {

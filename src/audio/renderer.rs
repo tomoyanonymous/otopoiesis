@@ -63,7 +63,7 @@ where
         };
 
         let odevice = host.default_output_device();
-        log::info!("device {:?}", odevice.as_ref().map(|d| d.name()));
+        log::debug!("device {:?}", odevice.as_ref().map(|d| d.name()));
         let (oconfig, ostream) = if let Some(device) = odevice.as_ref() {
             let oconfig_builder = device
                 .supported_output_configs()
@@ -247,7 +247,7 @@ where
     }
 
     fn prepare_play(&mut self) {
-        if let Ok(_model) = self.imodel.lock() {
+        if let Ok(_model) = self.imodel.try_lock() {
             //do nothing
         }
         let config = self.oconfig.as_ref().unwrap();
@@ -256,7 +256,7 @@ where
             cpal::BufferSize::Fixed(s) => s as usize,
         } * config.channels as usize;
 
-        if let Ok(mut model) = self.omodel.lock() {
+        if let Ok(mut model) = self.omodel.try_lock() {
             let info = PlaybackInfo {
                 sample_rate: config.sample_rate.0,
                 current_time: 0,
