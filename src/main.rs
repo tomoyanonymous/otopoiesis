@@ -23,5 +23,4 @@ fn main() {
 
 ///binary crate for web does nothing.
 #[cfg(target_arch = "wasm32")]
-#[wasm_bindgen]
 fn main() {}

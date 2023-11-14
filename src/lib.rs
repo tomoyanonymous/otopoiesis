@@ -51,7 +51,7 @@ impl WebHandle {
     pub fn new() -> Self {
         console_error_panic_hook::set_once();
         // Redirect [`log`] message to `console.log` and friends:
-        if cfg(debug_assertions) {
+        if cfg!(debug_assertions) {
             eframe::web::WebLogger::init(log::LevelFilter::Debug).ok();
         } else {
             eframe::web::WebLogger::init(log::LevelFilter::Trace).ok();
