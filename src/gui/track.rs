@@ -116,19 +116,18 @@ impl<'a> egui::Widget for Model<'a> {
                     ui.set_min_width(40.);
                     ui.set_height(gui::TRACK_HEIGHT);
                     let position = self.get_position_to_add();
-                    let menues = ui.centered_and_justified(|ui| {
+                    ui.centered_and_justified(|ui| {
                         menu::add_region_button(self.id, position, &self.action_tx, ui);
-                    });
-                    menues
+                    })
                 });
 
                 if menu.response.clicked() {
                     self.sync_state();
                 }
-                if regions_opt.is_none() {
-                    menu.response
+                if let Some(regions) = regions_opt {
+                    regions.response.union(menu.response)
                 } else {
-                    regions_opt.unwrap().response.union(menu.response)
+                    menu.response
                 }
             }
 

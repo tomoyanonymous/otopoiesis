@@ -177,7 +177,7 @@ impl undo::Action for AddTrack {
     fn apply(&mut self, target: &mut Self::Target) -> undo::Result<Self> {
         match target {
             Expr::Literal(Value::Project(_sr, tracks)) => {
-                tracks.push(self.elem.clone().into());
+                tracks.push(self.elem.clone());
                 self.pos = tracks.len() - 1;
                 Ok(())
             }

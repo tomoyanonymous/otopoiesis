@@ -57,7 +57,7 @@ impl Expr {
                     }
                     Value::ExtFunction(fname) => {
                         if app.is_some() {
-                            let mut a = app.as_ref().unwrap();
+                            let a = app.as_ref().unwrap();
                             let f = a.get_builtin_fn(&fname).ok_or(EvalError::NotFound)?.clone();
                             f.0.exec(app, &arg_res)
                         } else {

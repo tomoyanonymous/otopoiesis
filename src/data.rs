@@ -54,7 +54,7 @@ impl TryFrom<&Value> for Project {
     fn try_from(value: &Value) -> Result<Self, Self::Error> {
         match value {
             Value::Project(sr, tr) => {
-                let tracks: Vec<Track> = tr.iter().map(|t| Track::try_from(t)).try_collect()?;
+                let tracks: Vec<Track> = tr.iter().map(Track::try_from).try_collect()?;
                 Ok(Project {
                     sample_rate: (*sr as u64).into(),
                     tracks: tracks,
@@ -133,7 +133,7 @@ impl AppModel {
     }
     pub fn redo(&mut self) {
         let history = &mut self.history;
-        if let Some(_res) = self.source.as_mut().map(|src| history.redo(src)).flatten() {
+        if let Some(_res) = self.source.as_mut().and_then(|src| history.redo(src)) {
             self.compile(self.source.as_ref().unwrap().clone());
             self.ui_to_code();
         }
@@ -207,7 +207,7 @@ impl AppModel {
                     false
                 }
             })
-            .any(|v| v == true)
+            .any(|v| v)
     }
 
     pub fn compile(&mut self, source: Expr) -> bool {
@@ -215,8 +215,7 @@ impl AppModel {
         let res = source
             .eval(env, &mut Some(self))
             .ok()
-            .map(|v| Project::try_from(&v).ok())
-            .flatten();
+            .and_then(|v| Project::try_from(&v).ok());
         match res {
             Some(pj) => {
                 self.project = pj;

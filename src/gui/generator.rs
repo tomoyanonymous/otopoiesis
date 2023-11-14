@@ -123,7 +123,7 @@ impl<'a> Generator<'a> {
                 egui::pos2(x as f32, y)
             })
             .collect::<Vec<Pos2>>();
-        let mut visu = style.visuals.widgets.active.clone();
+        let mut visu = style.visuals.widgets.active;
         visu.fg_stroke.width = 1.0;
         self.state.shape = Shape::line(points_to_draw, visu.fg_stroke);
     }

@@ -14,10 +14,7 @@ where
     T: Clone,
 {
     pub fn new() -> Self {
-        Self {
-            local: vec![],
-            parent: None,
-        }
+        Self::default()
     }
     pub fn bind(&mut self, key: &Id, val: T) {
         self.local.push((key.clone(), val.clone()))
@@ -26,7 +23,15 @@ where
         self.local
             .iter()
             .find_map(|e| if &e.0 == key { Some(&e.1) } else { None })
-            .or_else(|| self.parent.as_ref().map(|e| e.lookup(key)).flatten())
+            .or_else(|| self.parent.as_ref().and_then(|e| e.lookup(key)))
+    }
+}
+impl<T: Clone> Default for Environment<T> {
+    fn default() -> Self {
+        Self {
+            local: vec![],
+            parent: None,
+        }
     }
 }
 pub fn extend_env<T: Clone>(env: Arc<Environment<T>>) -> Environment<T> {

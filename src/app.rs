@@ -167,7 +167,7 @@ impl eframe::App for Model {
                         let widget = match self.editor_mode {
                             EditorMode::Code => {
                                 txt = app.source.as_ref().map_or("".to_string(), |src| {
-                                    serde_json::to_string_pretty::<Expr>(&src).unwrap()
+                                    serde_json::to_string_pretty::<Expr>(src).unwrap()
                                 });
                                 app.project_str = txt.clone();
                                 egui::TextEdit::multiline(&mut txt).code_editor()
