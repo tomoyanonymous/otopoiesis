@@ -15,7 +15,7 @@ impl Component for Noise {
     fn render(&mut self, _input: &[f32], output: &mut [f32], _info: &PlaybackInfo) {
         #[cfg(not(target_arch = "wasm32"))]
         for o in output.iter_mut() {
-            *o = unsafe { coreaudio_sys::random() as f64 / i64::MAX as f64 } as f32;
+            *o = rand::random::<f32>();
         }
         output.fill(1.0);
     }
