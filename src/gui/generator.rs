@@ -1,8 +1,5 @@
 use crate::{
-    audio::{
-        self,
-        region::{RangedComponent, RangedComponentDyn},
-    },
+    audio::{self, RangedComponent, RangedComponentDyn},
     gui::parameter::slider_from_parameter,
     script::{self, Expr, Value},
     utils::AtomicRange,
@@ -58,7 +55,7 @@ pub trait GeneratorUI<'a> {
         let channels = 2;
         let numsamples = (sample_rate as f64 * self.get_displayed_duration()).ceil() as usize;
         let mut buf = vec![0.0f32; numsamples * channels];
-        let audio_component = audio::generator::get_component_for_value(self.get_generator());
+        let audio_component = audio::get_component_for_value(self.get_generator());
         let mut ranged_component = RangedComponentDyn::new(
             audio_component,
             AtomicRange::from(self.get_displayed_range()),

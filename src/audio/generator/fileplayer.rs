@@ -1,5 +1,5 @@
 use crate::app::filemanager::{self, FileManager};
-use crate::audio::region::RangedComponent;
+use crate::audio::RangedComponent;
 use crate::audio::{Component, PlaybackInfo};
 use crate::data::FilePlayerParam;
 use crate::parameter::Parameter;

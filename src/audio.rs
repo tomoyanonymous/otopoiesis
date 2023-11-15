@@ -19,13 +19,8 @@ impl PlaybackInfo {
     }
 }
 
-pub trait Component: std::fmt::Debug {
-    fn get_input_channels(&self) -> u64;
-    fn get_output_channels(&self) -> u64;
-    fn prepare_play(&mut self, info: &PlaybackInfo);
-    fn render(&mut self, input: &[f32], output: &mut [f32], info: &PlaybackInfo);
-}
-
+pub mod component;
+pub use component::{get_component_for_value, Component, RangedComponent, RangedComponentDyn};
 pub mod generator;
 pub mod region;
 pub mod renderer;

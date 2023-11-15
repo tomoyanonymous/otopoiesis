@@ -1,19 +1,14 @@
-use crate::audio::{Component, PlaybackInfo};
+use crate::audio::{
+    get_component_for_value, Component, PlaybackInfo, RangedComponent, RangedComponentDyn,
+};
 
 // use crate::parameter::UIntParameter
 use crate::data::{self, FadeParam, Region};
 use crate::parameter::Parameter;
 use crate::script::{Expr, Value};
-use crate::utils::{AtomicRange, SimpleAtomic};
+use crate::utils::SimpleAtomic;
 use std::ops::RangeInclusive;
 // 基本はオフラインレンダリング
-
-/// Interface for offline rendering.
-pub trait RangedComponent: std::fmt::Debug {
-    fn get_range(&self) -> RangeInclusive<f64>;
-    fn get_output_channels(&self) -> u64;
-    fn render_offline(&mut self, dest: &mut [f32], sample_rate: u32, channels: u64);
-}
 
 #[derive(Debug)]
 pub struct FadeModel {
@@ -134,50 +129,6 @@ impl RangedComponent for RegionArray {
 }
 
 #[derive(Debug)]
-pub struct RangedComponentDyn {
-    generator: Box<dyn Component + Sync + Send>,
-    range: AtomicRange<f64>,
-    // buffer: Vec<f32>,
-}
-
-impl RangedComponentDyn {
-    pub fn new(generator: Box<dyn Component + Sync + Send>, range: AtomicRange<f64>) -> Self {
-        Self {
-            generator,
-            range,
-            // buffer: vec![],
-        }
-    }
-}
-
-impl RangedComponent for RangedComponentDyn {
-    fn get_range(&self) -> RangeInclusive<f64> {
-        let (start, end) = self.range.get_pair();
-        start..=end
-    }
-
-    fn get_output_channels(&self) -> u64 {
-        self.generator.get_output_channels()
-    }
-
-    fn render_offline(&mut self, dest: &mut [f32], sample_rate: u32, channels: u64) {
-        let info_local = PlaybackInfo {
-            sample_rate,
-            current_time: 0,
-            frame_per_buffer: dest.len() as u64 / channels,
-            channels,
-        };
-        // self.buffer.resize(
-        //     (self.range.getrange() * sample_rate as f64) as usize * channels as usize,
-        //     0.0,
-        // );
-        let input_dummy = vec![0.0f32; 1];
-        self.generator.prepare_play(&info_local);
-        self.generator.render(&input_dummy, dest, &info_local)
-    }
-}
-
-#[derive(Debug)]
 pub struct TransformerModel(Box<dyn RangedComponent + Send + Sync>);
 
 impl TransformerModel {
@@ -232,7 +183,7 @@ impl Model {
 
         let content: Box<dyn RangedComponent + Send + Sync> = match &params.content {
             data::Content::Generator(g) => {
-                let c = super::generator::get_component_for_value(g);
+                let c = get_component_for_value(g);
                 let ranged_component = RangedComponentDyn::new(c, params.range.clone());
                 Box::new(ranged_component)
             }
@@ -295,6 +246,7 @@ mod test {
         param_float,
         parameter::{FloatParameter, Parameter, RangedNumeric},
         script::{Expr, Value},
+        utils::AtomicRange,
     };
 
     use super::*;
