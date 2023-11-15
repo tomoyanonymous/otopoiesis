@@ -1,10 +1,10 @@
 use crate::{
     audio::PlaybackInfo,
-    data::{AppModel, Content, FadeParam, Region, RegionFilter},
+    data::{AppModel, Region},
 };
 
-use super::{Environment, EvalError, Expr, ExtFun, ExtFunT, Type, Value};
-use std::collections::HashMap;
+use super::{Environment, EvalError, Expr, ExtFun, ExtFunT, Id, Type, Value};
+use std::sync::Arc;
 
 #[derive(Clone, Debug)]
 pub struct ArrayReverse {}
@@ -106,18 +106,26 @@ impl ExtFunT for FadeInOut {
             return Err(EvalError::InvalidNumArgs(3, v.len()));
         }
         match v {
-            [region, Value::Parameter(time_in), Value::Parameter(time_out)] => {
-                let mut rg = Region::try_from(region).expect("not a region");
-
+            [origin, Value::Parameter(time_in), Value::Parameter(time_out)] => {
+                let mut rg = Region::try_from(origin).expect("not a region");
                 let label = rg.label.clone();
-                let content = Value::new_lazy(Expr::App(
-                    Expr::Var("apply_fade_in_out".into()).into(),
-                    vec![
-                        Expr::Literal(region.clone()),
-                        Expr::Literal(Value::Parameter(time_in.clone())),
-                        Expr::Literal(Value::Parameter(time_out.clone())),
-                    ],
-                ));
+                let mut env = Environment::new();
+                env.bind(&"time_in".into(), Value::Parameter(time_in.clone()));
+                env.bind(&"time_out".into(), Value::Parameter(time_out.clone()));
+
+                let content = Value::Closure(
+                    vec![Id::from("start"), Id::from("dur")],
+                    Arc::new(env),
+                    Expr::App(
+                        Expr::Var("apply_fade_in_out".into()).into(),
+                        vec![
+                            Expr::Literal(origin.clone()),
+                            Expr::Literal(Value::Parameter(time_in.clone())),
+                            Expr::Literal(Value::Parameter(time_out.clone())),
+                        ],
+                    )
+                    .into(),
+                );
                 Ok(Value::Region(
                     time_in.clone(),
                     time_out.clone(),
@@ -136,16 +144,98 @@ impl ExtFunT for FadeInOut {
 }
 
 #[derive(Clone, Debug)]
+struct FadeInfo<'a> {
+    start: &'a u64,
+    dur: &'a u64,
+    time_in: &'a u64,
+    time_out: &'a u64,
+}
+
+#[derive(Clone, Debug)]
+enum FadeState {
+    BeforeRange,
+    FadeIn(f64),
+    NonFade,
+    FadeOut(f64),
+    AfterRange,
+}
+impl FadeState {
+    pub fn get_gain(&self) -> f64 {
+        match self {
+            FadeState::BeforeRange | FadeState::AfterRange => 0.0,
+            FadeState::NonFade => 1.0,
+            FadeState::FadeIn(g) | FadeState::FadeOut(g) => *g,
+        }
+    }
+}
+
+impl<'a> FadeInfo<'a> {
+    pub fn new(start: &'a u64, dur: &'a u64, time_in: &'a u64, time_out: &'a u64) -> Option<Self> {
+        if time_in + time_out <= *dur {
+            Some(Self {
+                start,
+                dur,
+                time_in,
+                time_out,
+            })
+        } else {
+            None
+        }
+    }
+    pub fn calc(&self, now: u64) -> FadeState {
+        let reltime = now as i64 - *self.start as i64;
+        if reltime <= 0 {
+            return FadeState::BeforeRange;
+        }
+        if reltime >= *self.dur as i64 {
+            return FadeState::AfterRange;
+        }
+        if reltime < *self.time_in as i64 {
+            return FadeState::FadeIn(reltime as f64 / *self.time_in as f64);
+        }
+        let out_start = *self.dur as i64 - *self.time_out as i64;
+        if reltime > out_start {
+            let ratio = (out_start - reltime) as f64 / *self.time_out as f64;
+            return FadeState::FadeOut(ratio);
+        } else {
+            return FadeState::NonFade;
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
 pub struct ApplyFadeInOut {}
+impl ApplyFadeInOut {
+    pub fn apply(input: f64, now: u64, start: u64, dur: u64, time_in: u64, time_out: u64) -> f64 {
+        let fadeinfo = FadeInfo::new(&start, &dur, &time_in, &time_out);
+        let gain = fadeinfo.map_or(0.0, |info| info.calc(now).get_gain());
+        input * gain
+    }
+}
 impl ExtFunT for ApplyFadeInOut {
     fn exec(
         &self,
         _app: &mut Option<&mut AppModel>,
-        _play_info: &Option<&PlaybackInfo>,
-        _v: &[Value],
+        play_info: &Option<&PlaybackInfo>,
+        v: &[Value],
     ) -> Result<Value, EvalError> {
+        let now = play_info.unwrap().current_time;
+        let sr = play_info.unwrap().sample_rate as f64;
         // do nothing for now
-        Err(EvalError::NotFound)
+        match v {
+            [input_sample, start, dur, time_in, time_out] => {
+                let input = input_sample.get_as_float().unwrap_or(0.0);
+                let start = (start.get_as_float().unwrap_or(0.0) * sr) as u64;
+                let dur = (dur.get_as_float().unwrap_or(0.0) * sr) as u64;
+                let time_in = (time_in.get_as_float().unwrap_or(0.0) * sr) as u64;
+                let time_out = (time_out.get_as_float().unwrap_or(0.0) * sr) as u64;
+
+                Ok(Value::Number(Self::apply(
+                    input, now as u64, start, dur, time_in, time_out,
+                )))
+            }
+            _ => Err(EvalError::InvalidNumArgs(3, v.len())),
+        }
     }
 
     fn get_name(&self) -> &str {

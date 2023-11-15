@@ -185,29 +185,6 @@ impl Component for FilePlayer {
     }
 }
 
-impl RangedComponent for FilePlayer {
-    fn get_range(&self) -> std::ops::RangeInclusive<f64> {
-        self.param.start_sec.get() as f64
-            ..=(self.param.start_sec.get() + self.param.duration.get()) as f64
-    }
-
-    fn get_output_channels(&self) -> u64 {
-        self.param.channels.get()
-    }
-
-    fn render_offline(&mut self, dest: &mut [f32], sample_rate: u32, channels: u64) {
-        let info = PlaybackInfo {
-            sample_rate,
-            current_time: 0,
-            frame_per_buffer: dest.len() as u64 / channels,
-            channels,
-        };
-        self.prepare_play(&info);
-        let input_dummy = vec![0.0f32; 1];
-        self.render(&input_dummy, dest, &info);
-    }
-}
-
 #[cfg(test)]
 mod test {
     use crate::{audio::PlaybackInfo, data};

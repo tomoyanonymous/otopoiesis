@@ -5,7 +5,7 @@ use std::sync::Arc;
 pub struct Model {
     param: data::Project,
     _transport: Arc<data::Transport>,
-    tracks: Vec<super::track::Model>, // regions: Vec<audio::region::Region<>>
+    tracks: Vec<Box<dyn Component + Send + Sync>>, // regions: Vec<audio::region::Region<>>
     tmp_buffer: Vec<f32>,
 }
 
@@ -20,12 +20,15 @@ impl Model {
             tmp_buffer,
         }
     }
-    fn get_new_tracks(project: &data::Project) -> Vec<super::track::Model> {
+    fn get_new_tracks(project: &data::Project) -> Vec<Box<dyn Component + Send + Sync>> {
         project
             .tracks
             .iter()
             .map(|t| match t {
-                data::Track::Regions(r) => super::track::Model::new(r.clone(), 2),
+                data::Track::Regions(r) => {
+                    Box::new(super::track::Model::new(r.clone(), 2))
+                        as Box<dyn Component + Send + Sync>
+                }
                 data::Track::Generator(_) => todo!(),
                 data::Track::Transformer() => todo!(),
             })

@@ -1,16 +1,5 @@
-use std::sync::Arc;
-
 use super::*;
-use crate::{
-    data::{FilePlayerParam, OscillatorParam},
-    parameter::{FloatParameter, Parameter, RangedNumeric, UIntParameter},
-    script::{self, EvalError, Expr, Value},
-};
-pub mod constant;
-#[cfg(not(target_arch = "wasm32"))]
-pub mod fileplayer;
-pub mod noise;
-pub mod oscillator;
+
 
 pub trait GeneratorComponent {
     type Params;
@@ -49,3 +38,9 @@ where
         }
     }
 }
+
+pub mod constant;
+#[cfg(not(target_arch = "wasm32"))]
+pub mod fileplayer;
+pub mod noise;
+pub mod oscillator;

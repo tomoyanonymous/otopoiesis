@@ -8,6 +8,8 @@ use crate::parameter::Parameter;
 use crate::script::{Expr, Value};
 use crate::utils::SimpleAtomic;
 use std::ops::RangeInclusive;
+
+use super::component::RangedScriptComponent;
 // 基本はオフラインレンダリング
 
 #[derive(Debug)]
@@ -126,6 +128,10 @@ impl RangedComponent for RegionArray {
             dest.copy_from_slice(&region.interleaved_samples_cache);
         });
     }
+
+    fn get_sample(&self,time:u64)->Option<f64> {
+        todo!()
+    }
 }
 
 #[derive(Debug)]
@@ -143,25 +149,32 @@ impl TransformerModel {
                     .collect::<Vec<_>>(),
             )),
             data::RegionFilter::Script(val) => {
-                let (rg, time_in, time_out) = match val {
-                    Value::Closure(_ids, _env, box Expr::App(box Expr::Var(fname), args)) => {
+                match val {
+                    Value::Closure(_ids, env, box Expr::App(box Expr::Var(fname), args)) => {
                         match (fname.as_str(), args.as_slice()) {
                             (
                                 "apply_fade_in_out",
                                 [Expr::Literal(region), Expr::Literal(Value::Parameter(time_in)), Expr::Literal(Value::Parameter(time_out))],
-                            ) => (
-                                Region::try_from(region).expect("not a function"),
-                                time_in,
-                                time_out,
-                            ),
+                            ) => {
+                               let (start,dur) =  if let Value::Region(start,dur,_content,_label,_t) = region{
+                                    (start,dur)
+                                }else{
+                                    panic!("not a region")
+                                };
+                                Box::new(RangedScriptComponent {
+                                start: Value::Parameter(start.clone()),
+                                dur: Value::Parameter(dur.clone()),
+                                origin: region.clone(),
+                                translator: Value::ExtFunction(()),
+                                env: env.clone(),
+                            })
+                        },
                             _ => todo!(),
                         }
                     }
                     _ => todo!(),
-                };
-                let param = FadeParam::new_with(time_in.clone(), time_out.clone());
+                }
                 //rg and origin should be same...
-                Box::new(FadeModel::new(param.clone(), rg))
             }
         };
         Self(component)

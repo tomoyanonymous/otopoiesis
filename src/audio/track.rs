@@ -1,11 +1,17 @@
+use std::sync::Arc;
+
 use crate::audio::{Component, PlaybackInfo};
 use crate::data;
+
+use super::component::ScriptComponent;
+use super::{RangedComponent, RangedComponentDyn};
 
 #[derive(Debug)]
 pub struct Model {
     param: Vec<data::Region>,
     _channels: u64,
-    regions: Vec<super::region::Model>,
+    //actual regions contains sample caches
+    regions: Vec<Box<dyn RangedComponent + Send + Sync>>,
 }
 
 impl Model {
@@ -18,10 +24,20 @@ impl Model {
             regions,
         }
     }
-    fn get_new_regions(param: &[data::Region], channels: u64) -> Vec<super::region::Model> {
+    fn get_new_regions(
+        param: &[data::Region],
+        channels: u64,
+    ) -> Vec<Box<dyn RangedComponent + Send + Sync>> {
         param
             .iter()
-            .map(|region| super::region::Model::new(region.clone(), channels))
+            .map(|region| match region.content {
+                data::Content::Generator(g) => Box::new(RangedComponentDyn::new(
+                    Box::new(ScriptComponent::try_new(&g).expect("not an generator")),
+                    region.range.clone(),
+                ))
+                    as Box<dyn RangedComponent + Send + Sync>,
+                data::Content::Transformer(_, _) => todo!(),
+            })
             .collect::<Vec<_>>()
     }
     fn renew_regions(&mut self, info: &PlaybackInfo) {
@@ -33,12 +49,27 @@ impl Model {
             self.param
                 .iter()
                 .map(|region| {
-                    //temporary moves value to
-                    let model = super::region::Model::new(region.clone(), channels);
-                    super::region::render_region_offline_async(model, info)
+                    let mut model = match region.content {
+                        data::Content::Generator(g) => Box::new(RangedComponentDyn::new(
+                            Box::new(ScriptComponent::try_new(&g).expect("not an generator")),
+                            region.range.clone(),
+                        ))
+                            as Box<dyn RangedComponent + Send + Sync>,
+                        data::Content::Transformer(_, _) => todo!(),
+                    };
+                    super::component::render_region_offline_async(&mut model, info)
                 })
-                .map(move |h| h.join().expect("hoge"))
-                .collect::<Vec<super::region::Model>>()
+                .map(|handle| *handle.join().expect("failed to join threads"))
+                .collect::<_>()
+            // self.param
+            //     .iter()
+            //     .map(|region| {
+            //         //temporary moves value to
+            //         let model = super::region::Model::new(region.clone(), channels);
+            //         super::region::render_region_offline_async(model, info)
+            //     })
+            //     .map(move |h| h.join().expect("hoge"))
+            //     .collect::<Vec<_>>()
         };
         #[cfg(target_arch = "wasm32")]
         let res = self
@@ -76,8 +107,8 @@ impl Component for Model {
             out_per_channel.iter_mut().enumerate().for_each(|(ch, s)| {
                 //順にリージョンを読んでいくので、重なってる場合は後の要素のやつが上書きする形になる
                 for region in self.regions.iter() {
-                    let start_samp = (region.params.range.start() * info.sample_rate as f64) as i64;
-                    if region.params.range.contains(now_in_sec) {
+                    let start_samp = (region.get_range().start() * info.sample_rate as f64) as i64;
+                    if region.get_range().contains(&now_in_sec) {
                         let read_point = ((now - start_samp) * chs) as usize;
                         // 再生中にRangeを変更すると範囲外アクセスの可能性はあるので対応
                         let out = region
