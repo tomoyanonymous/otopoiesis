@@ -17,11 +17,13 @@ pub use {
 pub trait ExtFunT: std::fmt::Debug {
     fn exec(
         &self,
+        env: &Arc<Environment<Value>>,
         app: &mut Option<&mut data::AppModel>,
         play_info: &Option<&PlaybackInfo>,
         v: &[Value],
     ) -> Result<Value, EvalError>;
     fn get_name(&self) -> &str;
+
 }
 
 pub trait MixerT: std::fmt::Debug {

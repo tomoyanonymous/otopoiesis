@@ -86,6 +86,15 @@ impl RangedComponent for FadeModel {
                 });
         }
     }
+
+    fn get_sample_cache(&self) -> &[f32] {
+        todo!()
+    }
+
+    fn get_sample(&self, time: f64, sample_rate: u32) -> Option<f64> {
+        todo!()
+    }
+    
 }
 
 #[derive(Debug)]
@@ -129,7 +138,11 @@ impl RangedComponent for RegionArray {
         });
     }
 
-    fn get_sample(&self,time:u64)->Option<f64> {
+    fn get_sample(&self, time: f64,sample_rate: u32) -> Option<f64> {
+        todo!()
+    }
+
+    fn get_sample_cache(&self) -> &[f32] {
         todo!()
     }
 }
@@ -151,26 +164,29 @@ impl TransformerModel {
             data::RegionFilter::Script(val) => {
                 match val {
                     Value::Closure(_ids, env, box Expr::App(box Expr::Var(fname), args)) => {
-                        match (fname.as_str(), args.as_slice()) {
-                            (
-                                "apply_fade_in_out",
-                                [Expr::Literal(region), Expr::Literal(Value::Parameter(time_in)), Expr::Literal(Value::Parameter(time_out))],
-                            ) => {
-                               let (start,dur) =  if let Value::Region(start,dur,_content,_label,_t) = region{
-                                    (start,dur)
-                                }else{
-                                    panic!("not a region")
-                                };
-                                Box::new(RangedScriptComponent {
-                                start: Value::Parameter(start.clone()),
-                                dur: Value::Parameter(dur.clone()),
-                                origin: region.clone(),
-                                translator: Value::ExtFunction(()),
-                                env: env.clone(),
-                            })
-                        },
-                            _ => todo!(),
-                        }
+                        todo!()
+                        // match (fname.as_str(), args.as_slice()) {
+                        //     (
+                        //         "apply_fade_in_out",
+                        //         [Expr::Literal(region), Expr::Literal(Value::Parameter(time_in)), Expr::Literal(Value::Parameter(time_out))],
+                        //     ) => {
+                        //         let (start, dur) =
+                        //             if let Value::Region(start, dur, _content, _label, _t) = region
+                        //             {
+                        //                 (start, dur)
+                        //             } else {
+                        //                 panic!("not a region")
+                        //             };
+                        //         Box::new(RangedScriptComponent::new(
+                        //             Value::Parameter(start.clone()),
+                        //             Value::Parameter(dur.clone()),
+                        //             region.clone(),
+                        //             Value::ExtFunction(()),
+                        //             env.clone(),
+                        //         ))
+                        //     }
+                        //     _ => todo!(),
+                        // }
                     }
                     _ => todo!(),
                 }
@@ -361,7 +377,7 @@ mod test {
                 Box::new(Expr::Var("sinewave".into())),
                 vec![
                     Expr::Literal(Value::Parameter(Arc::new(param_float!(
-                        440.0,
+                        1000.0,
                         "freq",
                         20.0..=20000.0
                     )))),

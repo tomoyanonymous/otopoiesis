@@ -59,7 +59,7 @@ impl Expr {
                         });
                         body.eval(Arc::new(newenv), play_info, app)
                     }
-                    Value::ExtFunction(f) => f.0.exec(app, play_info, &arg_res),
+                    Value::ExtFunction(f) => f.0.exec(&env, app, play_info, &arg_res),
                     _ => Err(EvalError::TypeMismatch("Not a Function".into())),
                 }
             }

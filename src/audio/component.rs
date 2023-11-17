@@ -151,8 +151,22 @@ pub fn get_component_for_value(v: &script::Value) -> Box<dyn Component + Send + 
 pub trait RangedComponent: std::fmt::Debug {
     fn get_range(&self) -> RangeInclusive<f64>;
     fn get_output_channels(&self) -> u64;
+    fn get_sample_cache(&self) -> &[f32];
     fn render_offline(&mut self, dest: &mut [f32], sample_rate: u32, channels: u64);
-    fn get_sample(&self,time:u64)->Option<f64>;
+    fn get_cache_len(&self, sample_rate: u32) -> usize {
+        let range = self.get_range();
+        let len_sec = range.end() - range.start();
+        (len_sec * sample_rate as f64) as usize
+    }
+    fn get_sample(&self, time: f64, sample_rate: u32) -> Option<f64> {
+        if self.get_range().contains(&time) {
+            self.get_sample_cache()
+                .get((sample_rate as f64 * (time - self.get_range().start())) as usize)
+                .map(|s| *s as f64)
+        } else {
+            None
+        }
+    }
     fn get_default_playback_info(&self, sample_rate: u32, channels: u64) -> PlaybackInfo {
         let dur = self.get_range().end() - self.get_range().start();
         let numsamples = (dur * sample_rate as f64).ceil() as u64;
@@ -163,13 +177,12 @@ pub trait RangedComponent: std::fmt::Debug {
             channels,
         }
     }
-    
 }
 #[cfg(not(target_arch = "wasm32"))]
-pub fn render_region_offline_async<'a>(
-    region:&mut Box<dyn RangedComponent+Send+Sync>,
+pub fn render_region_offline_async(
+    mut region: Box<dyn RangedComponent + Send + Sync>,
     info: &PlaybackInfo,
-) -> std::thread::JoinHandle<&'a mut Box<dyn RangedComponent+Send+Sync>> {
+) -> std::thread::JoinHandle<Box<dyn RangedComponent + Send + Sync>> {
     let name = format!("regionrender{}", rand::random::<u64>());
     let info = info.clone();
 
@@ -189,7 +202,7 @@ pub fn render_region_offline_async<'a>(
 pub struct RangedComponentDyn {
     generator: Box<dyn Component + Sync + Send>,
     range: AtomicRange<f64>,
-    // buffer: Vec<f32>,
+    buffer: Vec<f32>,
 }
 
 impl RangedComponentDyn {
@@ -197,7 +210,7 @@ impl RangedComponentDyn {
         Self {
             generator,
             range,
-            // buffer: vec![],
+            buffer: vec![],
         }
     }
 }
@@ -219,17 +232,21 @@ impl RangedComponent for RangedComponentDyn {
             frame_per_buffer: dest.len() as u64 / channels,
             channels,
         };
-        // self.buffer.resize(
-        //     (self.range.getrange() * sample_rate as f64) as usize * channels as usize,
-        //     0.0,
-        // );
+        self.buffer.resize(
+            (self.range.getrange() * sample_rate as f64) as usize * channels as usize,
+            0.0,
+        );
         let input_dummy = vec![0.0f32; 1];
         self.generator.prepare_play(&info_local);
         self.generator.render(&input_dummy, dest, &info_local)
     }
 
-    fn get_sample(&self,time:u64)->Option<f64> {
+    fn get_sample(&self, time: f64, sample_rate: u32) -> Option<f64> {
         todo!()
+    }
+
+    fn get_sample_cache(&self) -> &[f32] {
+        &self.buffer
     }
 }
 
@@ -240,8 +257,25 @@ pub struct RangedScriptComponent {
     pub origin: Value, //expect:region
     pub translator: Value,
     pub env: Arc<Environment<Value>>,
+    cache: Vec<f32>,
 }
 impl RangedScriptComponent {
+    pub fn new(
+        start: Value,
+        dur: Value,
+        origin: Value,
+        translator: Value,
+        env: Arc<Environment<Value>>,
+    ) -> Self {
+        Self {
+            start,
+            dur,
+            origin,
+            translator,
+            env,
+            cache: vec![],
+        }
+    }
     pub fn compute_sample(&self, input: f64, info: &PlaybackInfo) -> f64 {
         let expr = Expr::App(
             //例えばFadeInOutなら、クロージャにtime_in、time_outの様なパラメータを閉じ込めておいて、apply_fade_in_outの中でenv.lookupで取り出す、とか？
@@ -270,7 +304,7 @@ impl RangedComponent for RangedScriptComponent {
 
     fn render_offline(&mut self, dest: &mut [f32], sample_rate: u32, channels: u64) {
         //リバースとかノンリニアな処理のものとフェードインアウトとかリニアな処理（リアルタイム加工できるもの）は形を分けるべきかもしれない
-
+        self.cache.resize(self.get_cache_len(sample_rate), 0.0);
         let mut info = self.get_default_playback_info(sample_rate, channels);
         let origin_rg = Region::try_from(&self.origin).expect("not a region");
         let mut origin_model = region::Model::new(origin_rg, 2);
@@ -297,7 +331,7 @@ impl RangedComponent for RangedScriptComponent {
         }
     }
 
-    fn get_sample(&self,time:u64)->Option<f64> {
-        todo!()
+    fn get_sample_cache(&self) -> &[f32] {
+        &self.cache
     }
 }

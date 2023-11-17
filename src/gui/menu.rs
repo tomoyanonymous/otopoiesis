@@ -28,7 +28,7 @@ fn make_region(trackid: usize, pos: f64, c: String) -> Value {
         Expr::Var(c).into(),
         vec![
             Expr::Literal(Value::Parameter(Arc::new(
-                FloatParameter::new(440., "freq").set_range(10.0..=20000.),
+                FloatParameter::new(1000., "freq").set_range(10.0..=20000.),
             ))),
             Expr::Literal(Value::Parameter(Arc::new(
                 FloatParameter::new(1.0, "amp").set_range(0.0..=1.0),

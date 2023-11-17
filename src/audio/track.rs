@@ -30,7 +30,7 @@ impl Model {
     ) -> Vec<Box<dyn RangedComponent + Send + Sync>> {
         param
             .iter()
-            .map(|region| match region.content {
+            .map(|region| match &region.content {
                 data::Content::Generator(g) => Box::new(RangedComponentDyn::new(
                     Box::new(ScriptComponent::try_new(&g).expect("not an generator")),
                     region.range.clone(),
@@ -49,7 +49,7 @@ impl Model {
             self.param
                 .iter()
                 .map(|region| {
-                    let mut model = match region.content {
+                    let model = match &region.content {
                         data::Content::Generator(g) => Box::new(RangedComponentDyn::new(
                             Box::new(ScriptComponent::try_new(&g).expect("not an generator")),
                             region.range.clone(),
@@ -57,10 +57,9 @@ impl Model {
                             as Box<dyn RangedComponent + Send + Sync>,
                         data::Content::Transformer(_, _) => todo!(),
                     };
-                    super::component::render_region_offline_async(&mut model, info)
-                })
-                .map(|handle| *handle.join().expect("failed to join threads"))
-                .collect::<_>()
+                    super::component::render_region_offline_async(model, info)
+                }).map(|h| h.join().expect("failed to join threads") ).collect::<Vec<_>>()
+
             // self.param
             //     .iter()
             //     .map(|region| {
@@ -112,7 +111,7 @@ impl Component for Model {
                         let read_point = ((now - start_samp) * chs) as usize;
                         // 再生中にRangeを変更すると範囲外アクセスの可能性はあるので対応
                         let out = region
-                            .interleaved_samples_cache
+                            .get_sample_cache()
                             .get(read_point + ch)
                             .unwrap_or(&0.0);
                         *s = *out;

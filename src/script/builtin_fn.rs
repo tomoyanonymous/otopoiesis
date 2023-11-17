@@ -3,7 +3,7 @@ use crate::{
     data::{AppModel, Region},
 };
 
-use super::{Environment, EvalError, Expr, ExtFun, ExtFunT, Id, Type, Value};
+use super::{extend_env, Environment, EvalError, Expr, ExtFun, ExtFunT, Id, Type, Value};
 use std::sync::Arc;
 
 #[derive(Clone, Debug)]
@@ -12,6 +12,7 @@ pub struct ArrayReverse {}
 impl ExtFunT for ArrayReverse {
     fn exec(
         &self,
+        env: &Arc<Environment<Value>>,
         _app: &mut Option<&mut AppModel>,
         _play_info: &Option<&PlaybackInfo>,
         v: &[Value],
@@ -40,6 +41,7 @@ pub struct Print {}
 impl ExtFunT for Print {
     fn exec(
         &self,
+        env: &Arc<Environment<Value>>,
         _app: &mut Option<&mut AppModel>,
         _play_info: &Option<&PlaybackInfo>,
         v: &[Value],
@@ -61,6 +63,7 @@ pub struct SineWave {}
 impl ExtFunT for SineWave {
     fn exec(
         &self,
+        env: &Arc<Environment<Value>>,
         _app: &mut Option<&mut AppModel>,
         play_info: &Option<&PlaybackInfo>,
         v: &[Value],
@@ -96,8 +99,9 @@ pub struct FadeInOut {}
 impl ExtFunT for FadeInOut {
     fn exec(
         &self,
-        app: &mut Option<&mut AppModel>,
-        play_info: &Option<&PlaybackInfo>,
+        env: &Arc<Environment<Value>>,
+        _app: &mut Option<&mut AppModel>,
+        _play_info: &Option<&PlaybackInfo>,
         v: &[Value],
     ) -> Result<Value, EvalError> {
         // ここでは実際のフェードイン、アウトはしない。
@@ -107,19 +111,22 @@ impl ExtFunT for FadeInOut {
         }
         match v {
             [origin, Value::Parameter(time_in), Value::Parameter(time_out)] => {
-                let mut rg = Region::try_from(origin).expect("not a region");
-                let label = rg.label.clone();
-                let mut env = Environment::new();
-                env.bind(&"time_in".into(), Value::Parameter(time_in.clone()));
-                env.bind(&"time_out".into(), Value::Parameter(time_out.clone()));
-
+                let (start, dur, content, _label) = match origin {
+                    Value::Region(start, dur, content, label, _type) => {
+                        (start, dur, content, label)
+                    }
+                    _ => panic!("not a region"),
+                };
+                let mut env = extend_env(env.clone());
                 let content = Value::Closure(
-                    vec![Id::from("start"), Id::from("dur")],
+                    vec![],
                     Arc::new(env),
                     Expr::App(
                         Expr::Var("apply_fade_in_out".into()).into(),
                         vec![
-                            Expr::Literal(origin.clone()),
+                            Expr::Literal(*content.clone()),
+                            Expr::Literal(Value::Parameter(start.clone())),
+                            Expr::Literal(Value::Parameter(dur.clone())),
                             Expr::Literal(Value::Parameter(time_in.clone())),
                             Expr::Literal(Value::Parameter(time_out.clone())),
                         ],
@@ -127,8 +134,8 @@ impl ExtFunT for FadeInOut {
                     .into(),
                 );
                 Ok(Value::Region(
-                    time_in.clone(),
-                    time_out.clone(),
+                    start.clone(),
+                    dur.clone(),
                     content.into(),
                     "fade_in_out".into(),
                     Type::Unknown,
@@ -215,6 +222,7 @@ impl ApplyFadeInOut {
 impl ExtFunT for ApplyFadeInOut {
     fn exec(
         &self,
+        env: &Arc<Environment<Value>>,
         _app: &mut Option<&mut AppModel>,
         play_info: &Option<&PlaybackInfo>,
         v: &[Value],
@@ -224,17 +232,20 @@ impl ExtFunT for ApplyFadeInOut {
         // do nothing for now
         match v {
             [input_sample, start, dur, time_in, time_out] => {
-                let input = input_sample.get_as_float().unwrap_or(0.0);
+                let input = input_sample
+                    .eval_closure(play_info, _app)
+                    .map(|s| s.get_as_float().expect("not a float"))
+                    .expect("not a closure");
                 let start = (start.get_as_float().unwrap_or(0.0) * sr) as u64;
                 let dur = (dur.get_as_float().unwrap_or(0.0) * sr) as u64;
                 let time_in = (time_in.get_as_float().unwrap_or(0.0) * sr) as u64;
                 let time_out = (time_out.get_as_float().unwrap_or(0.0) * sr) as u64;
-
-                Ok(Value::Number(Self::apply(
-                    input, now as u64, start, dur, time_in, time_out,
-                )))
+                Ok(Value::Number(input))//なんかおかしい
+                // Ok(Value::Number(Self::apply(
+                //     input, now as u64, start, dur, time_in, time_out,
+                // )))
             }
-            _ => Err(EvalError::InvalidNumArgs(3, v.len())),
+            _ => Err(EvalError::InvalidNumArgs(5, v.len())),
         }
     }
 
@@ -249,9 +260,10 @@ pub struct Nop {}
 impl ExtFunT for Nop {
     fn exec(
         &self,
-        app: &mut Option<&mut crate::data::AppModel>,
-        play_info: &Option<&PlaybackInfo>,
-        v: &[Value],
+        _env: &Arc<Environment<Value>>,
+        _app: &mut Option<&mut crate::data::AppModel>,
+        _play_info: &Option<&PlaybackInfo>,
+        _v: &[Value],
     ) -> Result<Value, EvalError> {
         Ok(Value::None)
     }
@@ -266,6 +278,7 @@ pub fn gen_default_functions() -> Vec<(String, ExtFun)> {
         ("reverse".into(), ExtFun::new(ArrayReverse {})),
         ("sinewave".into(), ExtFun::new(SineWave {})),
         ("fadeinout".into(), ExtFun::new(FadeInOut {})),
+        ("apply_fade_in_out".into(), ExtFun::new(ApplyFadeInOut {})),
     ]
 }
 pub fn gen_global_env() -> Environment<Value> {
