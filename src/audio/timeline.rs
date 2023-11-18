@@ -25,10 +25,8 @@ impl Model {
             .tracks
             .iter()
             .map(|t| match t {
-                data::Track::Regions(r) => {
-                    Box::new(super::track::Model::new(r.clone(), 2))
-                        as Box<dyn Component + Send + Sync>
-                }
+                data::Track::Regions(r) => Box::new(super::track::Model::new(r.clone(), 2))
+                    as Box<dyn Component + Send + Sync>,
                 data::Track::Generator(_) => todo!(),
                 data::Track::Transformer() => todo!(),
             })

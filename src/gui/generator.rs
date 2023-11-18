@@ -6,8 +6,6 @@ use crate::{
 };
 use egui::{epaint::Shape, Pos2, Sense, Vec2};
 
-use std::ops::RangeInclusive;
-
 pub struct State {
     samples: Vec<f32>,
     shape: Shape,
@@ -29,7 +27,7 @@ impl Default for State {
 
 /// get peak samples
 fn reduce_samples(input: &[f32], output: &mut [f32]) {
-    let rate = ( input.len() as f64/output.len() as f64).floor();
+    let rate = (input.len() as f64 / output.len() as f64).floor();
     output
         .iter_mut()
         .zip(input.chunks(rate as usize))
@@ -53,7 +51,6 @@ pub trait GeneratorUI<'a> {
         let pix_len = width.ceil() as usize;
         let sample_rate = 44100u32;
         let channels = 2;
-        let numsamples = (sample_rate as f64 * self.get_displayed_duration()).ceil() as usize;
         let audio_component = audio::get_component_for_value(self.get_generator());
 
         let mut ranged_component =

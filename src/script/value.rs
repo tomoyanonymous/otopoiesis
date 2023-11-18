@@ -12,9 +12,15 @@ pub enum Value {
     Function(Vec<Id>, Box<Expr>),
     Closure(Vec<Id>, Arc<Environment<Value>>, Box<Expr>),
     ExtFunction(ExtFun),
-    Track(Box<Value>, Type),                //input type, output type
-    Region(Arc<FloatParameter>,Arc<FloatParameter>, Box<Value>, Id, Type), //start,dur,content,label,type
-    Project(f64, Vec<Value>),               //todo:reducer
+    Track(Box<Value>, Type), //input type, output type
+    Region(
+        Arc<FloatParameter>,
+        Arc<FloatParameter>,
+        Box<Value>,
+        Id,
+        Type,
+    ), //start,dur,content,label,type
+    Project(f64, Vec<Value>), //todo:reducer
 }
 
 impl Value {

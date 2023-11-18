@@ -23,7 +23,6 @@ pub trait ExtFunT: std::fmt::Debug {
         v: &[Value],
     ) -> Result<Value, EvalError>;
     fn get_name(&self) -> &str;
-
 }
 
 pub trait MixerT: std::fmt::Debug {
@@ -39,7 +38,7 @@ impl ExtFun {
     pub fn new(e: impl ExtFunT + 'static) -> Self {
         Self(Arc::new(e))
     }
-    pub fn get_name(&self)->&str{
+    pub fn get_name(&self) -> &str {
         self.0.get_name()
     }
 }
@@ -59,7 +58,7 @@ impl<'d> serde::de::Visitor<'d> for ExtFunVisitor {
     fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
         formatter.write_str("External Fun")
     }
-    fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+    fn visit_str<E>(self, _v: &str) -> Result<Self::Value, E>
     where
         E: serde::de::Error,
     {

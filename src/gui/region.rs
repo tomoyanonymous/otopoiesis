@@ -24,8 +24,7 @@ pub enum ContentModel {
 pub struct State {
     pub label: String,
     content: ContentModel,
-    range_handles: [UiBarState; 2], // pub osc_params: Arc<oscillator::SharedParams>,
-    offset_saved: i64,
+    range_handles: [UiBarState; 2],
     #[allow(dead_code)]
     is_interactive: bool,
 }
@@ -85,7 +84,6 @@ impl State {
             label: labeltext.to_string(),
             content,
             range_handles,
-            offset_saved: 0,
             is_interactive,
         }
     }
@@ -127,7 +125,6 @@ impl<'a> egui::Widget for Model<'a> {
         let bar_width = 5.;
         let start = self.params.start.get();
         let end = start + self.params.dur.get();
-        let min_start = 0.0;
         let max_end = (end + self.params.dur.range.end()) as f64;
 
         //for debug

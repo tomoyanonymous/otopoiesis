@@ -1,6 +1,5 @@
 use super::*;
 
-
 pub trait GeneratorComponent {
     type Params;
     fn get_params(&self) -> &Self::Params;

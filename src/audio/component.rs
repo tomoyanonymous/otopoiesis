@@ -178,7 +178,7 @@ impl RangedComponent for RangedComponentDyn {
         self.buffer = dest;
     }
 
-    fn get_sample(&self, time: f64, sample_rate: u32) -> Option<f64> {
+    fn get_sample(&self, _time: f64, _sample_rate: u32) -> Option<f64> {
         todo!()
     }
 

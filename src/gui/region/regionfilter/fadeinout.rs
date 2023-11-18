@@ -5,7 +5,6 @@ use crate::gui;
 use crate::gui::TRACK_HEIGHT;
 use crate::parameter::FloatParameter;
 use crate::parameter::Parameter;
-use crate::utils::AtomicRange;
 
 /// origin needed to be boxed to be recursive data structure.
 

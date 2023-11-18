@@ -1,8 +1,5 @@
 use crate::gui;
-use crate::parameter::{FloatParameter, Parameter};
-use crate::utils::atomic::{self, SimpleAtomic};
 use std::ops::RangeInclusive;
-use std::sync::Arc;
 pub(super) enum HandleMode {
     Start,
     End,

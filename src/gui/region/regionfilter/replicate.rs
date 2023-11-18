@@ -51,10 +51,7 @@ impl<'a> egui::Widget for Replicate<'a> {
         ui.horizontal(|ui| {
             for region in self.state.regions.iter_mut() {
                 ui.add_sized(
-                    egui::vec2(
-                        scale(self.origin.dur.get()),
-                        crate::gui::TRACK_HEIGHT,
-                    ),
+                    egui::vec2(scale(self.origin.dur.get()), crate::gui::TRACK_HEIGHT),
                     RegionContent {
                         param: self.origin,
                         state: region,

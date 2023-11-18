@@ -1,9 +1,6 @@
-use crate::{
-    audio::PlaybackInfo,
-    data::{AppModel, Region},
-};
+use crate::{audio::PlaybackInfo, data::AppModel};
 
-use super::{extend_env, Environment, EvalError, Expr, ExtFun, ExtFunT, Id, Type, Value};
+use super::{extend_env, Environment, EvalError, Expr, ExtFun, ExtFunT, Type, Value};
 use std::sync::Arc;
 
 #[derive(Clone, Debug)]
@@ -12,7 +9,7 @@ pub struct ArrayReverse {}
 impl ExtFunT for ArrayReverse {
     fn exec(
         &self,
-        env: &Arc<Environment<Value>>,
+        _env: &Arc<Environment<Value>>,
         _app: &mut Option<&mut AppModel>,
         _play_info: &Option<&PlaybackInfo>,
         v: &[Value],
@@ -41,7 +38,7 @@ pub struct Print {}
 impl ExtFunT for Print {
     fn exec(
         &self,
-        env: &Arc<Environment<Value>>,
+        _env: &Arc<Environment<Value>>,
         _app: &mut Option<&mut AppModel>,
         _play_info: &Option<&PlaybackInfo>,
         v: &[Value],
@@ -63,7 +60,7 @@ pub struct SineWave {}
 impl ExtFunT for SineWave {
     fn exec(
         &self,
-        env: &Arc<Environment<Value>>,
+        _env: &Arc<Environment<Value>>,
         _app: &mut Option<&mut AppModel>,
         play_info: &Option<&PlaybackInfo>,
         v: &[Value],
@@ -119,7 +116,7 @@ impl ExtFunT for FadeInOut {
                     }
                     _ => panic!("not a region"),
                 };
-                let mut env = extend_env(env.clone());
+                let env = extend_env(env.clone());
                 let content = Value::Closure(
                     vec![],
                     Arc::new(env),
@@ -226,7 +223,7 @@ impl ApplyFadeInOut {
 impl ExtFunT for ApplyFadeInOut {
     fn exec(
         &self,
-        env: &Arc<Environment<Value>>,
+        _env: &Arc<Environment<Value>>,
         _app: &mut Option<&mut AppModel>,
         play_info: &Option<&PlaybackInfo>,
         v: &[Value],
@@ -235,7 +232,7 @@ impl ExtFunT for ApplyFadeInOut {
         let sr = play_info.unwrap().sample_rate as f64;
         // do nothing for now
         match v {
-            [input_sample, start, dur, time_in, time_out] => {
+            [input_sample, _start, dur, time_in, time_out] => {
                 let input = input_sample
                     .eval_closure(play_info, _app)
                     .map(|s| s.get_as_float().expect("not a float"))

@@ -7,9 +7,8 @@ use std::sync::Arc;
 use crate::parameter::{FloatParameter, Parameter};
 
 pub use self::atomic::{make_simple_atomic, SimpleAtomic, SimpleAtomicTest};
-use atomic::IsAtomicNumber;
 
-#[derive(Serialize, Deserialize, Debug,Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct AtomicRange {
     start: Arc<FloatParameter>,
     dur: Arc<FloatParameter>,
@@ -24,7 +23,7 @@ impl AtomicRange {
         self.start.get()
     }
     pub fn end(&self) -> f32 {
-        self.start()+self.dur.get()
+        self.start() + self.dur.get()
     }
     pub fn getrange(&self) -> f32 {
         self.dur.get()
@@ -36,7 +35,7 @@ impl AtomicRange {
         self.start.set(v);
     }
     pub fn set_end(&self, v: f32) {
-        self.dur.set(v-self.start());
+        self.dur.set(v - self.start());
     }
     pub fn shift(&self, v: f32) {
         self.set_start(self.start() + v);
@@ -53,4 +52,3 @@ impl AtomicRange {
         self.set_end(end_bounded);
     }
 }
-
