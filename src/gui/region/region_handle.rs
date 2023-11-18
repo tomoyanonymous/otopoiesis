@@ -1,4 +1,5 @@
 use crate::gui;
+use crate::parameter::{FloatParameter, Parameter};
 use crate::utils::atomic::{self, SimpleAtomic};
 use std::ops::RangeInclusive;
 use std::sync::Arc;
@@ -28,12 +29,12 @@ impl UiBarState {
 }
 
 pub(super) struct UiBar<'a> {
-    pos: &'a Arc<atomic::F64>,
+    pos: &'a mut f64,
     state: &'a mut UiBarState,
     mode: HandleMode,
 }
 impl<'a> UiBar<'a> {
-    pub fn new(pos: &'a Arc<atomic::F64>, state: &'a mut UiBarState, mode: HandleMode) -> Self {
+    pub fn new(pos: &'a mut f64, state: &'a mut UiBarState, mode: HandleMode) -> Self {
         Self { pos, state, mode }
     }
     pub fn set_limit(&mut self, range: RangeInclusive<f64>) {
@@ -41,14 +42,15 @@ impl<'a> UiBar<'a> {
     }
     fn react(&mut self, response: &egui::Response) {
         if response.drag_started() {
-            self.state.saved_state = self.pos.load();
+            self.state.saved_state = *self.pos;
         }
         if response.dragged() {
             self.state.saved_state +=
                 (response.drag_delta().x / gui::PIXELS_PER_SEC_DEFAULT) as f64;
-            self.pos.store(
-                (self.state.saved_state).clamp(*self.state.range.start(), *self.state.range.end()),
-            );
+            let pos = (self.state.saved_state)
+                .clamp(*self.state.range.start(), *self.state.range.end())
+                as f64;
+            *self.pos = pos;
         }
         if response.drag_released() {
             self.state.saved_state = 0.0

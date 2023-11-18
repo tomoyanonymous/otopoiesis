@@ -13,10 +13,10 @@ fn with_fade(region: Value) -> Value {
             vec![
                 Expr::Literal(region),
                 Expr::Literal(Value::Parameter(Arc::new(
-                    FloatParameter::new(0.1, "time_in").set_range(0.0..=1000.),
+                    FloatParameter::new(0.4, "time_in").set_range(0.0..=1000.),
                 ))),
                 Expr::Literal(Value::Parameter(Arc::new(
-                    FloatParameter::new(0.1, "time_out").set_range(0.0..=1000.),
+                    FloatParameter::new(0.4, "time_out").set_range(0.0..=1000.),
                 ))),
             ],
         )
@@ -40,7 +40,7 @@ fn make_region(trackid: usize, pos: f64, c: String) -> Value {
     ));
     let region = Value::Region(
         Arc::new(param_float!(pos as f32, "start", 0.0..=f32::MAX)),
-        Arc::new(param_float!(pos as f32 + 1.0, "start", 0.0..=f32::MAX)),
+        Arc::new(param_float!(pos as f32 + 1.0, "dur", 0.0..=f32::MAX)),
         generator.into(),
         format!("region{}", trackid + 1),
         Type::Unknown,

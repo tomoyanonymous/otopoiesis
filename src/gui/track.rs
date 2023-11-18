@@ -54,7 +54,7 @@ impl<'a> Model<'a> {
         match &self.track {
             data::Track::Regions(r) => r
                 .iter()
-                .fold(0.0, |acc, region| acc.max(region.range.end())),
+                .fold(0.0, |acc, region| acc.max(*region.getrange().end())),
             _ => unreachable!(),
         }
     }
@@ -85,9 +85,9 @@ impl<'a> egui::Widget for Model<'a> {
                                 .iter_mut()
                                 .zip(region_params.iter())
                                 .map(|(region, region_param)| {
-                                    let range = region_param.range.clone();
-                                    let x_start = area.left() + scale(range.start());
-                                    let x_end = area.left() + scale(range.end());
+                                    let range = region_param.getrange().clone();
+                                    let x_start = area.left() + scale(*range.start());
+                                    let x_end = area.left() + scale(*range.end());
                                     let rect = egui::Rect::from_points(&[
                                         [x_start, top].into(),
                                         [x_end, top + height].into(),

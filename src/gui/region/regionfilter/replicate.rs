@@ -1,4 +1,4 @@
-use crate::{data, gui};
+use crate::{data, gui, parameter::Parameter};
 pub struct RegionContent<'a> {
     param: &'a data::Region,
     state: &'a mut super::region::State,
@@ -52,7 +52,7 @@ impl<'a> egui::Widget for Replicate<'a> {
             for region in self.state.regions.iter_mut() {
                 ui.add_sized(
                     egui::vec2(
-                        scale(self.origin.range.getrange() as f32),
+                        scale(self.origin.dur.get()),
                         crate::gui::TRACK_HEIGHT,
                     ),
                     RegionContent {

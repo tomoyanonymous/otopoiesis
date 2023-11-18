@@ -4,92 +4,53 @@ use serde::{Deserialize, Serialize};
 
 use std::sync::Arc;
 
+use crate::parameter::{FloatParameter, Parameter};
+
 pub use self::atomic::{make_simple_atomic, SimpleAtomic, SimpleAtomicTest};
 use atomic::IsAtomicNumber;
 
-#[derive(Serialize, Deserialize, Debug)]
-pub struct AtomicRange<T>(pub Arc<T::Composed>, pub Arc<T::Composed>)
-where
-    T: IsAtomicNumber<T>;
+#[derive(Serialize, Deserialize, Debug,Clone)]
+pub struct AtomicRange {
+    start: Arc<FloatParameter>,
+    dur: Arc<FloatParameter>,
+}
 
-impl<T> AtomicRange<T>
-where
-    T: IsAtomicNumber<T>,
-{
-    pub fn new(start: T, end: T) -> Self {
-        Self(
-            Arc::new(make_simple_atomic(start)),
-            Arc::new(make_simple_atomic(end)),
-        )
+impl AtomicRange {
+    pub fn new(start: Arc<FloatParameter>, dur: Arc<FloatParameter>) -> Self {
+        Self { start, dur }
     }
 
-    pub fn get_pair(&self) -> (T, T) {
-        (self.start(), self.end())
+    pub fn start(&self) -> f32 {
+        self.start.get()
     }
-    pub fn start(&self) -> T {
-        self.0.load()
+    pub fn end(&self) -> f32 {
+        self.start()+self.dur.get()
     }
-    pub fn end(&self) -> T {
-        self.1.load()
+    pub fn getrange(&self) -> f32 {
+        self.dur.get()
     }
-    pub fn getrange(&self) -> T {
-        self.1.load() - self.0.load()
+    pub fn contains(&self, v: f32) -> bool {
+        (self.start()..=self.end()).contains(&v)
     }
-    pub fn contains(&self, v: T) -> bool {
-        let (min, max) = self.get_pair();
-        (min..max).contains(&v)
+    pub fn set_start(&self, v: f32) {
+        self.start.set(v);
     }
-    pub fn set_start(&self, v: T) {
-        self.0.store(v);
+    pub fn set_end(&self, v: f32) {
+        self.dur.set(v-self.start());
     }
-    pub fn set_end(&self, v: T) {
-        self.1.store(v);
-    }
-    pub fn shift(&self, v: T) {
+    pub fn shift(&self, v: f32) {
         self.set_start(self.start() + v);
         self.set_end(self.end() + v);
     }
     //does not shrink when the range reached to 0.
-    pub fn shift_bounded(&self, v: T) {
-        let mut start_bounded = self.start() as T + v;
-        if start_bounded > T::default() {
-            start_bounded = T::default();
+    pub fn shift_bounded(&self, v: f32) {
+        let mut start_bounded = self.start() + v;
+        if start_bounded > 0.0 {
+            start_bounded = 0.0;
         }
         let end_bounded = start_bounded + self.getrange();
-        self.set_start(start_bounded);
+        self.set_start(start_bounded.max(0.0));
         self.set_end(end_bounded);
     }
 }
-impl<T> Clone for AtomicRange<T>
-where
-    T: IsAtomicNumber<T>,
-{
-    fn clone(&self) -> Self {
-        Self(Arc::clone(&self.0), Arc::clone(&self.1))
-    }
-}
-impl<T> From<std::ops::Range<T>> for AtomicRange<T>
-where
-    T: IsAtomicNumber<T>,
-{
-    fn from(t: std::ops::Range<T>) -> Self {
-        Self::new(t.start, t.end)
-    }
-}
 
-impl<T> From<std::ops::RangeInclusive<T>> for AtomicRange<T>
-where
-    T: IsAtomicNumber<T>,
-{
-    fn from(t: std::ops::RangeInclusive<T>) -> Self {
-        Self::new(*t.start(), *t.end())
-    }
-}
-impl<T> From<&AtomicRange<T>> for std::ops::RangeInclusive<T>
-where
-    T: IsAtomicNumber<T>,
-{
-    fn from(t: &AtomicRange<T>) -> Self {
-        t.start()..=t.end()
-    }
-}

@@ -6,7 +6,7 @@ use crate::audio::{
 use crate::data::{self, FadeParam, Region};
 use crate::parameter::Parameter;
 use crate::script::{Expr, Value};
-use crate::utils::SimpleAtomic;
+use crate::utils::{AtomicRange, SimpleAtomic};
 use std::ops::RangeInclusive;
 
 use super::component::RangedScriptComponent;
@@ -28,21 +28,22 @@ impl FadeModel {
 
 impl RangedComponent for FadeModel {
     fn get_range(&self) -> RangeInclusive<f64> {
-        let (start, end) = self.origin.params.range.get_pair();
-        start..=end
+        self.origin.params.getrange()
     }
     fn get_output_channels(&self) -> u64 {
         2
     }
-    fn render_offline(&mut self, dest: &mut [f32], sample_rate: u32, channels: u64) {
+
+    fn render_offline(&mut self, sample_rate: u32, channels: u64) {
         // resize should be the caller.
         // dest.resize(self.origin.interleaved_samples_cache.len(), 0.0);
+        todo!();
         self.origin.render_offline(sample_rate, channels);
+        let dest = self.get_sample_cache_mut();
         assert_eq!(self.origin.interleaved_samples_cache.len(), dest.len());
         let chs = self.get_output_channels() as usize;
         let in_time = (self.param.time_in.get() as f64 * sample_rate as f64) as usize;
         let out_time = (self.param.time_out.get() as f64 * sample_rate as f64) as usize;
-
         let slice = &self.origin.interleaved_samples_cache[0..dest.len()];
         dest.copy_from_slice(slice);
 
@@ -94,7 +95,10 @@ impl RangedComponent for FadeModel {
     fn get_sample(&self, time: f64, sample_rate: u32) -> Option<f64> {
         todo!()
     }
-    
+
+    fn get_sample_cache_mut(&mut self) -> &mut [f32] {
+        todo!()
+    }
 }
 
 #[derive(Debug)]
@@ -109,40 +113,45 @@ impl RangedComponent for RegionArray {
     /// panics  if the end is earlier than the start.
     ///
     fn get_range(&self) -> RangeInclusive<f64> {
-        if !self.0.is_empty() {
-            let start = self.0[0].params.range.start();
-            let end = self.0.last().unwrap().params.range.end();
-            assert!(end >= start);
-            start..=end
-        } else {
-            0.0..=0.0
-        }
+        todo!()
+        // if !self.0.is_empty() {
+        //     let start = self.0[0].params.range.start();
+        //     let end = self.0.last().unwrap().params.range.end();
+        //     assert!(end >= start);
+        //     start..=end
+        // } else {
+        //     0.0..=0.0
+        // }
     }
 
     fn get_output_channels(&self) -> u64 {
         2
     }
 
-    fn render_offline(&mut self, dest: &mut [f32], sample_rate: u32, channels: u64) {
+    fn render_offline(&mut self, sample_rate: u32, channels: u64) {
         //todo: asynchrounous render
-        self.0.iter_mut().for_each(|region| {
-            let range = &region.params.range;
-            let scale_to_index = |x: f64| (x * sample_rate as f64) as usize * channels as usize;
-            let dest = &mut dest[scale_to_index(range.start())..scale_to_index(range.end())];
-            region
-                .interleaved_samples_cache
-                .resize(scale_to_index(range.getrange()), 0.0); // no need?
-            region.render_offline(sample_rate, channels);
-            assert_eq!(region.interleaved_samples_cache.len(), dest.len());
-            dest.copy_from_slice(&region.interleaved_samples_cache);
-        });
+        todo!();
+        // self.0.iter_mut().for_each(|region| {
+        //     let range = &region.params.range;
+        //     let scale_to_index = |x: f64| (x * sample_rate as f64) as usize * channels as usize;
+        //     region
+        //         .interleaved_samples_cache
+        //         .resize(scale_to_index(range.getrange()), 0.0); // no need?
+        //     region.render_offline(sample_rate, channels);
+        //     self.get_sample_cache_mut()
+        //         .copy_from_slice(&region.interleaved_samples_cache);
+        // });
     }
 
-    fn get_sample(&self, time: f64,sample_rate: u32) -> Option<f64> {
+    fn get_sample(&self, time: f64, sample_rate: u32) -> Option<f64> {
         todo!()
     }
 
     fn get_sample_cache(&self) -> &[f32] {
+        todo!()
+    }
+
+    fn get_sample_cache_mut(&mut self) -> &mut [f32] {
         todo!()
     }
 }
@@ -213,7 +222,10 @@ impl Model {
         let content: Box<dyn RangedComponent + Send + Sync> = match &params.content {
             data::Content::Generator(g) => {
                 let c = get_component_for_value(g);
-                let ranged_component = RangedComponentDyn::new(c, params.range.clone());
+                let ranged_component = RangedComponentDyn::new(
+                    c,
+                    AtomicRange::new(params.start.clone(), params.dur.clone()),
+                );
                 Box::new(ranged_component)
             }
             data::Content::Transformer(filter, origin) => {
@@ -230,19 +242,19 @@ impl Model {
     }
     pub fn render_offline(&mut self, sample_rate: u32, channels: u64) {
         self.interleaved_samples_cache.resize(
-            (self.params.range.getrange() * sample_rate as f64) as usize * channels as usize,
+            (self.params.dur.get() as f64 * sample_rate as f64) as usize * channels as usize,
             0.0,
         );
-        self.content
-            .render_offline(&mut self.interleaved_samples_cache, sample_rate, channels);
+        self.content.render_offline(sample_rate, channels);
+        self.interleaved_samples_cache = self.content.get_sample_cache().to_vec();
         self.cache_completed = true;
     }
     pub fn contains_samples(&self, range: RangeInclusive<f64>) -> bool {
-        let t_range = &self.params.range;
+        let t_range = &self.params.getrange();
         let start = t_range.start();
         let end = t_range.end();
         let c1 = range.contains(&start) || range.contains(&end);
-        let c2 = t_range.contains(*range.start()) && t_range.contains(*range.end());
+        let c2 = t_range.contains(range.start()) && t_range.contains(range.end());
         c1 || c2
     }
 }
@@ -369,15 +381,17 @@ mod test {
     pub fn run_generator_region() {
         let channel = 2;
         let sample_rate = 48000;
-        let range = 0.1..0.2;
+        let start = Arc::new(FloatParameter::new(0.1, "start"));
+        let dur = Arc::new(FloatParameter::new(0.1, "dur"));
         let osc_param = data::generator::OscillatorParam::default();
         let data = data::Region::new(
-            AtomicRange::<f64>::new(range.start, range.end),
+            start.clone(),
+            dur.clone(),
             data::Content::Generator(Value::new_lazy(Expr::App(
                 Box::new(Expr::Var("sinewave".into())),
                 vec![
                     Expr::Literal(Value::Parameter(Arc::new(param_float!(
-                        1000.0,
+                        2200.0,
                         "freq",
                         20.0..=20000.0
                     )))),
@@ -397,8 +411,7 @@ mod test {
         );
         let mut model = Model::new(data, channel);
         model.render_offline(sample_rate, channel);
-        let range_samps =
-            ((range.end - range.start) * sample_rate as f64) as usize * channel as usize;
+        let range_samps = (dur.get() as f64 * sample_rate as f64) as usize * channel as usize;
         assert_eq!(model.interleaved_samples_cache.len(), range_samps);
 
         let mut answer = vec![0.0f32; range_samps];
@@ -422,7 +435,8 @@ mod test {
         );
         let channel = 2;
         let sample_rate = 48000;
-        let range = 0.1..0.2;
+        let start = Arc::new(FloatParameter::new(0.1, "start"));
+        let dur = Arc::new(FloatParameter::new(0.1, "dur"));
 
         // let generator = data::Content::Generator(data::Generator::Constant(Arc::new(
         //     FloatParameter::new(1.0, "test").set_range(0.0..=1.0),
@@ -435,14 +449,15 @@ mod test {
                 0.0..=1.0
             ))))],
         ));
-        let range_atomic = AtomicRange::<f64>::new(range.start, range.end);
 
         let data = data::Region::new(
-            range_atomic.clone(),
+            start.clone(),
+            dur.clone(),
             data::Content::Transformer(
                 data::RegionFilter::FadeInOut(fade_param.clone()),
                 Box::new(data::Region::new(
-                    range_atomic,
+                    start.clone(),
+                    dur.clone(),
                     Content::Generator(generator),
                     "generator",
                 )),
@@ -451,8 +466,7 @@ mod test {
         );
         let mut model = Model::new(data, channel);
         model.render_offline(sample_rate, channel);
-        let range_samps =
-            ((range.end - range.start) * sample_rate as f64) as usize * channel as usize;
+        let range_samps = (dur.get() as f64 * sample_rate as f64) as usize * channel as usize;
         assert_eq!(model.interleaved_samples_cache.len(), range_samps);
 
         let mut answer = vec![1.0f32; range_samps];

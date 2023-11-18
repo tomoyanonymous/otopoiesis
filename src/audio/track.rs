@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use crate::audio::{Component, PlaybackInfo};
 use crate::data;
+use crate::utils::AtomicRange;
 
 use super::component::ScriptComponent;
 use super::{RangedComponent, RangedComponentDyn};
@@ -33,7 +34,7 @@ impl Model {
             .map(|region| match &region.content {
                 data::Content::Generator(g) => Box::new(RangedComponentDyn::new(
                     Box::new(ScriptComponent::try_new(&g).expect("not an generator")),
-                    region.range.clone(),
+                    AtomicRange::new(region.start.clone(), region.dur.clone()),
                 ))
                     as Box<dyn RangedComponent + Send + Sync>,
                 data::Content::Transformer(_, _) => todo!(),
@@ -52,13 +53,15 @@ impl Model {
                     let model = match &region.content {
                         data::Content::Generator(g) => Box::new(RangedComponentDyn::new(
                             Box::new(ScriptComponent::try_new(&g).expect("not an generator")),
-                            region.range.clone(),
+                            AtomicRange::new(region.start.clone(), region.dur.clone()),
                         ))
                             as Box<dyn RangedComponent + Send + Sync>,
                         data::Content::Transformer(_, _) => todo!(),
                     };
                     super::component::render_region_offline_async(model, info)
-                }).map(|h| h.join().expect("failed to join threads") ).collect::<Vec<_>>()
+                })
+                .map(|h| h.join().expect("failed to join threads"))
+                .collect::<Vec<_>>()
 
             // self.param
             //     .iter()

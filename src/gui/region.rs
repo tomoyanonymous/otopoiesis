@@ -1,10 +1,12 @@
 use crate::data;
 use crate::data::Region;
 use crate::gui;
+use crate::parameter::Parameter;
 use crate::script;
 use crate::script::Expr;
 use crate::script::Value;
 use crate::utils::atomic::SimpleAtomic;
+use crate::utils::AtomicRange;
 mod region_handle;
 pub mod regionfilter;
 use region_handle::{HandleMode, UiBar, UiBarState};
@@ -30,8 +32,8 @@ pub struct State {
 
 impl State {
     pub fn new(params: &data::Region, labeltext: impl ToString, is_interactive: bool) -> Self {
-        let handle_left = UiBarState::new(0.0..=params.range.0.load());
-        let handle_right = UiBarState::new(params.range.1.load()..=f64::MAX);
+        let handle_left = UiBarState::new(0.0..=params.dur.get().into());
+        let handle_right = UiBarState::new(params.dur.get().into()..=f64::MAX);
         let content = match &params.content {
             data::Content::Generator(param) => {
                 ContentModel::Generator(param.clone(), super::generator::State::new())
@@ -43,14 +45,15 @@ impl State {
                     data::RegionFilter::FadeInOut(_p) => {
                         regionfilter::RegionFilterState::FadeInOut(fadeinout::State::new(
                             origin,
-                            origin.range.clone(),
+                            origin.start.clone(),
+                            origin.dur.clone(),
                         ))
                     }
                     data::RegionFilter::Replicate(p) => regionfilter::RegionFilterState::Replicate(
                         replicate::State::new(origin.as_ref(), p.count.load() as u64),
                     ),
                     data::RegionFilter::Script(v) => {
-                        let (rg,_time_in, _time_out) = match v {
+                        let (rg, _time_in, _time_out) = match v {
                             Value::Closure(
                                 _ids,
                                 _env,
@@ -70,7 +73,8 @@ impl State {
                         };
                         regionfilter::RegionFilterState::FadeInOut(fadeinout::State::new(
                             &rg,
-                            rg.range.clone(),
+                            rg.start.clone(),
+                            rg.dur.clone(),
                         ))
                     }
                 })
@@ -100,20 +104,13 @@ impl<'a> Model<'a> {
         // self.osc_params.amp.get().abs()
         1.0
     }
-    fn interact_main(&mut self, main: &egui::Response) -> egui::Response {
-        let mut main = main.clone();
-        if main.drag_started() {
-            self.state.offset_saved = self.params.range.start() as i64;
-        }
+    fn interact_main(&mut self, main: &mut egui::Response) {
         if main.dragged() {
             let offset = main.drag_delta().x as f64 / gui::PIXELS_PER_SEC_DEFAULT as f64;
-            self.params.range.shift(offset);
-            main = main.on_hover_cursor(egui::CursorIcon::Grabbing)
+            let start = self.params.start.get() as f64;
+            self.params.start.set((start + offset) as f32);
+            *main = main.clone().on_hover_cursor(egui::CursorIcon::Grabbing)
         }
-        if main.drag_released() {
-            self.state.offset_saved = 0;
-        }
-        main
     }
 }
 
@@ -128,10 +125,10 @@ impl<'a> egui::Widget for Model<'a> {
         let height = gui::TRACK_HEIGHT + 30.0;
 
         let bar_width = 5.;
-        let start = self.params.range.start();
-        let end = self.params.range.end();
+        let start = self.params.start.get();
+        let end = start + self.params.dur.get();
         let min_start = 0.0;
-        let max_end = end + self.params.range.getrange();
+        let max_end = (end + self.params.dur.range.end()) as f64;
 
         //for debug
         // let rect = ui.available_rect_before_wrap();
@@ -141,14 +138,17 @@ impl<'a> egui::Widget for Model<'a> {
 
         ui.horizontal_top(|ui| {
             let bar_size = egui::vec2(bar_width, height);
+            let mut start = self.params.start.get() as f64;
+            let mut end = self.params.dur.get() as f64 + start;
 
-            let (main, is_interactive) = match (&self.params.content, &mut self.state.content) {
+            let (mut main, is_interactive) = match (&self.params.content, &mut self.state.content) {
                 (data::Content::Transformer(filter, origin), ContentModel::RegionFilter(state)) => {
                     match (filter, state) {
                         (data::RegionFilter::Gain, _) => todo!(),
                         (data::RegionFilter::FadeInOut(param), RegionFilterState::FadeInOut(s)) => {
-                            self.params.range.set_start(origin.range.start());
-                            self.params.range.set_end(origin.range.end());
+                            //not needed to sync?
+                            self.params.start.set(origin.start.get());
+                            self.params.dur.set(origin.dur.get());
                             (
                                 ui.add(regionfilter::RegionFilter::FadeInOut(FadeInOut::new(
                                     param,
@@ -179,29 +179,35 @@ impl<'a> egui::Widget for Model<'a> {
                         .group(|ui| {
                             ui.add_space(-bar_width);
                             let mut handle_start = UiBar::new(
-                                &self.params.range.0,
+                                &mut start,
                                 &mut self.state.range_handles[0],
                                 HandleMode::Start,
                             );
-                            handle_start.set_limit(min_start..=end);
+                            handle_start.set_limit(0.0..=*self.params.getrange().end() as f64);
                             let startui = ui.add_sized(bar_size, handle_start);
                             let gen = super::generator::Generator::new(
                                 param,
-                                &self.params.range,
+                                AtomicRange::new(
+                                    self.params.start.clone(),
+                                    self.params.dur.clone(),
+                                ),
                                 genstate,
                             );
                             let main = ui.add(gen);
                             let mut handle_end = UiBar::new(
-                                &self.params.range.1,
+                                &mut end,
                                 &mut self.state.range_handles[1],
                                 HandleMode::End,
                             );
-                            handle_end.set_limit(start..=max_end);
+                            handle_end.set_limit(*self.params.getrange().start()..=max_end);
                             let endui = ui.add_sized(bar_size, handle_end);
                             if startui.union(endui).drag_released() {
                                 let mut gen = super::generator::Generator::new(
                                     param,
-                                    &self.params.range,
+                                    AtomicRange::new(
+                                        self.params.start.clone(),
+                                        self.params.dur.clone(),
+                                    ),
                                     genstate,
                                 );
                                 gen.update_shape(&ui.ctx().style());
@@ -215,7 +221,9 @@ impl<'a> egui::Widget for Model<'a> {
             };
 
             if is_interactive {
-                self.interact_main(&main);
+                self.params.start.set(start as f32);
+                self.params.dur.set((end - start) as f32);
+                self.interact_main(&mut main);
             }
         })
         .response

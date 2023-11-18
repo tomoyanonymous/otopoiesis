@@ -82,69 +82,6 @@ impl Component for ScriptComponent {
 pub fn get_component_for_value(v: &script::Value) -> Box<dyn Component + Send + Sync> {
     let generator = ScriptComponent::try_new(v).expect("not a valid component");
     Box::new(generator)
-    // match v {
-    //     Value::Closure(
-    //         _ids,
-    //         _env,
-    //         box Expr::App(box Expr::Literal(Value::ExtFunction(fname)), args),
-    //     ) => match (fname.as_str(), &args.as_slice()) {
-    //         (
-    //             "sinewave",
-    //             &[Expr::Literal(Value::Parameter(freq)), Expr::Literal(Value::Parameter(amp)), Expr::Literal(Value::Parameter(phase))],
-    //         ) => Box::new(oscillator::sinewave(OscillatorParam {
-    //             amp: amp.clone(),
-    //             freq: freq.clone(),
-    //             phase: phase.clone(),
-    //         })),
-    //         (
-    //             "sawtooth",
-    //             &[Expr::Literal(Value::Parameter(freq)), Expr::Literal(Value::Parameter(amp)), Expr::Literal(Value::Parameter(phase)), Expr::Literal(Value::Parameter(dir))],
-    //         ) => Box::new(oscillator::saw(
-    //             OscillatorParam {
-    //                 amp: amp.clone(),
-    //                 freq: freq.clone(),
-    //                 phase: phase.clone(),
-    //             },
-    //             dir.clone(),
-    //         )),
-    //         (
-    //             "rectangular",
-    //             &[Expr::Literal(Value::Parameter(freq)), Expr::Literal(Value::Parameter(amp)), Expr::Literal(Value::Parameter(phase)), Expr::Literal(Value::Parameter(duty))],
-    //         ) => Box::new(oscillator::rect(
-    //             OscillatorParam {
-    //                 amp: amp.clone(),
-    //                 freq: freq.clone(),
-    //                 phase: phase.clone(),
-    //             },
-    //             duty.clone(),
-    //         )),
-    //         (
-    //             "triangular",
-    //             &[Expr::Literal(Value::Parameter(freq)), Expr::Literal(Value::Parameter(amp)), Expr::Literal(Value::Parameter(phase))],
-    //         ) => Box::new(oscillator::sinewave(OscillatorParam {
-    //             amp: amp.clone(),
-    //             freq: freq.clone(),
-    //             phase: phase.clone(),
-    //         })),
-    //         ("constant", &[Expr::Literal(Value::Parameter(val))]) => {
-    //             Box::new(constant::Constant(val.clone()))
-    //         }
-    //         #[cfg(not(target_arch = "wasm32"))]
-    //         ("fileplayer", &[Expr::Literal(Value::String(path))]) => {
-    //             let p = FilePlayerParam {
-    //                 path: path.clone(),
-    //                 channels: UIntParameter::new(2, "channels").set_range(0..=2),
-    //                 start_sec: FloatParameter::new(0.0, "start").set_range(0.0..=10.0),
-    //                 duration: FloatParameter::new(1.0, "duration").set_range(0.0..=10.0),
-    //             };
-    //             Box::new(fileplayer::FilePlayer::new(Arc::new(p)))
-    //         }
-    //         (_, _) => {
-    //             panic!("No matching generator")
-    //         }
-    //     },
-    //     _ => panic!("invalid components"),
-    // }
 }
 
 /// Interface for offline rendering.
@@ -152,7 +89,8 @@ pub trait RangedComponent: std::fmt::Debug {
     fn get_range(&self) -> RangeInclusive<f64>;
     fn get_output_channels(&self) -> u64;
     fn get_sample_cache(&self) -> &[f32];
-    fn render_offline(&mut self, dest: &mut [f32], sample_rate: u32, channels: u64);
+    fn get_sample_cache_mut(&mut self) -> &mut [f32];
+    fn render_offline(&mut self, sample_rate: u32, channels: u64);
     fn get_cache_len(&self, sample_rate: u32) -> usize {
         let range = self.get_range();
         let len_sec = range.end() - range.start();
@@ -189,8 +127,7 @@ pub fn render_region_offline_async(
     std::thread::Builder::new()
         .name(name)
         .spawn(move || {
-            let mut dest = vec![0.0f32; (info.channels * info.frame_per_buffer) as usize];
-            region.render_offline(&mut dest, info.sample_rate, info.channels);
+            region.render_offline(info.sample_rate, info.channels);
             region
         })
         .expect("failed to launch thread")
@@ -201,12 +138,12 @@ pub fn render_region_offline_async(
 #[derive(Debug)]
 pub struct RangedComponentDyn {
     generator: Box<dyn Component + Sync + Send>,
-    range: AtomicRange<f64>,
+    range: AtomicRange,
     buffer: Vec<f32>,
 }
 
 impl RangedComponentDyn {
-    pub fn new(generator: Box<dyn Component + Sync + Send>, range: AtomicRange<f64>) -> Self {
+    pub fn new(generator: Box<dyn Component + Sync + Send>, range: AtomicRange) -> Self {
         Self {
             generator,
             range,
@@ -217,28 +154,28 @@ impl RangedComponentDyn {
 
 impl RangedComponent for RangedComponentDyn {
     fn get_range(&self) -> RangeInclusive<f64> {
-        let (start, end) = self.range.get_pair();
-        start..=end
+        self.range.start() as f64..=self.range.end() as f64
     }
 
     fn get_output_channels(&self) -> u64 {
         self.generator.get_output_channels()
     }
 
-    fn render_offline(&mut self, dest: &mut [f32], sample_rate: u32, channels: u64) {
+    fn render_offline(&mut self, sample_rate: u32, channels: u64) {
+        let len = (self.range.getrange() as f64 * sample_rate as f64) as usize * channels as usize;
         let info_local = PlaybackInfo {
             sample_rate,
             current_time: 0,
-            frame_per_buffer: dest.len() as u64 / channels,
+            frame_per_buffer: len as u64 / channels,
             channels,
         };
-        self.buffer.resize(
-            (self.range.getrange() * sample_rate as f64) as usize * channels as usize,
-            0.0,
-        );
+        self.buffer.resize(len, 0.0);
         let input_dummy = vec![0.0f32; 1];
         self.generator.prepare_play(&info_local);
-        self.generator.render(&input_dummy, dest, &info_local)
+        let mut dest = self.buffer.clone();
+        // let dest = self.get_sample_cache_mut();
+        self.generator.render(&input_dummy, &mut dest, &info_local);
+        self.buffer = dest;
     }
 
     fn get_sample(&self, time: f64, sample_rate: u32) -> Option<f64> {
@@ -247,6 +184,9 @@ impl RangedComponent for RangedComponentDyn {
 
     fn get_sample_cache(&self) -> &[f32] {
         &self.buffer
+    }
+    fn get_sample_cache_mut(&mut self) -> &mut [f32] {
+        &mut self.buffer
     }
 }
 
@@ -287,14 +227,14 @@ impl RangedScriptComponent {
             ],
         );
         let sample = expr.eval(self.env.clone(), &Some(info), &mut None);
-        sample.map_or(0.0, |s| s.get_as_float().unwrap_or(0.0))
+        sample.unwrap().get_as_float().unwrap()
     }
 }
 
 impl RangedComponent for RangedScriptComponent {
     fn get_range(&self) -> RangeInclusive<f64> {
-        let start = self.start.get_as_float().unwrap_or(0.0);
-        let dur = self.dur.get_as_float().unwrap_or(0.0);
+        let start = self.start.get_as_float().unwrap();
+        let dur = self.dur.get_as_float().unwrap();
         start..=(start + dur)
     }
 
@@ -302,14 +242,14 @@ impl RangedComponent for RangedScriptComponent {
         2
     }
 
-    fn render_offline(&mut self, dest: &mut [f32], sample_rate: u32, channels: u64) {
+    fn render_offline(&mut self, sample_rate: u32, channels: u64) {
         //リバースとかノンリニアな処理のものとフェードインアウトとかリニアな処理（リアルタイム加工できるもの）は形を分けるべきかもしれない
         self.cache.resize(self.get_cache_len(sample_rate), 0.0);
         let mut info = self.get_default_playback_info(sample_rate, channels);
         let origin_rg = Region::try_from(&self.origin).expect("not a region");
         let mut origin_model = region::Model::new(origin_rg, 2);
         origin_model.render_offline(sample_rate, channels);
-
+        let mut dest = self.cache.clone();
         for (_count, (input_per_channel, out_per_channel)) in origin_model
             .interleaved_samples_cache
             .chunks(channels as usize)
@@ -329,9 +269,14 @@ impl RangedComponent for RangedScriptComponent {
                 }
             }
         }
+        self.cache = dest;
     }
 
     fn get_sample_cache(&self) -> &[f32] {
         &self.cache
+    }
+
+    fn get_sample_cache_mut(&mut self) -> &mut [f32] {
+        &mut self.cache
     }
 }

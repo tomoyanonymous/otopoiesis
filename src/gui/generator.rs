@@ -29,7 +29,7 @@ impl Default for State {
 
 /// get peak samples
 fn reduce_samples(input: &[f32], output: &mut [f32]) {
-    let rate = super::PIXELS_PER_SEC_DEFAULT;
+    let rate = ( input.len() as f64/output.len() as f64).floor();
     output
         .iter_mut()
         .zip(input.chunks(rate as usize))
@@ -42,11 +42,11 @@ fn reduce_samples(input: &[f32], output: &mut [f32]) {
 pub trait GeneratorUI<'a> {
     fn get_generator(&self) -> &script::Value;
     fn get_samples(&mut self) -> &mut Vec<f32>;
-    fn get_displayed_range(&self) -> RangeInclusive<f64>;
+    fn get_displayed_range(&self) -> &AtomicRange;
 
     fn get_displayed_duration(&self) -> f64 {
         let range = self.get_displayed_range();
-        range.end() - range.start()
+        (range.end() - range.start()) as f64
     }
     fn update_samples(&mut self) {
         let width = self.get_displayed_duration() * super::PIXELS_PER_SEC_DEFAULT as f64;
@@ -54,21 +54,20 @@ pub trait GeneratorUI<'a> {
         let sample_rate = 44100u32;
         let channels = 2;
         let numsamples = (sample_rate as f64 * self.get_displayed_duration()).ceil() as usize;
-        let mut buf = vec![0.0f32; numsamples * channels];
         let audio_component = audio::get_component_for_value(self.get_generator());
-        let mut ranged_component = RangedComponentDyn::new(
-            audio_component,
-            AtomicRange::from(self.get_displayed_range()),
-        );
-        ranged_component.render_offline(&mut buf, sample_rate, channels as u64);
-        self.get_samples().resize(pix_len, 0.0f32);
-        reduce_samples(&buf, self.get_samples());
+
+        let mut ranged_component =
+            RangedComponentDyn::new(audio_component, self.get_displayed_range().clone());
+        ranged_component.render_offline(sample_rate, channels as u64);
+        // let mut buf = vec![0.0;pix_len];
+        self.get_samples().resize(pix_len, 0.0);
+        reduce_samples(ranged_component.get_sample_cache(), &mut self.get_samples());
     }
 }
 
 pub struct Generator<'a> {
     param: &'a script::Value,
-    displayed_range: &'a AtomicRange<f64>,
+    displayed_range: AtomicRange,
     state: &'a mut State,
 }
 
@@ -81,15 +80,15 @@ impl<'a> GeneratorUI<'a> for Generator<'a> {
         &mut self.state.samples
     }
 
-    fn get_displayed_range(&self) -> RangeInclusive<f64> {
-        self.displayed_range.start()..=self.displayed_range.end()
+    fn get_displayed_range(&self) -> &AtomicRange {
+        &self.displayed_range
     }
 }
 
 impl<'a> Generator<'a> {
     pub fn new(
         param: &'a script::Value,
-        displayed_range: &'a AtomicRange<f64>,
+        displayed_range: AtomicRange,
         state: &'a mut State,
     ) -> Self {
         Self {

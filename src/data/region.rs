@@ -5,6 +5,7 @@ use crate::{
     parameter::{FloatParameter, Parameter, RangedNumeric},
 };
 use serde::{Deserialize, Serialize};
+use std::ops::RangeInclusive;
 use std::sync::Arc;
 
 #[derive(Serialize, Deserialize, Clone, Default, Debug)]
@@ -45,14 +46,12 @@ pub enum RegionFilter {
     Script(Value),
 }
 impl TryFrom<&Value> for RegionFilter {
-    type Error=ConversionError;
+    type Error = ConversionError;
 
     fn try_from(value: &Value) -> Result<Self, Self::Error> {
         Ok(Self::Script(value.clone()))
     }
 }
-
-
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub enum Content {
@@ -66,7 +65,8 @@ pub enum Content {
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Region {
     /// range stores a real time, not in sample.
-    pub range: AtomicRange<f64>,
+    pub start: Arc<FloatParameter>,
+    pub dur: Arc<FloatParameter>,
     pub content: Content,
     pub label: String,
 }
@@ -74,16 +74,23 @@ pub struct Region {
 impl Region {
     /// Utility function that converts a raw region into the region with fadein/out transformer.
     ///
-    pub fn new(range: AtomicRange<f64>, content: Content, label: impl Into<String>) -> Self {
+    pub fn new(
+        start: Arc<FloatParameter>,
+        dur: Arc<FloatParameter>,
+        content: Content,
+        label: impl Into<String>,
+    ) -> Self {
         Self {
-            range,
+            start,
+            dur,
             content,
             label: label.into(),
         }
     }
     pub fn with_fade(origin: Self) -> Self {
         Self::new(
-            AtomicRange::<f64>::new(origin.range.start(), origin.range.end()),
+            origin.start.clone(),
+            origin.dur.clone(),
             Content::Transformer(
                 RegionFilter::FadeInOut(FadeParam::new()),
                 Box::new(origin.clone()),
@@ -91,12 +98,18 @@ impl Region {
             origin.label,
         )
     }
+    pub fn getrange(&self) -> RangeInclusive<f64> {
+        let start = self.start.get() as f64;
+        let end = start + self.dur.get() as f64;
+        start..=end
+    }
 }
 
 impl std::default::Default for Region {
     fn default() -> Self {
         Self {
-            range: AtomicRange::<f64>::new(0.0, 0.0),
+            start: Arc::new(FloatParameter::default()),
+            dur: Arc::new(FloatParameter::default()),
             content: Content::Generator(Value::None),
             label: "".to_string(),
         }
@@ -109,14 +122,13 @@ impl std::fmt::Display for Region {
     }
 }
 fn make_region_from_param(
-    start: f64,
-    dur: f64,
+    start: Arc<FloatParameter>,
+    dur: Arc<FloatParameter>,
     content: &Value,
     label: &str,
 ) -> Result<Region, ConversionError> {
-    let range = AtomicRange::new(start, start + dur);
     let content = Content::Generator(content.clone());
-    let res = Region::new(range, content, label);
+    let res = Region::new(start.clone(), dur.clone(), content, label);
     Ok(res)
 }
 
@@ -126,7 +138,7 @@ impl TryFrom<&Value> for Region {
     fn try_from(value: &Value) -> Result<Self, Self::Error> {
         match value {
             Value::Region(start, dur, content, label, _) => {
-                make_region_from_param(start.get() as f64, dur.get() as f64, content, label)
+                make_region_from_param(start.clone(), dur.clone(), content, label)
             }
             Value::Closure(_ids, env, box body) => {
                 let converted_region = body

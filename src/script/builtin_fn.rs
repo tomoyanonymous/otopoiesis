@@ -72,11 +72,13 @@ impl ExtFunT for SineWave {
             Some(info) => match &v {
                 &[freq, amp, phase] => {
                     let res = {
+                        //2Hzなら (now/sr)
                         let now = info.current_time;
                         let f = freq.get_as_float()?;
                         let a = amp.get_as_float()?;
                         let p = phase.get_as_float()?;
-                        let phase_sample = f * (now as f64 / info.sample_rate as f64) % 1.0 + p;
+                        let phase_sample = (f * (now as f64 / info.sample_rate as f64) + p)
+                            % (std::f64::consts::PI * 2.0);
                         Some(phase_sample.sin() * a)
                     };
                     res.map(|r| Value::Number(r))
@@ -198,12 +200,14 @@ impl<'a> FadeInfo<'a> {
             return FadeState::AfterRange;
         }
         if reltime < *self.time_in as i64 {
-            return FadeState::FadeIn(reltime as f64 / *self.time_in as f64);
+            let gain = reltime as f64 / *self.time_in as f64;
+
+            return FadeState::FadeIn(gain);
         }
         let out_start = *self.dur as i64 - *self.time_out as i64;
         if reltime > out_start {
-            let ratio = (out_start - reltime) as f64 / *self.time_out as f64;
-            return FadeState::FadeOut(ratio);
+            let gain = 1.0 - (reltime - out_start) as f64 / *self.time_out as f64;
+            return FadeState::FadeOut(gain);
         } else {
             return FadeState::NonFade;
         }
@@ -215,7 +219,7 @@ pub struct ApplyFadeInOut {}
 impl ApplyFadeInOut {
     pub fn apply(input: f64, now: u64, start: u64, dur: u64, time_in: u64, time_out: u64) -> f64 {
         let fadeinfo = FadeInfo::new(&start, &dur, &time_in, &time_out);
-        let gain = fadeinfo.map_or(0.0, |info| info.calc(now).get_gain());
+        let gain = fadeinfo.unwrap().calc(now).get_gain();
         input * gain
     }
 }
@@ -236,14 +240,14 @@ impl ExtFunT for ApplyFadeInOut {
                     .eval_closure(play_info, _app)
                     .map(|s| s.get_as_float().expect("not a float"))
                     .expect("not a closure");
-                let start = (start.get_as_float().unwrap_or(0.0) * sr) as u64;
-                let dur = (dur.get_as_float().unwrap_or(0.0) * sr) as u64;
-                let time_in = (time_in.get_as_float().unwrap_or(0.0) * sr) as u64;
-                let time_out = (time_out.get_as_float().unwrap_or(0.0) * sr) as u64;
-                Ok(Value::Number(input))//なんかおかしい
-                // Ok(Value::Number(Self::apply(
-                //     input, now as u64, start, dur, time_in, time_out,
-                // )))
+                let start = 0;
+                let dur = (dur.get_as_float().unwrap() * sr) as u64;
+                let time_in = (time_in.get_as_float().unwrap() * sr) as u64;
+                let time_out = (time_out.get_as_float().unwrap() * sr) as u64;
+                // Ok(Value::Number(input))//なんかおかしい
+                Ok(Value::Number(Self::apply(
+                    input, now as u64, start, dur, time_in, time_out,
+                )))
             }
             _ => Err(EvalError::InvalidNumArgs(5, v.len())),
         }

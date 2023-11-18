@@ -1,6 +1,9 @@
+use std::sync::Arc;
+
 use crate::data;
 use crate::gui;
 use crate::gui::TRACK_HEIGHT;
+use crate::parameter::FloatParameter;
 use crate::parameter::Parameter;
 use crate::utils::AtomicRange;
 
@@ -8,12 +11,17 @@ use crate::utils::AtomicRange;
 
 pub struct State {
     pub origin: Box<super::region::State>,
-    pub range: AtomicRange<f64>,
+    pub start: Arc<FloatParameter>,
+    pub dur: Arc<FloatParameter>,
     start_tmp: f32,
     end_tmp: f32,
 }
 impl State {
-    pub fn new(origin: &data::Region, range: AtomicRange<f64>) -> Self {
+    pub fn new(
+        origin: &data::Region,
+        start: Arc<FloatParameter>,
+        dur: Arc<FloatParameter>,
+    ) -> Self {
         let label = &origin.label.clone();
         Self {
             origin: Box::new(super::region::State::new(
@@ -21,7 +29,8 @@ impl State {
                 format!("{}_fade", label),
                 false,
             )),
-            range,
+            start,
+            dur,
             start_tmp: 0.0,
             end_tmp: 0.0,
         }
@@ -120,7 +129,7 @@ impl<'a> egui::Widget for FadeInOut<'a> {
         target_rect.set_bottom(target_rect.top() + TRACK_HEIGHT);
 
         // let _response = ui.allocate_rect(target_rect, egui::Sense::focusable_noninteractive());
-        let range_sec = self.state.range.end() - self.state.range.start();
+        let range_sec = self.state.dur.get();
         let range_pix = range_sec as f32 * gui::PIXELS_PER_SEC_DEFAULT;
         let sec_to_pix = move |sec| sec * gui::PIXELS_PER_SEC_DEFAULT;
         let pix_to_sec = move |pix| pix / gui::PIXELS_PER_SEC_DEFAULT;
