@@ -1,5 +1,6 @@
 use atomic::SimpleAtomic;
-use std::sync::{Arc, Mutex};
+use log::Log;
+use std::sync::{Arc, Mutex, OnceLock};
 
 use crate::audio::renderer::{Renderer, RendererBase};
 use crate::data::Project;
@@ -14,6 +15,47 @@ enum EditorMode {
     Code,
     Result,
 }
+struct Logger {
+    pub enabled: atomic::Bool,
+    pub data: Arc<Mutex<String>>,
+}
+impl Logger {
+    pub fn new() -> Self {
+        Self {
+            enabled: atomic::Bool::new(true),
+            data: Arc::new(Mutex::new(String::new())),
+        }
+    }
+}
+impl log::Log for Logger {
+    fn enabled(&self, metadata: &log::Metadata) -> bool {
+        self.enabled.load() && metadata.level() <= log::STATIC_MAX_LEVEL
+    }
+
+    fn log(&self, record: &log::Record) {
+        if !self.enabled(record.metadata()) {
+            return;
+        }
+        if let Ok(mut txt) = self.data.try_lock() {
+            let t = format!(
+                "{}:{} -- {}\n",
+                record.level(),
+                record.target(),
+                record.args()
+            );
+            txt.push_str(&t);
+
+            print!("{}",t);
+        }
+    }
+
+    fn flush(&self) {
+        if let Ok(mut txt) = self.data.try_lock() {
+            txt.clear();
+        }
+    }
+}
+static GLOBAL_LOGGER: OnceLock<Logger> = OnceLock::new();
 
 pub struct Model {
     app: Arc<Mutex<data::AppModel>>,
@@ -22,6 +64,7 @@ pub struct Model {
     ui: gui::app::State,
     editor_open: bool,
     editor_mode: EditorMode,
+    logger_open: bool,
 }
 
 fn new_renderer(app: &data::AppModel) -> Renderer<audio::timeline::Model> {
@@ -45,8 +88,18 @@ impl Model {
 
         let mut renderer = new_renderer(&app.try_lock().unwrap());
 
+        let _logger = GLOBAL_LOGGER.get_or_init(|| Logger::new());
+        if cfg!(debug_assertions)
+        {
+            log::set_max_level(log::LevelFilter::Debug);
+        }else {
+            log::set_max_level(log::LevelFilter::Warn);
+        }
+
+        log::set_logger(GLOBAL_LOGGER.get().unwrap()).expect("failed to set logger");
         renderer.prepare_play();
         renderer.pause();
+        log::debug!("app launched");
         Self {
             audio: renderer,
             app: Arc::clone(&app),
@@ -54,26 +107,26 @@ impl Model {
             ui,
             editor_open: false,
             editor_mode: EditorMode::Code,
+            logger_open: false,
         }
     }
 
     pub fn play(&mut self) {
+        log::debug!("play");
         self.refresh_audio();
 
         self.audio.prepare_play();
         self.audio.play();
     }
     pub fn pause(&mut self) {
+        log::debug!("pause");
         self.audio.pause();
     }
     fn refresh_audio(&mut self) {
+        log::debug!("refresh audio");
         self.audio = new_renderer(&self.app.try_lock().unwrap());
         self.audio.prepare_play();
         self.audio.pause();
-    }
-
-    fn _respawn_ui(&mut self) {
-        self.ui = gui::app::State::new(&self.app.try_lock().unwrap());
     }
     fn sync_transport(&mut self) {
         let t = self.app.try_lock().unwrap().transport.clone();
@@ -141,9 +194,6 @@ impl eframe::App for Model {
                 }
             });
         }
-        let mut mainui = gui::app::Model::new(self.app.clone(), &mut self.ui);
-        mainui.show_ui(ctx);
-        self.sync_transport();
 
         let style = egui::Style {
             animation_time: 0.2,
@@ -248,5 +298,41 @@ impl eframe::App for Model {
                     }
                 });
             });
+        egui::panel::TopBottomPanel::bottom("Logger")
+            .default_height(150.)
+            .resizable(true)
+            .show_animated(ctx, self.logger_open, |ui| {
+                
+                ui.vertical(|ui| {
+
+                    ui.label("Log");
+                    egui::ScrollArea::vertical().max_height(300.).show(ui,|ui|{
+
+                        if let Ok(mut txt) = GLOBAL_LOGGER.get().unwrap().data.try_lock() {
+                            ui.add(
+                                egui::TextEdit::multiline(&mut txt as &mut String)
+                                .code_editor()
+                                .desired_width(f32::INFINITY)
+                                .interactive(false)
+                                .desired_rows(5),
+                            );
+                        }
+                    });
+                    if ui.button("clear").clicked() {
+                        GLOBAL_LOGGER.get().unwrap().flush();
+                    }
+                });
+            });
+        egui::panel::TopBottomPanel::bottom("logger_toggle")
+            .default_height(30.)
+            .resizable(false)
+            .show(ctx, |ui| {  
+
+                    ui.toggle_value(&mut self.logger_open, "Console Log");
+            });
+        //launch main ui
+        let mut mainui = gui::app::Model::new(self.app.clone(), &mut self.ui);
+        mainui.show_ui(ctx);
+        self.sync_transport();
     }
 }

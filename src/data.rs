@@ -208,6 +208,7 @@ impl AppModel {
     }
 
     pub fn compile(&mut self, source: Expr) -> bool {
+        log::debug!("compiling source...");
         let env = Arc::new(builtin_fn::gen_global_env());
         let res = source
             .eval(env, &mut None, &mut Some(self))
