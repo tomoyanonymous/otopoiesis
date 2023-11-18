@@ -2,6 +2,7 @@ use crate::data;
 use crate::data::Region;
 use crate::gui;
 use crate::parameter::Parameter;
+use crate::parameter::RangedNumeric;
 use crate::script;
 use crate::script::Expr;
 use crate::script::Value;
@@ -125,7 +126,7 @@ impl<'a> egui::Widget for Model<'a> {
         let bar_width = 5.;
         let start = self.params.start.get();
         let end = start + self.params.dur.get();
-        let max_end = (end + self.params.dur.range.end()) as f64;
+        let max_end = (end + self.params.dur.get_range().end()) as f64;
 
         //for debug
         // let rect = ui.available_rect_before_wrap();

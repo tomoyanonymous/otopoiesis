@@ -138,24 +138,33 @@ impl<'a> egui::Widget for Generator<'a> {
                 egui::menu::menu_button(ui, "parameter", |ui| {
                     //  ui.collapsing("parameter", |ui| {
                     match &self.param {
-                        Value::Closure(
-                            _,
-                            _env,
-                            box Expr::App(box Expr::Literal(Value::ExtFunction(fname)), args),
-                        ) => {
+                        Value::Closure(_, env, box Expr::App(box callee, args)) => {
+                            let f = callee.eval(env.clone(), &None, &mut None);
+                            let label = f.map_or("".to_string(), |f| match f {
+                                Value::ExtFunction(name) => name.get_name().to_string(),
+                                _ => "".to_string(),
+                            });
+                            let args = args
+                                .iter()
+                                .map(|a| a.eval(env.clone(), &None, &mut None))
+                                .try_collect::<Vec<_>>();
                             let response = ui
                                 .vertical(|ui| {
-                                    ui.label(fname.get_name());
-                                    args.iter()
-                                        .map(|a| {
-                                            if let Expr::Literal(Value::Parameter(param)) = a {
-                                                slider_from_parameter(param, false, ui)
-                                            } else {
-                                                ui.label("Invalid Parameter")
-                                            }
-                                        })
-                                        .reduce(|acc, b| acc.union(b))
-                                        .unwrap()
+                                    ui.label(label);
+                                    if let Ok(args) = args {
+                                        args.iter()
+                                            .map(|a| {
+                                                if let Value::Parameter(param) = a {
+                                                    slider_from_parameter(param, false, ui)
+                                                } else {
+                                                    ui.label("Invalid Parameter")
+                                                }
+                                            })
+                                            .reduce(|acc, b| acc.union(b))
+                                            .unwrap()
+                                    } else {
+                                        ui.label("Invalid Parameter")
+                                    }
                                 })
                                 .inner;
                             if (response.clicked() || response.drag_released())

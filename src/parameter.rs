@@ -14,7 +14,7 @@ pub trait Parameter: Clone + std::fmt::Debug {
 pub trait RangedNumeric {
     type Element;
     fn set_range(&mut self, r: RangeInclusive<Self::Element>) -> Self;
-    fn get_range(&self) -> &RangeInclusive<Self::Element>;
+    fn get_range(&self) -> RangeInclusive<Self::Element>;
 }
 pub trait NumericParameter: Parameter + RangedNumeric {}
 
@@ -53,7 +53,7 @@ impl Parameter for BoolParameter {
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct FloatParameter {
     value: atomic::F32,
-    pub range: RangeInclusive<f32>,
+    pub range: RangeInclusive<atomic::F32>,
     label: String,
 }
 
@@ -62,7 +62,7 @@ impl Parameter for FloatParameter {
     fn new(init: Self::Element, label: impl Into<String>) -> Self {
         Self {
             value: atomic::F32::from(init),
-            range: f32::MIN..=f32::MAX,
+            range: atomic::F32::from(f32::MIN)..=atomic::F32::from(f32::MAX),
             label: label.into(),
         }
     }
@@ -72,8 +72,10 @@ impl Parameter for FloatParameter {
     }
     // note that no need to be "&mut self" here.
     fn set(&self, v: Self::Element) {
-        self.value
-            .store(v.max(*self.range.start()).min(*self.range.end()));
+        self.value.store(
+            v.max(self.range.start().load())
+                .min(self.range.end().load()),
+        );
     }
 
     fn get_label(&self) -> &str {
@@ -83,12 +85,14 @@ impl Parameter for FloatParameter {
 
 impl RangedNumeric for FloatParameter {
     type Element = f32;
-    fn get_range(&self) -> &RangeInclusive<Self::Element> {
-        &self.range
+    fn get_range(&self) -> RangeInclusive<Self::Element> {
+        let r = &self.range;
+        r.start().load()..=r.end().load()
     }
 
     fn set_range(&mut self, r: RangeInclusive<Self::Element>) -> Self {
-        self.range = r;
+        self.range.start().store(*r.start());
+        self.range.end().store(*r.end());
         self.clone()
     }
 }
@@ -136,8 +140,8 @@ impl Parameter for UIntParameter {
 impl RangedNumeric for UIntParameter {
     type Element = u64;
 
-    fn get_range(&self) -> &RangeInclusive<Self::Element> {
-        &self.range
+    fn get_range(&self) -> RangeInclusive<Self::Element> {
+        self.range.clone()
     }
 
     fn set_range(&mut self, r: RangeInclusive<Self::Element>) -> Self {
