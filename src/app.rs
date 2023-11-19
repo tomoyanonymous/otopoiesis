@@ -15,15 +15,27 @@ enum EditorMode {
     Code,
     Result,
 }
+use std::collections::VecDeque;
 struct Logger {
     pub enabled: atomic::Bool,
-    pub data: Arc<Mutex<String>>,
+    pub data: Arc<Mutex<VecDeque<(String, log::Level)>>>,
 }
 impl Logger {
     pub fn new() -> Self {
+        let data = Arc::new(Mutex::new(VecDeque::new()));
+
         Self {
             enabled: atomic::Bool::new(true),
-            data: Arc::new(Mutex::new(String::new())),
+            data,
+        }
+    }
+    pub fn get_color(level:log::Level)->egui::Color32{
+        match level{
+            log::Level::Error => egui::Color32::RED,
+            log::Level::Warn => egui::Color32::YELLOW,
+            log::Level::Info => egui::Color32::WHITE,
+            log::Level::Debug => egui::Color32::DEBUG_COLOR,
+            log::Level::Trace => egui::Color32::BLUE,
         }
     }
 }
@@ -38,14 +50,14 @@ impl log::Log for Logger {
         }
         if let Ok(mut txt) = self.data.try_lock() {
             let t = format!(
-                "{}:{} -- {}\n",
+                "{}:{} -- {}",
                 record.level(),
                 record.target(),
                 record.args()
             );
-            txt.push_str(&t);
-
-            print!("{}", t);
+            println!("{}", t);
+            txt.push_front((t, record.level()));
+            txt.truncate(1000);
         }
     }
 
@@ -299,6 +311,8 @@ impl eframe::App for Model {
             });
         egui::panel::TopBottomPanel::bottom("Logger")
             .default_height(150.)
+            .max_height(400.)
+            .min_height(100.)
             .resizable(true)
             .show_animated(ctx, self.logger_open, |ui| {
                 ui.vertical(|ui| {
@@ -306,14 +320,16 @@ impl eframe::App for Model {
                     egui::ScrollArea::vertical()
                         .max_height(300.)
                         .show(ui, |ui| {
-                            if let Ok(mut txt) = GLOBAL_LOGGER.get().unwrap().data.try_lock() {
-                                ui.add(
-                                    egui::TextEdit::multiline(&mut txt as &mut String)
-                                        .code_editor()
-                                        .desired_width(f32::INFINITY)
-                                        .interactive(false)
-                                        .desired_rows(5),
-                                );
+                            if let Ok(mut data) = GLOBAL_LOGGER.get().unwrap().data.try_lock() {
+                                data.iter_mut().rev().for_each(|d| {
+                                    ui.add(
+                                        egui::TextEdit::singleline(&mut  d.0)
+                                            .desired_width(f32::INFINITY)
+                                            .interactive(false)
+                                            .text_color(Logger::get_color(d.1)),
+                                            
+                                    );
+                                });
                             }
                         });
                     if ui.button("clear").clicked() {
