@@ -47,6 +47,7 @@ pub trait GeneratorUI<'a> {
         (range.end() - range.start()) as f64
     }
     fn update_samples(&mut self) {
+        log::debug!("update sample cache");
         let width = self.get_displayed_duration() * super::PIXELS_PER_SEC_DEFAULT as f64;
         let pix_len = width.ceil() as usize;
         let sample_rate = 44100u32;
@@ -154,11 +155,11 @@ impl<'a> egui::Widget for Generator<'a> {
                                     if let Ok(args) = args {
                                         args.iter()
                                             .map(|a| {
-                                                // if let Value::Parameter(param) = a {
-                                                //     slider_from_parameter(param, false, ui)
-                                                // } else {
+                                                if let Value::Parameter(param) = a {
+                                                    slider_from_parameter(param, false, ui)
+                                                } else {
                                                     ui.label("Invalid Parameter")
-                                                // }
+                                                }
                                             })
                                             .reduce(|acc, b| acc.union(b))
                                             .unwrap()

@@ -1,9 +1,6 @@
 use std::sync::Mutex;
 
-use crate::{
-    data::AppModel,
-    parameter::{Parameter, UIntParameter},
-};
+use crate::{data::AppModel, parameter::Parameter};
 
 use super::*;
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -30,31 +27,21 @@ impl Param {
 pub enum Value {
     None,
     Number(f64),
-    // Parameter(Arc<FloatParameter>), //shared through
+    Parameter(Arc<FloatParameter>), //shared through
     String(Arc<Mutex<String>>),
     Array(Vec<Value>, Type), //typed array
     Function(Vec<Param>, Box<Expr>),
     Closure(Vec<Param>, Arc<Environment>, Box<Expr>),
     ExtFunction(ExtFun),
-    Track(Box<Value>, Type), //input type, output type
-    Region(
-        Arc<FloatParameter>,
-        Arc<FloatParameter>,
-        Box<Value>,
-        Id,
-        Type,
-    ), //start,dur,content,label,type
-    Project(f64, Vec<Value>), //todo:reducer
+    Track(Arc<Environment>, Box<Expr>, Type), //input type, output type
+    Region(Arc<Environment>, Box<Expr>, Box<Expr>, Box<Expr>, Id, Type), //start,dur,content,label,type
+    Project(Arc<Environment>, f64, Vec<Expr>),                           //todo:reducer
 }
 
 impl Value {
     pub fn new_lazy(expr: Expr) -> Self {
         //wrap expression with function without arguments
-        Self::Closure(
-            vec![],
-            Arc::new(Environment::new()),
-            Box::new(expr),
-        )
+        Self::Closure(vec![], Arc::new(Environment::new()), Box::new(expr))
     }
     pub fn eval_closure(
         &self,
@@ -63,31 +50,25 @@ impl Value {
     ) -> Result<Self, EvalError> {
         match self {
             Self::Closure(_ids, env, expr) => expr.eval(env.clone(), play_info, app),
+
             _ => Err(EvalError::TypeMismatch("Not a Closure".into())),
         }
     }
     pub fn get_as_float(&self) -> Result<f64, EvalError> {
         match self {
-            // Value::Parameter(p) => Ok(p.get() as f64),
+            Value::Parameter(p) => Ok(p.get() as f64),
             Value::Number(f) => Ok(*f),
+            Value::Closure(_ids, env, body) => {
+                let res = body.eval(env.clone(), &None, &mut None)?;
+                res.get_as_float()
+            }
             _ => Err(EvalError::TypeMismatch("not a float".into())),
         }
-    }
-    pub fn audio_track(channels: u64) -> Self {
-        let t = Type::IVec(
-            Type::Array(Type::Number.into(), channels).into(),
-            Rate::Audio,
-        );
-        let generator = Value::None;
-        Self::Track(generator.into(), t)
-    }
-    pub fn midi_track() -> Self {
-        Self::Track(Value::None.into(), Type::Vec(Type::midi_note().into()))
     }
     pub fn get_type(&self) -> Type {
         match self {
             Value::None => Type::Unit,
-            Value::Number(_) => Type::Number,
+            Value::Number(_) | Value::Parameter(_) => Type::Number,
             Value::String(_) => Type::String,
             Value::Array(v, t) => {
                 // let _t_elem = v.get(0).map_or(Type::Unknown, |v| v.get_type()).into();
@@ -97,9 +78,9 @@ impl Value {
             Value::Function(_a, _v) => todo!(),
             Value::Closure(_, _, _) => todo!(),
             Value::ExtFunction(_f) => Type::Function(Type::Unknown.into(), Type::Unknown.into()), //cannot infer?
-            Value::Track(_input, _output) => todo!(),
-            Value::Region(_start, _dur, _, _label, _) => todo!(),
-            Value::Project(_sr, _tracks) => todo!(),
+            Value::Track(_env, _input, _output) => todo!(),
+            Value::Region(_env, _start, _dur, _content, _label, _) => todo!(),
+            Value::Project(_env, _sr, _tracks) => todo!(),
         }
     }
 }

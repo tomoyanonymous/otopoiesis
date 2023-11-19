@@ -1,5 +1,5 @@
 use super::{ConversionError, Generator, Region};
-use crate::script::Value;
+use crate::script::{EvalError, Value};
 use serde::{Deserialize, Serialize};
 /// Data structure for track.
 /// The track has some input/output stream.
@@ -33,21 +33,25 @@ impl std::fmt::Display for Track {
 }
 
 impl TryFrom<&Value> for Track {
-    type Error = ConversionError;
+    type Error = EvalError;
 
     fn try_from(value: &Value) -> Result<Self, Self::Error> {
         match value {
-            Value::Track(box Value::Array(regions, _), _t) => {
-                let regions: Vec<Region> = regions
-                    .iter()
-                    .map(|rg| {
-                        let region: Result<Region, ConversionError> = Region::try_from(rg);
-                        region
-                    })
-                    .try_collect()?;
-                Ok(Self::Regions(regions))
+            Value::Track(env, box regions, _t) => {
+                if let Value::Array(regions, _) = regions.eval(env.clone(), &None, &mut None)? {
+                    let regions: Vec<Region> = regions
+                        .iter()
+                        .map(|rg| {
+                            let region = Region::try_from(rg);
+                            region
+                        })
+                        .try_collect()?;
+                    Ok(Self::Regions(regions))
+                } else {
+                    Err(EvalError::InvalidConversion)
+                }
             }
-            _ => Err(ConversionError {}),
+            _ => Err(EvalError::InvalidConversion),
         }
     }
 }

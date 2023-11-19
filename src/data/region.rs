@@ -1,5 +1,5 @@
 use super::ConversionError;
-use crate::script::{Expr, Value};
+use crate::script::{EvalError, Expr, Value};
 use crate::{
     data::{atomic, AtomicRange},
     parameter::{FloatParameter, Parameter, RangedNumeric},
@@ -46,7 +46,7 @@ pub enum RegionFilter {
     Script(Value),
 }
 impl TryFrom<&Value> for RegionFilter {
-    type Error = ConversionError;
+    type Error = EvalError;
 
     fn try_from(value: &Value) -> Result<Self, Self::Error> {
         Ok(Self::Script(value.clone()))
@@ -126,28 +126,30 @@ fn make_region_from_param(
     dur: Arc<FloatParameter>,
     content: &Value,
     label: &str,
-) -> Result<Region, ConversionError> {
+) -> Result<Region, EvalError> {
     let content = Content::Generator(content.clone());
     let res = Region::new(start.clone(), dur.clone(), content, label);
     Ok(res)
 }
 
 impl TryFrom<&Value> for Region {
-    type Error = ConversionError;
+    type Error = EvalError;
 
     fn try_from(value: &Value) -> Result<Self, Self::Error> {
         match value {
-            Value::Region(start, dur, content, label, _) => {
-                make_region_from_param(start.clone(), dur.clone(), content, label)
-            }
-            Value::Closure(_ids, env, box body) => {
-                let converted_region = body
-                    .eval(env.clone(), &None, &mut None)
-                    .map_err(|e| Self::Error {})?;
-                Self::try_from(&converted_region)
-            }
+            Value::Region(env, start, dur, content, label, _) => {
+                let start = start.eval(env.clone(), &None, &mut None)?;
+                let dur = dur.eval(env.clone(), &None, &mut None)?;
 
-            _ => Err(ConversionError {}),
+                let content = content.eval(env.clone(), &None, &mut None)?;
+                match (start, dur) {
+                    (Value::Parameter(start), Value::Parameter(dur)) => {
+                        make_region_from_param(start.clone(), dur.clone(), &content, label)
+                    }
+                    _ => Err(EvalError::InvalidConversion),
+                }
+            }
+            _ => Err(EvalError::InvalidConversion),
         }
     }
 }

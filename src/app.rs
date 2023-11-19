@@ -45,7 +45,7 @@ impl log::Log for Logger {
             );
             txt.push_str(&t);
 
-            print!("{}",t);
+            print!("{}", t);
         }
     }
 
@@ -89,10 +89,9 @@ impl Model {
         let mut renderer = new_renderer(&app.try_lock().unwrap());
 
         let _logger = GLOBAL_LOGGER.get_or_init(|| Logger::new());
-        if cfg!(debug_assertions)
-        {
+        if cfg!(debug_assertions) {
             log::set_max_level(log::LevelFilter::Debug);
-        }else {
+        } else {
             log::set_max_level(log::LevelFilter::Warn);
         }
 
@@ -302,22 +301,21 @@ impl eframe::App for Model {
             .default_height(150.)
             .resizable(true)
             .show_animated(ctx, self.logger_open, |ui| {
-                
                 ui.vertical(|ui| {
-
                     ui.label("Log");
-                    egui::ScrollArea::vertical().max_height(300.).show(ui,|ui|{
-
-                        if let Ok(mut txt) = GLOBAL_LOGGER.get().unwrap().data.try_lock() {
-                            ui.add(
-                                egui::TextEdit::multiline(&mut txt as &mut String)
-                                .code_editor()
-                                .desired_width(f32::INFINITY)
-                                .interactive(false)
-                                .desired_rows(5),
-                            );
-                        }
-                    });
+                    egui::ScrollArea::vertical()
+                        .max_height(300.)
+                        .show(ui, |ui| {
+                            if let Ok(mut txt) = GLOBAL_LOGGER.get().unwrap().data.try_lock() {
+                                ui.add(
+                                    egui::TextEdit::multiline(&mut txt as &mut String)
+                                        .code_editor()
+                                        .desired_width(f32::INFINITY)
+                                        .interactive(false)
+                                        .desired_rows(5),
+                                );
+                            }
+                        });
                     if ui.button("clear").clicked() {
                         GLOBAL_LOGGER.get().unwrap().flush();
                     }
@@ -326,9 +324,8 @@ impl eframe::App for Model {
         egui::panel::TopBottomPanel::bottom("logger_toggle")
             .default_height(30.)
             .resizable(false)
-            .show(ctx, |ui| {  
-
-                    ui.toggle_value(&mut self.logger_open, "Console Log");
+            .show(ctx, |ui| {
+                ui.toggle_value(&mut self.logger_open, "Console Log");
             });
         //launch main ui
         let mut mainui = gui::app::Model::new(self.app.clone(), &mut self.ui);

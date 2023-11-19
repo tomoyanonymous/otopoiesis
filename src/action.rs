@@ -88,12 +88,12 @@ impl std::fmt::Display for Action {
 
 #[derive(Debug)]
 pub struct AddRegion {
-    elem: Value,
+    elem: Expr,
     track_num: usize,
     pos: usize,
 }
 impl AddRegion {
-    pub fn new(elem: Value, track_num: usize) -> Self {
+    pub fn new(elem: Expr, track_num: usize) -> Self {
         Self {
             elem,
             track_num,
@@ -117,9 +117,9 @@ impl undo::Action for AddRegion {
 
     fn apply(&mut self, target: &mut Self::Target) -> undo::Result<Self> {
         match target {
-            Expr::Literal(Value::Project(_sr, tracks)) => {
+            Expr::Literal(Value::Project(_env, _sr, tracks)) => {
                 match tracks.get_mut(self.track_num).unwrap() {
-                    Value::Track(box Value::Array(regions, _t), _tracktype) => {
+                    Expr::Track(box Expr::Array(regions)) => {
                         regions.push(self.elem.clone());
                         assert!(!regions.is_empty());
                         self.pos = regions.len() - 1;
@@ -134,9 +134,9 @@ impl undo::Action for AddRegion {
 
     fn undo(&mut self, target: &mut Self::Target) -> undo::Result<Self> {
         match target {
-            Expr::Literal(Value::Project(_sr, tracks)) => {
+            Expr::Literal(Value::Project(_env, _sr, tracks)) => {
                 match tracks.get_mut(self.track_num).unwrap() {
-                    Value::Track(box Value::Array(regions, _t), _tracktype) => {
+                    Expr::Track(box Expr::Array(regions)) => {
                         if regions.is_empty() {
                             Err(Error::ContainerEmpty)
                         } else if regions.len() < self.pos {
@@ -158,12 +158,12 @@ impl DisplayableAction for AddRegion {}
 
 #[derive(Debug)]
 pub struct AddTrack {
-    elem: Value,
+    elem: Expr,
     pos: usize,
 }
 
 impl AddTrack {
-    pub fn new(elem: Value) -> Self {
+    pub fn new(elem: Expr) -> Self {
         Self { elem, pos: 0 }
     }
 }
@@ -176,7 +176,7 @@ impl undo::Action for AddTrack {
 
     fn apply(&mut self, target: &mut Self::Target) -> undo::Result<Self> {
         match target {
-            Expr::Literal(Value::Project(_sr, tracks)) => {
+            Expr::Literal(Value::Project(_env, _sr, tracks)) => {
                 tracks.push(self.elem.clone());
                 self.pos = tracks.len() - 1;
                 Ok(())
@@ -187,7 +187,7 @@ impl undo::Action for AddTrack {
 
     fn undo(&mut self, target: &mut Self::Target) -> undo::Result<Self> {
         match target {
-            Expr::Literal(Value::Project(_sr, tracks)) => {
+            Expr::Literal(Value::Project(_env, _sr, tracks)) => {
                 if tracks.is_empty() {
                     Err(Error::ContainerEmpty)
                 } else {

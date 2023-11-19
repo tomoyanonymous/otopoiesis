@@ -2,7 +2,7 @@
 
 use crate::action;
 use crate::app::filemanager::{self, FileManager};
-use crate::script::{builtin_fn, Environment};
+use crate::script::{builtin_fn, Environment, EvalError};
 use crate::utils::{atomic, AtomicRange, SimpleAtomic};
 
 use rfd;
@@ -52,17 +52,27 @@ impl Default for LaunchArg {
 pub struct ConversionError {}
 
 impl TryFrom<&Value> for Project {
-    type Error = ConversionError;
+    type Error = EvalError;
     fn try_from(value: &Value) -> Result<Self, Self::Error> {
         match value {
-            Value::Project(sr, tr) => {
-                let tracks: Vec<Track> = tr.iter().map(Track::try_from).try_collect()?;
+            Value::Project(env, sr, tr) => {
+                let tracks: Vec<Track> = tr
+                    .iter()
+                    .map(|t| {
+                        let res = t
+                            .eval(env.clone(), &None, &mut None)
+                            .and_then(|t| Track::try_from(&t));
+                        res
+                    })
+                    .try_collect()?;
+
                 Ok(Project {
+                    root_env: env.clone(),
                     sample_rate: (*sr as u64).into(),
                     tracks: tracks,
                 })
             }
-            _ => Err(ConversionError {}),
+            _ => Err(EvalError::InvalidConversion),
         }
     }
 }
@@ -93,7 +103,8 @@ impl AppModel {
         if let Some(file) = project_file.clone() {
             let _ = filemanager::get_global_file_manager().read_to_string(file, &mut project_str);
         }
-        let source = Some(Expr::Literal(Value::Project(44100., vec![])));
+        let root_env = Arc::new(Environment::new());
+        let source = Some(Expr::Literal(Value::Project(root_env, 44100., vec![])));
         let (action_tx, action_rx) = mpsc::channel();
         Self {
             transport,
@@ -212,14 +223,16 @@ impl AppModel {
         let env = Arc::new(Environment::new());
         let res = source
             .eval(env, &mut None, &mut Some(self))
-            .ok()
-            .and_then(|v| Project::try_from(&v).ok());
+            .and_then(|v| Project::try_from(&v));
         match res {
-            Some(pj) => {
+            Ok(pj) => {
                 self.project = pj;
                 true
             }
-            None => false,
+            Err(e) => {
+                log::error!("{:?}", e);
+                false
+            }
         }
     }
 }
@@ -292,12 +305,14 @@ pub struct GlobalSetting;
 pub struct Project {
     pub sample_rate: atomic::U64,
     pub tracks: Vec<Track>,
+    pub root_env: Arc<Environment>,
 }
 impl Project {
-    fn new(sample_rate: u64) -> Self {
+    pub fn new(sample_rate: u64) -> Self {
         Self {
             sample_rate: atomic::U64::from(sample_rate),
             tracks: vec![],
+            root_env: Arc::new(Environment::new()),
         }
     }
 }

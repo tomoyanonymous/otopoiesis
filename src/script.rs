@@ -25,7 +25,7 @@ pub trait ExtFunT: std::fmt::Debug {
         v: &[Value],
     ) -> Result<Value, EvalError>;
     fn get_name(&self) -> &str;
-    fn get_params(&self)->&[Param];
+    fn get_params(&self) -> &[Param];
 }
 
 pub trait MixerT: std::fmt::Debug {
@@ -44,7 +44,7 @@ impl ExtFun {
     pub fn get_name(&self) -> &str {
         self.0.get_name()
     }
-    pub fn get_params(&self)->&[Param]{
+    pub fn get_params(&self) -> &[Param] {
         self.0.get_params()
     }
 }

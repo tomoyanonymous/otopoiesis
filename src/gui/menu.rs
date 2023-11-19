@@ -4,49 +4,88 @@ use crate::{data, param_float};
 
 use crate::parameter::{FloatParameter, Parameter, RangedNumeric};
 use std::sync::{mpsc, Arc, Mutex};
-fn with_fade(region: Value) -> Value {
-    Value::Closure(
+fn with_fade(region: Expr) -> Expr {
+    Expr::App(
+        Expr::Var("fadeinout".to_string()).into(),
+        vec![
+            region,
+            Expr::Literal(Value::Parameter(Arc::new(
+                FloatParameter::new(0.4, "time_in").set_range(0.0..=0.5),
+            ))),
+            Expr::Literal(Value::Parameter(Arc::new(
+                FloatParameter::new(0.4, "time_out").set_range(0.0..=0.5),
+            ))),
+        ],
+    )
+}
+fn make_region(trackid: usize, pos: f64, c: String) -> Expr {
+    let generator = Expr::Lambda(
         vec![],
-        Arc::new(Environment::new()),
         Expr::App(
-            Expr::Var("fadeinout".to_string()).into(),
+            Expr::Literal(Value::ExtFunction(ExtFun::new(builtin_fn::SineWave::new()))).into(),
             vec![
-                Expr::Literal(region),
-                // Expr::Literal(Value::Parameter(Arc::new(
-                //     FloatParameter::new(0.4, "time_in").set_range(0.0..=0.5),
-                // ))),
-                // Expr::Literal(Value::Parameter(Arc::new(
-                //     FloatParameter::new(0.4, "time_out").set_range(0.0..=0.5),
-                // ))),
+                Expr::Literal(Value::Parameter(Arc::new(param_float!(
+                    440.,
+                    "freq",
+                    20.0..=20000.
+                ))))
+                .into(),
+                Expr::Literal(Value::Parameter(Arc::new(param_float!(
+                    1.0,
+                    "amp",
+                    0.0..=1.
+                ))))
+                .into(),
+                Expr::Literal(Value::Parameter(Arc::new(param_float!(
+                    0.,
+                    "phase",
+                    0.0..=1.0
+                ))))
+                .into(),
             ],
         )
         .into(),
-    )
-}
-fn make_region(trackid: usize, pos: f64, c: String) -> Value {
-    let generator = Value::ExtFunction(ExtFun::new(builtin_fn::SineWave::new()));
-    let region = Value::Region(
-        Arc::new(param_float!(pos as f32, "start", 0.0..=f32::MAX)),
-        Arc::new(param_float!(pos as f32 + 1.0, "dur", 0.0..=f32::MAX)),
+    );
+    let region = Expr::Region(
+        Expr::Literal(Value::Parameter(Arc::new(param_float!(
+            pos as f32,
+            "start",
+            0.0..=f32::MAX
+        ))))
+        .into(),
+        Expr::Literal(Value::Parameter(Arc::new(param_float!(
+            pos as f32 + 1.0,
+            "dur",
+            0.0..=f32::MAX
+        ))))
+        .into(),
         generator.into(),
         format!("region{}", trackid + 1),
-        Type::Unknown,
     );
 
     with_fade(region)
 }
 
-fn make_region_file(trackid: usize, pos: f64, path: String) -> Value {
-    let generator = Value::new_lazy(Expr::App(
+fn make_region_file(trackid: usize, pos: f64, path: String) -> Expr {
+    let generator = Expr::App(
         Expr::Var("fileplayer".into()).into(),
         vec![Expr::Literal(Value::String(Arc::new(Mutex::new(path))))],
-    ));
-    let region = Value::Region(
-        Arc::new(param_float!(pos as f32, "start", 0.0..=f32::MAX)),
-        Arc::new(param_float!(pos as f32 + 1.0, "start", 0.0..=f32::MAX)),
+    );
+    let region = Expr::Region(
+        Expr::Literal(Value::Parameter(Arc::new(param_float!(
+            pos as f32,
+            "start",
+            0.0..=f32::MAX
+        ))))
+        .into(),
+        Expr::Literal(Value::Parameter(Arc::new(param_float!(
+            pos as f32 + 1.0,
+            "start",
+            0.0..=f32::MAX
+        ))))
+        .into(),
         generator.into(),
         format!("region{}", trackid + 1),
-        Type::Unknown,
     );
     with_fade(region)
 }
