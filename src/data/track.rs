@@ -1,4 +1,4 @@
-use super::{ConversionError, Generator, Region};
+use super::{Generator, Region};
 use crate::script::{EvalError, Value};
 use serde::{Deserialize, Serialize};
 /// Data structure for track.

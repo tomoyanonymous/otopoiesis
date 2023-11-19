@@ -2,7 +2,7 @@
 
 use crate::action;
 use crate::app::filemanager::{self, FileManager};
-use crate::script::{builtin_fn, Environment, EvalError};
+use crate::script::{Environment, EvalError};
 use crate::utils::{atomic, AtomicRange, SimpleAtomic};
 
 use rfd;

@@ -53,8 +53,8 @@ impl ExtFunT for Print {
         _play_info: &Option<&PlaybackInfo>,
         v: &[Value],
     ) -> Result<Value, EvalError> {
-        let str = self.get_params().iter().fold(String::new(), |acc, b| {
-            format!("{}, {}", acc, b.get_label())
+        let str = v.iter().fold(String::new(), |acc, b| {
+            format!("{}, {:?}", acc, b)
         });
         println!("{}", str);
         Ok(Value::None)
@@ -162,7 +162,7 @@ impl ExtFunT for FadeInOut {
         match v {
             [origin, time_in, time_out] => {
                 let (start, dur, content, _label) = match origin {
-                    Value::Region(env, start, dur, content, label, _type) => {
+                    Value::Region(_env, start, dur, content, label, _type) => {
                         (start, dur, content, label)
                     }
                     _ => panic!("not a region"),

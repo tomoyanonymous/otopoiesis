@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use crate::audio::{Component, PlaybackInfo};
 use crate::data;
 use crate::utils::AtomicRange;
@@ -27,7 +25,7 @@ impl Model {
     }
     fn get_new_regions(
         param: &[data::Region],
-        channels: u64,
+        _channels: u64,
     ) -> Vec<Box<dyn RangedComponent + Send + Sync>> {
         param
             .iter()
@@ -44,7 +42,7 @@ impl Model {
     fn renew_regions(&mut self, info: &PlaybackInfo) {
         //fetch update.
 
-        let channels = info.channels;
+        // let channels = info.channels;
         #[cfg(not(target_arch = "wasm32"))]
         let res = {
             self.param

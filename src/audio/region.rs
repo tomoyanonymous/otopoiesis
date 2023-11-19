@@ -1,15 +1,12 @@
-use crate::audio::{
-    get_component_for_value, Component, PlaybackInfo, RangedComponent, RangedComponentDyn,
-};
+use crate::audio::{get_component_for_value, PlaybackInfo, RangedComponent, RangedComponentDyn};
 
 // use crate::parameter::UIntParameter
-use crate::data::{self, FadeParam, Region};
+use crate::data::{self, Region};
 use crate::parameter::Parameter;
 use crate::script::{Expr, Value};
 use crate::utils::{AtomicRange, SimpleAtomic};
 use std::ops::RangeInclusive;
 
-use super::component::RangedScriptComponent;
 // 基本はオフラインレンダリング
 
 #[derive(Debug)]
@@ -284,10 +281,8 @@ mod test {
 
     use crate::{
         data::Content,
-        param_float,
         parameter::{FloatParameter, Parameter, RangedNumeric},
         script::{builtin_fn, Expr, ExtFun, Value},
-        utils::AtomicRange,
     };
 
     use super::*;

@@ -1,5 +1,5 @@
 use crate::action::{self, Action};
-use crate::script::{builtin_fn, Environment, Expr, ExtFun, Type, Value};
+use crate::script::{builtin_fn, Expr, ExtFun, Value};
 use crate::{data, param_float};
 
 use crate::parameter::{FloatParameter, Parameter, RangedNumeric};
@@ -18,7 +18,7 @@ fn with_fade(region: Expr) -> Expr {
         ],
     )
 }
-fn make_region(trackid: usize, pos: f64, c: String) -> Expr {
+fn make_region(trackid: usize, pos: f64, _c: String) -> Expr {
     let generator = Expr::Lambda(
         vec![],
         Expr::App(

@@ -1,7 +1,6 @@
-use super::ConversionError;
-use crate::script::{EvalError, Expr, Value};
+use crate::script::{EvalError, Value};
 use crate::{
-    data::{atomic, AtomicRange},
+    data::atomic,
     parameter::{FloatParameter, Parameter, RangedNumeric},
 };
 use serde::{Deserialize, Serialize};
