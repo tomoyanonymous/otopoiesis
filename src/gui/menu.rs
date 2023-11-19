@@ -1,43 +1,30 @@
 use crate::action::{self, Action};
-use crate::script::{builtin_fn, Expr, Type, Value};
+use crate::script::{builtin_fn, Environment, Expr, ExtFun, Type, Value};
 use crate::{data, param_float};
 
 use crate::parameter::{FloatParameter, Parameter, RangedNumeric};
-use std::sync::{mpsc, Arc};
+use std::sync::{mpsc, Arc, Mutex};
 fn with_fade(region: Value) -> Value {
     Value::Closure(
         vec![],
-        Arc::new(builtin_fn::gen_global_env()),
+        Arc::new(Environment::new()),
         Expr::App(
             Expr::Var("fadeinout".to_string()).into(),
             vec![
                 Expr::Literal(region),
-                Expr::Literal(Value::Parameter(Arc::new(
-                    FloatParameter::new(0.4, "time_in").set_range(0.0..=0.5),
-                ))),
-                Expr::Literal(Value::Parameter(Arc::new(
-                    FloatParameter::new(0.4, "time_out").set_range(0.0..=0.5),
-                ))),
+                // Expr::Literal(Value::Parameter(Arc::new(
+                //     FloatParameter::new(0.4, "time_in").set_range(0.0..=0.5),
+                // ))),
+                // Expr::Literal(Value::Parameter(Arc::new(
+                //     FloatParameter::new(0.4, "time_out").set_range(0.0..=0.5),
+                // ))),
             ],
         )
         .into(),
     )
 }
 fn make_region(trackid: usize, pos: f64, c: String) -> Value {
-    let generator = Value::new_lazy(Expr::App(
-        Expr::Var(c).into(),
-        vec![
-            Expr::Literal(Value::Parameter(Arc::new(
-                FloatParameter::new(440., "freq").set_range(10.0..=20000.),
-            ))),
-            Expr::Literal(Value::Parameter(Arc::new(
-                FloatParameter::new(1.0, "amp").set_range(0.0..=1.0),
-            ))),
-            Expr::Literal(Value::Parameter(Arc::new(
-                FloatParameter::new(0.0, "phase").set_range(0.0..=1.0),
-            ))),
-        ],
-    ));
+    let generator = Value::ExtFunction(ExtFun::new(builtin_fn::SineWave::new()));
     let region = Value::Region(
         Arc::new(param_float!(pos as f32, "start", 0.0..=f32::MAX)),
         Arc::new(param_float!(pos as f32 + 1.0, "dur", 0.0..=f32::MAX)),
@@ -52,7 +39,7 @@ fn make_region(trackid: usize, pos: f64, c: String) -> Value {
 fn make_region_file(trackid: usize, pos: f64, path: String) -> Value {
     let generator = Value::new_lazy(Expr::App(
         Expr::Var("fileplayer".into()).into(),
-        vec![Expr::Literal(Value::String(path))],
+        vec![Expr::Literal(Value::String(Arc::new(Mutex::new(path))))],
     ));
     let region = Value::Region(
         Arc::new(param_float!(pos as f32, "start", 0.0..=f32::MAX)),

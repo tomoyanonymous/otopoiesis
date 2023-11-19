@@ -196,7 +196,7 @@ pub struct RangedScriptComponent {
     pub dur: Value,
     pub origin: Value, //expect:region
     pub translator: Value,
-    pub env: Arc<Environment<Value>>,
+    pub env: Arc<Environment>,
     cache: Vec<f32>,
 }
 impl RangedScriptComponent {
@@ -205,7 +205,7 @@ impl RangedScriptComponent {
         dur: Value,
         origin: Value,
         translator: Value,
-        env: Arc<Environment<Value>>,
+        env: Arc<Environment>,
     ) -> Self {
         Self {
             start,

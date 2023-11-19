@@ -61,7 +61,7 @@ impl State {
                             ) => match (fname.as_str(), args.as_slice()) {
                                 (
                                     "apply_fade_in_out",
-                                    [Expr::Literal(region), Expr::Literal(Value::Parameter(time_in)), Expr::Literal(Value::Parameter(time_out))],
+                                    [Expr::Literal(region), Expr::Literal(Value::Number(time_in)), Expr::Literal(Value::Number(time_out))],
                                 ) => (
                                     Region::try_from(region).expect("not a function"),
                                     time_in,

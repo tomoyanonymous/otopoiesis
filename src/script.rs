@@ -3,6 +3,8 @@ use std::sync::Arc;
 
 use crate::{audio::PlaybackInfo, data, parameter::FloatParameter};
 
+use self::value::Param;
+
 pub mod builtin_fn;
 pub mod environment;
 pub mod expr;
@@ -17,12 +19,13 @@ pub use {
 pub trait ExtFunT: std::fmt::Debug {
     fn exec(
         &self,
-        env: &Arc<Environment<Value>>,
+        env: &Arc<Environment>,
         app: &mut Option<&mut data::AppModel>,
         play_info: &Option<&PlaybackInfo>,
         v: &[Value],
     ) -> Result<Value, EvalError>;
     fn get_name(&self) -> &str;
+    fn get_params(&self)->&[Param];
 }
 
 pub trait MixerT: std::fmt::Debug {
@@ -40,6 +43,9 @@ impl ExtFun {
     }
     pub fn get_name(&self) -> &str {
         self.0.get_name()
+    }
+    pub fn get_params(&self)->&[Param]{
+        self.0.get_params()
     }
 }
 

@@ -1,16 +1,40 @@
-use crate::{data::AppModel, parameter::Parameter};
+use std::sync::Mutex;
+
+use crate::{
+    data::AppModel,
+    parameter::{Parameter, UIntParameter},
+};
 
 use super::*;
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub enum Param {
+    Number(Arc<FloatParameter>),
+    String(Arc<Mutex<String>>),
+}
+impl Param {
+    pub fn get_label(&self) -> String {
+        match self {
+            Param::Number(p) => p.get_label().to_string(),
+            Param::String(p) => {
+                if let Ok(ref s) = p.try_lock() {
+                    s.to_string()
+                } else {
+                    "failed to lock thread".to_string()
+                }
+            }
+        }
+    }
+}
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum Value {
     None,
     Number(f64),
-    Parameter(Arc<FloatParameter>), //shared through
-    String(String),
+    // Parameter(Arc<FloatParameter>), //shared through
+    String(Arc<Mutex<String>>),
     Array(Vec<Value>, Type), //typed array
-    Function(Vec<Id>, Box<Expr>),
-    Closure(Vec<Id>, Arc<Environment<Value>>, Box<Expr>),
+    Function(Vec<Param>, Box<Expr>),
+    Closure(Vec<Param>, Arc<Environment>, Box<Expr>),
     ExtFunction(ExtFun),
     Track(Box<Value>, Type), //input type, output type
     Region(
@@ -28,7 +52,7 @@ impl Value {
         //wrap expression with function without arguments
         Self::Closure(
             vec![],
-            Arc::new(builtin_fn::gen_global_env()),
+            Arc::new(Environment::new()),
             Box::new(expr),
         )
     }
@@ -44,7 +68,7 @@ impl Value {
     }
     pub fn get_as_float(&self) -> Result<f64, EvalError> {
         match self {
-            Value::Parameter(p) => Ok(p.get() as f64),
+            // Value::Parameter(p) => Ok(p.get() as f64),
             Value::Number(f) => Ok(*f),
             _ => Err(EvalError::TypeMismatch("not a float".into())),
         }
@@ -63,7 +87,7 @@ impl Value {
     pub fn get_type(&self) -> Type {
         match self {
             Value::None => Type::Unit,
-            Value::Number(_) | Value::Parameter(_) => Type::Number,
+            Value::Number(_) => Type::Number,
             Value::String(_) => Type::String,
             Value::Array(v, t) => {
                 // let _t_elem = v.get(0).map_or(Type::Unknown, |v| v.get_type()).into();

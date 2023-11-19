@@ -1,32 +1,32 @@
-use super::*;
+use super::{value::Param, *};
 
+// Lexical Environment.
+// It is doubley-linked for UI Generation
 #[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct Environment<T>
-where
-    T: Clone,
+pub struct Environment
+
 {
-    pub local: Vec<(Id, T)>,
+    pub local: Vec<(String, Value)>,
     pub parent: Option<Arc<Self>>,
 }
 
-impl<T> Environment<T>
-where
-    T: Clone,
+impl Environment
 {
     pub fn new() -> Self {
         Self::default()
     }
-    pub fn bind(&mut self, key: &Id, val: T) {
-        self.local.push((key.clone(), val.clone()))
+    pub fn bind(&mut self, key: &str, val: Value) {
+        self.local.push((key.to_string(), val.clone()))
     }
-    pub fn lookup(&self, key: &str) -> Option<&T> {
+    pub fn lookup(&self, key: &str) -> Option<Value> {
         self.local
             .iter()
-            .find_map(|e| if &e.0 == key { Some(&e.1) } else { None })
+            .find_map(|e| if e.0 == key { Some(e.1.clone()) } else { None })
             .or_else(|| self.parent.as_ref().and_then(|e| e.lookup(key)))
+            .or_else(|| builtin_fn::lookup_extfun(key).ok().map( |f| Value::ExtFunction(f)))
     }
 }
-impl<T: Clone> Default for Environment<T> {
+impl Default for Environment {
     fn default() -> Self {
         Self {
             local: vec![],
@@ -34,8 +34,8 @@ impl<T: Clone> Default for Environment<T> {
         }
     }
 }
-pub fn extend_env<T: Clone>(env: Arc<Environment<T>>) -> Environment<T> {
-    Environment::<T> {
+pub fn extend_env(env: Arc<Environment>) -> Environment {
+    Environment {
         local: vec![],
         parent: Some(Arc::clone(&env)),
     }

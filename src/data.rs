@@ -2,7 +2,7 @@
 
 use crate::action;
 use crate::app::filemanager::{self, FileManager};
-use crate::script::builtin_fn;
+use crate::script::{builtin_fn, Environment};
 use crate::utils::{atomic, AtomicRange, SimpleAtomic};
 
 use rfd;
@@ -209,7 +209,7 @@ impl AppModel {
 
     pub fn compile(&mut self, source: Expr) -> bool {
         log::debug!("compiling source...");
-        let env = Arc::new(builtin_fn::gen_global_env());
+        let env = Arc::new(Environment::new());
         let res = source
             .eval(env, &mut None, &mut Some(self))
             .ok()

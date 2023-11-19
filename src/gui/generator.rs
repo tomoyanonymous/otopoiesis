@@ -154,11 +154,11 @@ impl<'a> egui::Widget for Generator<'a> {
                                     if let Ok(args) = args {
                                         args.iter()
                                             .map(|a| {
-                                                if let Value::Parameter(param) = a {
-                                                    slider_from_parameter(param, false, ui)
-                                                } else {
+                                                // if let Value::Parameter(param) = a {
+                                                //     slider_from_parameter(param, false, ui)
+                                                // } else {
                                                     ui.label("Invalid Parameter")
-                                                }
+                                                // }
                                             })
                                             .reduce(|acc, b| acc.union(b))
                                             .unwrap()

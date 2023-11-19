@@ -1,6 +1,10 @@
-use crate::{audio::PlaybackInfo, data::AppModel};
+use crate::{
+    audio::PlaybackInfo,
+    data::AppModel,
+    parameter::{FloatParameter, Parameter, RangedNumeric},
+};
 
-use super::{extend_env, Environment, EvalError, Expr, ExtFun, ExtFunT, Type, Value};
+use super::{extend_env, value::Param, Environment, EvalError, Expr, ExtFun, ExtFunT, Type, Value};
 use std::sync::Arc;
 
 #[derive(Clone, Debug)]
@@ -9,7 +13,7 @@ pub struct ArrayReverse {}
 impl ExtFunT for ArrayReverse {
     fn exec(
         &self,
-        _env: &Arc<Environment<Value>>,
+        _env: &Arc<Environment>,
         _app: &mut Option<&mut AppModel>,
         _play_info: &Option<&PlaybackInfo>,
         v: &[Value],
@@ -30,37 +34,65 @@ impl ExtFunT for ArrayReverse {
     fn get_name(&self) -> &str {
         "array_reverse"
     }
+
+    fn get_params(&self) -> &[super::value::Param] {
+        &[]
+    }
 }
 
 #[derive(Clone, Debug)]
-pub struct Print {}
+pub struct Print {
+    params: Vec<Param>,
+}
 
 impl ExtFunT for Print {
     fn exec(
         &self,
-        _env: &Arc<Environment<Value>>,
+        _env: &Arc<Environment>,
         _app: &mut Option<&mut AppModel>,
         _play_info: &Option<&PlaybackInfo>,
         v: &[Value],
     ) -> Result<Value, EvalError> {
-        let str = v
-            .iter()
-            .fold(String::new(), |acc, b| format!("{}, {:?}", acc, b));
-        println!("({})", str);
+        let str = self.get_params().iter().fold(String::new(), |acc, b| {
+            format!("{}, {}", acc, b.get_label())
+        });
+        println!("{}", str);
         Ok(Value::None)
     }
 
     fn get_name(&self) -> &str {
         "print"
     }
+
+    fn get_params(&self) -> &[Param] {
+        &self.params
+    }
 }
 
 #[derive(Clone, Debug)]
-pub struct SineWave {}
+pub struct SineWave {
+    params: [Param; 3],
+}
+impl SineWave {
+    pub fn new() -> Self {
+        let freq = Param::Number(Arc::new(
+            FloatParameter::new(440., "frequency").set_range(20.0..=20000.),
+        ));
+        let amp = Param::Number(Arc::new(
+            FloatParameter::new(1.0, "amplitude").set_range(0.0..=1.0),
+        ));
+        let phase = Param::Number(Arc::new(
+            FloatParameter::new(0.0, "phase").set_range(0.0..=1.0),
+        ));
+        Self {
+            params: [freq, amp, phase],
+        }
+    }
+}
 impl ExtFunT for SineWave {
     fn exec(
         &self,
-        _env: &Arc<Environment<Value>>,
+        _env: &Arc<Environment>,
         _app: &mut Option<&mut AppModel>,
         play_info: &Option<&PlaybackInfo>,
         v: &[Value],
@@ -90,15 +122,34 @@ impl ExtFunT for SineWave {
     fn get_name(&self) -> &str {
         "sinewave"
     }
+
+    fn get_params(&self) -> &[Param] {
+        &self.params
+    }
 }
 
 #[derive(Debug)]
-pub struct FadeInOut {}
+pub struct FadeInOut {
+    params: [Param; 2],
+}
+impl FadeInOut {
+    pub fn new() -> Self {
+        let time_in = Param::Number(Arc::new(
+            FloatParameter::new(0.01, "fade_in").set_range(0.0..=10.0),
+        ));
+        let time_out = Param::Number(Arc::new(
+            FloatParameter::new(0.01, "fade_out").set_range(0.0..=10.0),
+        ));
+        Self {
+            params: [time_in, time_out],
+        }
+    }
+}
 
 impl ExtFunT for FadeInOut {
     fn exec(
         &self,
-        env: &Arc<Environment<Value>>,
+        env: &Arc<Environment>,
         _app: &mut Option<&mut AppModel>,
         _play_info: &Option<&PlaybackInfo>,
         v: &[Value],
@@ -109,7 +160,7 @@ impl ExtFunT for FadeInOut {
             return Err(EvalError::InvalidNumArgs(3, v.len()));
         }
         match v {
-            [origin, Value::Parameter(time_in), Value::Parameter(time_out)] => {
+            [origin, Value::Number(time_in), Value::Number(time_out)] => {
                 let (start, dur, content, _label) = match origin {
                     Value::Region(start, dur, content, label, _type) => {
                         (start, dur, content, label)
@@ -124,10 +175,10 @@ impl ExtFunT for FadeInOut {
                         Expr::Var("apply_fade_in_out".into()).into(),
                         vec![
                             Expr::Literal(*content.clone()),
-                            Expr::Literal(Value::Parameter(start.clone())),
-                            Expr::Literal(Value::Parameter(dur.clone())),
-                            Expr::Literal(Value::Parameter(time_in.clone())),
-                            Expr::Literal(Value::Parameter(time_out.clone())),
+                            Expr::Literal(Value::Number(start.get() as f64)),
+                            Expr::Literal(Value::Number(dur.get() as f64)),
+                            Expr::Literal(Value::Number(time_in.clone())),
+                            Expr::Literal(Value::Number(time_out.clone())),
                         ],
                     )
                     .into(),
@@ -146,6 +197,10 @@ impl ExtFunT for FadeInOut {
 
     fn get_name(&self) -> &str {
         "fadeinout"
+    }
+
+    fn get_params(&self)->&[Param] {
+        &self.params
     }
 }
 
@@ -212,7 +267,26 @@ impl<'a> FadeInfo<'a> {
 }
 
 #[derive(Clone, Debug)]
-pub struct ApplyFadeInOut {}
+pub struct ApplyFadeInOut {
+    params:[Param;4]
+}
+impl ApplyFadeInOut{
+    pub fn new()->Self{
+        let start = Param::Number(Arc::new(
+            FloatParameter::new(0.01, "start"),
+        ));
+        let dur = Param::Number(Arc::new(
+            FloatParameter::new(0.01, "dur"),
+        ));
+        let time_in = Param::Number(Arc::new(
+            FloatParameter::new(0.01, "fade_in").set_range(0.0..=10.0),
+        ));
+        let time_out = Param::Number(Arc::new(
+            FloatParameter::new(0.01, "fade_out").set_range(0.0..=10.0),
+        ));
+        Self { params:  [start,dur,time_in,time_out]}
+    }
+}
 impl ApplyFadeInOut {
     pub fn apply(input: f64, now: u64, start: u64, dur: u64, time_in: u64, time_out: u64) -> f64 {
         let fadeinfo = FadeInfo::new(&start, &dur, &time_in, &time_out);
@@ -223,7 +297,7 @@ impl ApplyFadeInOut {
 impl ExtFunT for ApplyFadeInOut {
     fn exec(
         &self,
-        _env: &Arc<Environment<Value>>,
+        _env: &Arc<Environment>,
         _app: &mut Option<&mut AppModel>,
         play_info: &Option<&PlaybackInfo>,
         v: &[Value],
@@ -253,6 +327,10 @@ impl ExtFunT for ApplyFadeInOut {
     fn get_name(&self) -> &str {
         "apply_fade_in_out"
     }
+
+    fn get_params(&self)->&[Param] {
+        &self.params
+    }
 }
 
 #[derive(Debug)]
@@ -261,7 +339,7 @@ pub struct Nop {}
 impl ExtFunT for Nop {
     fn exec(
         &self,
-        _env: &Arc<Environment<Value>>,
+        _env: &Arc<Environment>,
         _app: &mut Option<&mut crate::data::AppModel>,
         _play_info: &Option<&PlaybackInfo>,
         _v: &[Value],
@@ -272,22 +350,32 @@ impl ExtFunT for Nop {
     fn get_name(&self) -> &str {
         "nop"
     }
-}
 
-pub fn gen_default_functions() -> Vec<(String, ExtFun)> {
-    vec![
-        ("reverse".into(), ExtFun::new(ArrayReverse {})),
-        ("sinewave".into(), ExtFun::new(SineWave {})),
-        ("fadeinout".into(), ExtFun::new(FadeInOut {})),
-        ("apply_fade_in_out".into(), ExtFun::new(ApplyFadeInOut {})),
-    ]
+    fn get_params(&self)->&[Param] {
+        &[]
+    }
 }
-pub fn gen_global_env() -> Environment<Value> {
-    let v = gen_default_functions()
-        .iter()
-        .map(|(s, f)| (s.clone(), Value::ExtFunction(f.clone())))
-        .collect::<Vec<_>>();
-    let mut env = Environment::new();
-    env.local = v;
-    env
+pub fn lookup_extfun(name:&str)->Result<ExtFun,EvalError>{
+    match name{
+        "sinewave"=> Ok(ExtFun::new(SineWave::new())),
+        "fadeinout"=>Ok(ExtFun::new(FadeInOut::new())),
+        _=>Err(EvalError::NotFound),
+    }
 }
+// pub fn gen_default_functions() -> Vec<(String, ExtFun)> {
+//     vec![
+//         ("reverse".into(), ExtFun::new(ArrayReverse {})),
+//         ("sinewave".into(), ExtFun::new(SineWave {})),
+//         ("fadeinout".into(), ExtFun::new(FadeInOut {})),
+//         ("apply_fade_in_out".into(), ExtFun::new(ApplyFadeInOut {})),
+//     ]
+// }
+// pub fn gen_global_env() -> Environment {
+    // let v = gen_default_functions()
+    //     .iter()
+    //     .map(|(s, f)| (s.clone(), Value::ExtFunction(f.clone())))
+    //     .collect::<Vec<_>>();
+    // let mut env = Environment::new();
+    // env.local = v;
+    // env
+// }

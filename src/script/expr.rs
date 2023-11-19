@@ -1,11 +1,11 @@
-use super::*;
+use super::{*, value::Param};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum Expr {
     Literal(Value),
     Var(Id),
     Let(Id, Box<Expr>, Box<Expr>),
-    Lambda(Vec<Id>, Box<Expr>),
+    Lambda(Vec<Param>, Box<Expr>),
     App(Box<Expr>, Vec<Expr>), //currently only single argument
 }
 
@@ -21,13 +21,13 @@ pub enum EvalError {
 impl Expr {
     pub fn eval(
         &self,
-        env: Arc<Environment<Value>>,
+        env: Arc<Environment>,
         play_info: &Option<&PlaybackInfo>,
         app: &mut Option<&mut data::AppModel>,
     ) -> Result<Value, EvalError> {
         match self {
             Expr::Literal(v) => Ok(v.clone()),
-            Expr::Var(v) => env.lookup(v).ok_or(EvalError::NotFound).cloned(),
+            Expr::Var(v) => env.lookup(v).ok_or(EvalError::NotFound),
             Expr::Lambda(ids, body) => Ok(Value::Closure(ids.clone(), env.clone(), body.clone())),
             Expr::Let(id, body, then) => {
                 let mut newenv = extend_env(env.clone());
@@ -55,7 +55,7 @@ impl Expr {
                     Value::Closure(ids, env, body) => {
                         let mut newenv = extend_env(env);
                         ids.iter().zip(arg_res.iter()).for_each(|(id, a)| {
-                            newenv.bind(id, a.clone());
+                            newenv.bind(&id.get_label(), a.clone());
                         });
                         body.eval(Arc::new(newenv), play_info, app)
                     }

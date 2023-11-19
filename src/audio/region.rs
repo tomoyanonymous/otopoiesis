@@ -286,7 +286,7 @@ mod test {
         data::Content,
         param_float,
         parameter::{FloatParameter, Parameter, RangedNumeric},
-        script::{Expr, Value},
+        script::{builtin_fn, Expr, ExtFun, Value},
         utils::AtomicRange,
     };
 
@@ -387,26 +387,7 @@ mod test {
         let data = data::Region::new(
             start.clone(),
             dur.clone(),
-            data::Content::Generator(Value::new_lazy(Expr::App(
-                Box::new(Expr::Var("sinewave".into())),
-                vec![
-                    Expr::Literal(Value::Parameter(Arc::new(param_float!(
-                        2200.0,
-                        "freq",
-                        20.0..=20000.0
-                    )))),
-                    Expr::Literal(Value::Parameter(Arc::new(param_float!(
-                        1.0,
-                        "amp",
-                        0.0..=1.0
-                    )))),
-                    Expr::Literal(Value::Parameter(Arc::new(param_float!(
-                        0.0,
-                        "phase",
-                        0.0..=1.0
-                    )))),
-                ],
-            ))),
+            data::Content::Generator(Value::ExtFunction(ExtFun::new(builtin_fn::SineWave::new()))),
             "test_sin",
         );
         let mut model = Model::new(data, channel);
@@ -443,11 +424,7 @@ mod test {
         // )));
         let generator = Value::new_lazy(Expr::App(
             Expr::Var("constant".to_string()).into(),
-            vec![Expr::Literal(Value::Parameter(Arc::new(param_float!(
-                1.0,
-                "test",
-                0.0..=1.0
-            ))))],
+            vec![Expr::Literal(Value::Number(0.0))],
         ));
 
         let data = data::Region::new(
