@@ -9,6 +9,7 @@ pub mod builtin_fn;
 pub mod environment;
 pub mod expr;
 pub mod value;
+pub mod ui;
 pub use {
     environment::{extend_env, Environment},
     expr::{EvalError, Expr},

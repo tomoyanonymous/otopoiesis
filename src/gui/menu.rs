@@ -50,13 +50,13 @@ fn make_region(trackid: usize, pos: f64, _c: String) -> Expr {
         Expr::Literal(Value::Parameter(Arc::new(param_float!(
             pos as f32,
             "start",
-            0.0..=f32::MAX
+            0.0..=f32::INFINITY
         ))))
         .into(),
         Expr::Literal(Value::Parameter(Arc::new(param_float!(
             pos as f32 + 1.0,
             "dur",
-            0.0..=f32::MAX
+            0.0..=f32::INFINITY
         ))))
         .into(),
         generator.into(),
@@ -75,13 +75,13 @@ fn make_region_file(trackid: usize, pos: f64, path: String) -> Expr {
         Expr::Literal(Value::Parameter(Arc::new(param_float!(
             pos as f32,
             "start",
-            0.0..=f32::MAX
+            0.0..=f32::INFINITY
         ))))
         .into(),
         Expr::Literal(Value::Parameter(Arc::new(param_float!(
             pos as f32 + 1.0,
             "start",
-            0.0..=f32::MAX
+            0.0..=f32::INFINITY
         ))))
         .into(),
         generator.into(),

@@ -33,7 +33,7 @@ pub struct State {
 impl State {
     pub fn new(params: &data::Region, labeltext: impl ToString, is_interactive: bool) -> Self {
         let handle_left = UiBarState::new(0.0..=params.dur.get().into());
-        let handle_right = UiBarState::new(params.dur.get().into()..=f64::MAX);
+        let handle_right = UiBarState::new(params.dur.get().into()..=f64::INFINITY);
         let content = match &params.content {
             data::Content::Generator(param) => {
                 ContentModel::Generator(param.clone(), super::generator::State::new())

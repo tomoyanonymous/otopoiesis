@@ -12,7 +12,7 @@ pub(crate) fn slider_from_parameter(
         ui.group(|ui| {
             ui.set_width(50.);
             ui.centered_and_justified(|ui| {
-                ui.label(param.get_label());
+                ui.label(format!("{}:{}", param.get_label(), param.get()));
             })
         });
         let range = &param.range;
@@ -23,6 +23,7 @@ pub(crate) fn slider_from_parameter(
                 }
                 range.start().load() as f64
             })
+            // .custom_formatter(|n, _r| format!("{:.6}", n))
             .max_decimals(5),
         );
         let main = ui.add(
@@ -45,6 +46,7 @@ pub(crate) fn slider_from_parameter(
                 }
                 range.end().load() as f64
             })
+            // .custom_formatter(|n, _r| format!("{:.6}", n))
             .max_decimals(5),
         );
         start.union(main.union(end))

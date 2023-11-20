@@ -62,7 +62,7 @@ impl Parameter for FloatParameter {
     fn new(init: Self::Element, label: impl Into<String>) -> Self {
         Self {
             value: atomic::F32::from(init),
-            range: atomic::F32::from(f32::MIN)..=atomic::F32::from(f32::MAX),
+            range: atomic::F32::from(f32::MIN)..=atomic::F32::from(f32::INFINITY),
             label: label.into(),
         }
     }
