@@ -63,7 +63,7 @@ pub enum Content {
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Region {
-    /// range stores a real time, not in sample.
+    /// start and dur stores a real time, not in sample.
     pub start: Arc<FloatParameter>,
     pub dur: Arc<FloatParameter>,
     pub content: Content,

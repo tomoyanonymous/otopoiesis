@@ -5,7 +5,7 @@ use std::sync::{Arc, Mutex, OnceLock};
 use crate::audio::renderer::{Renderer, RendererBase};
 use crate::data::Project;
 use crate::script::Expr;
-use crate::utils::{GLOBAL_LOGGER, Logger};
+use crate::utils::{Logger, GLOBAL_LOGGER};
 use crate::{audio, data, gui, utils::atomic};
 
 pub(crate) mod filemanager;
@@ -38,10 +38,12 @@ fn new_renderer(app: &data::AppModel) -> Renderer<audio::timeline::Model> {
 }
 
 impl Model {
-    pub fn new(_cc: &eframe::CreationContext<'_>, arg: Option<data::LaunchArg>) -> Self {
+    pub fn new(cc: &eframe::CreationContext<'_>, arg: Option<data::LaunchArg>) -> Self {
         let arg = arg.unwrap_or_default();
+        Self::setup_custom_fonts(&cc.egui_ctx);
         let mut appmodel = data::AppModel::new(data::Transport::new(), data::GlobalSetting {}, arg);
         let _ = appmodel.code_to_ui();
+        
         let ui = gui::app::State::new(&appmodel);
         #[allow(clippy::arc_with_non_send_sync)]
         let app = Arc::new(Mutex::new(appmodel));
@@ -69,7 +71,37 @@ impl Model {
             logger_open: false,
         }
     }
+    fn setup_custom_fonts(ctx: &egui::Context) {
+        // Start with the default fonts (we will be adding to them rather than replacing them).
+        let mut fonts = egui::FontDefinitions::default();
 
+        // Install my own font (maybe supporting non-latin characters).
+        // .ttf and .otf files supported.
+        fonts.font_data.insert(
+            "my_font".to_owned(),
+            egui::FontData::from_static(include_bytes!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/assets/fonts/NotoSansJP-VariableFont_wght.ttf"
+            ))),
+        );
+
+        // Put my font first (highest priority) for proportional text:
+        fonts
+            .families
+            .entry(egui::FontFamily::Proportional)
+            .or_default()
+            .insert(0, "my_font".to_owned());
+
+        // Put my font as last fallback for monospace:
+        fonts
+            .families
+            .entry(egui::FontFamily::Monospace)
+            .or_default()
+            .push("my_font".to_owned());
+
+        // Tell egui to use these fonts:
+        ctx.set_fonts(fonts);
+    }
     pub fn play(&mut self) {
         log::debug!("play");
         self.refresh_audio();
@@ -271,11 +303,10 @@ impl eframe::App for Model {
                             if let Ok(mut data) = GLOBAL_LOGGER.get().unwrap().data.try_lock() {
                                 data.iter_mut().rev().for_each(|d| {
                                     ui.add(
-                                        egui::TextEdit::singleline(&mut  d.0)
+                                        egui::TextEdit::singleline(&mut d.0)
                                             .desired_width(f32::INFINITY)
                                             .interactive(false)
                                             .text_color(Logger::get_color(d.1)),
-                                            
                                     );
                                 });
                             }
