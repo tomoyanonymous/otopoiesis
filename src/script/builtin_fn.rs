@@ -53,9 +53,9 @@ impl ExtFunT for Print {
         _play_info: &Option<&PlaybackInfo>,
         v: &[Value],
     ) -> Result<Value, EvalError> {
-        let str = v.iter().fold(String::new(), |acc, b| {
-            format!("{}, {:?}", acc, b)
-        });
+        let str = v
+            .iter()
+            .fold(String::new(), |acc, b| format!("{}, {:?}", acc, b));
         println!("{}", str);
         Ok(Value::None)
     }
@@ -103,12 +103,12 @@ impl ExtFunT for SineWave {
                     let res = {
                         //2Hzなら (now/sr)
                         let now = info.current_time;
+                        let now_s = now as f64 / info.sample_rate as f64;
                         let f = freq.get_as_float()?;
                         let a = amp.get_as_float()?;
                         let p = phase.get_as_float()?;
-                        let phase_sample = (f * (now as f64 / info.sample_rate as f64) + p)
-                            % (std::f64::consts::PI * 2.0);
-                        Some(phase_sample.sin() * a)
+                        let phase_sample = f * now_s + p;
+                        Some((phase_sample * std::f64::consts::PI * 2.0).sin() * a)
                     };
                     res.map(|r| Value::Number(r))
                         .ok_or(EvalError::TypeMismatch("sinewave type error".into()))
