@@ -1,9 +1,10 @@
 //! The definitions of un/redo-able actions for applications.
 //! Todo: fix an inconsistensy after code-app translation because serializing/deserializing refreshes Arc references.
 
-use crate::data;
+use crate::parameter::{FloatParameter, Parameter, RangedNumeric};
 use crate::script::{Expr, Value};
-use std::sync::{MutexGuard, PoisonError};
+use crate::{data, param_float};
+use std::sync::{Arc, MutexGuard, PoisonError};
 use undo;
 
 #[derive(Debug)]
@@ -206,6 +207,100 @@ impl std::fmt::Display for AddTrack {
 }
 impl DisplayableAction for AddTrack {}
 
+#[derive(Debug)]
+pub struct AddFadeInOut {
+    // elem: Expr, //original region
+    pub track_num: usize,
+    pub pos: usize,
+    pub time_in: f64,
+    pub time_out: f64,
+}
+impl undo::Action for AddFadeInOut {
+    type Target = Expr; //project
+
+    type Output = ();
+
+    type Error = Error;
+
+    fn apply(&mut self, project: &mut Self::Target) -> undo::Result<Self> {
+        match project {
+            Expr::Literal(Value::Project(_env, _sr, tracks)) => {
+                match tracks.get_mut(self.track_num).unwrap() {
+                    Expr::Track(box Expr::Array(regions)) => {
+                        if regions.is_empty() {
+                            Err(Error::ContainerEmpty)
+                        } else if regions.len() < self.pos {
+                            Err(Error::InvalidIndex(regions.len(), self.pos as i64))
+                        } else {
+                            let reg = regions.get_mut(self.pos).unwrap();
+                            let time_in = Expr::Literal(Value::Parameter(Arc::new(param_float!(
+                                self.time_in as f32,
+                                "time_in",
+                                0.0..=10.0
+                            ))));
+                            let time_out = Expr::Literal(Value::Parameter(Arc::new(param_float!(
+                                self.time_out as f32,
+                                "time_out",
+                                0.0..=10.0
+                            ))));
+                            *reg = Expr::App(
+                                Expr::Var("fadeinout".to_string()).into(),
+                                vec![reg.clone(), time_in.into(), time_out.into()],
+                            );
+                            Ok(())
+                        }
+                    }
+                    _ => Err(Error::InvalidTrackType),
+                }
+            }
+            _ => Err(Error::InvalidConversion),
+        }
+    }
+
+    fn undo(&mut self, target: &mut Self::Target) -> undo::Result<Self> {
+        match target {
+            Expr::Literal(Value::Project(env, _sr, tracks)) => {
+                match tracks.get_mut(self.track_num).unwrap() {
+                    Expr::Track(box Expr::Array(regions)) => {
+                        if regions.is_empty() {
+                            Err(Error::ContainerEmpty)
+                        } else if regions.len() < self.pos {
+                            Err(Error::InvalidIndex(regions.len(), self.pos as i64))
+                        } else {
+                            let reg = regions.get_mut(self.pos).unwrap();
+                            if let Expr::App(box Expr::Var(name), r) = reg {
+                                match (name.as_str(), r.as_slice()) {
+                                    ("fadeinout", [v, time_in, time_out]) => {
+                                        self.time_in = time_in
+                                            .eval(env.clone(), &None, &mut None)
+                                            .and_then(|v| v.get_as_float())
+                                            .unwrap_or(0.0);
+                                        self.time_out = time_out
+                                            .eval(env.clone(), &None, &mut None)
+                                            .and_then(|v| v.get_as_float())
+                                            .unwrap_or(0.0);
+
+                                        *reg = v.clone()
+                                    }
+                                    _ => return Err(Error::InvalidConversion),
+                                }
+                            }
+                            Ok(())
+                        }
+                    }
+                    _ => Err(Error::InvalidTrackType),
+                }
+            }
+            _ => Err(Error::InvalidConversion),
+        }
+    }
+}
+impl std::fmt::Display for AddFadeInOut {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Add fadein/out to region")
+    }
+}
+impl DisplayableAction for AddFadeInOut {}
 // pub fn add_region(
 //     app: &mut data::AppModel,
 //     track_num: usize,

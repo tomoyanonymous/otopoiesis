@@ -3,6 +3,8 @@ use crate::data;
 use crate::gui;
 use crate::gui::menu;
 use std::sync::mpsc;
+
+use super::menu::add_fade_to_region;
 pub struct State {
     regions: Vec<gui::region::State>,
     // new_array_count: u32,
@@ -84,7 +86,8 @@ impl<'a> egui::Widget for Model<'a> {
                                 .regions
                                 .iter_mut()
                                 .zip(region_params.iter())
-                                .map(|(region, region_param)| {
+                                .enumerate()
+                                .map(|(i, (region, region_param))| {
                                     let range = region_param.getrange().clone();
                                     let x_start = area.left() + scale(*range.start());
                                     let x_end = area.left() + scale(*range.end());
@@ -92,7 +95,11 @@ impl<'a> egui::Widget for Model<'a> {
                                         [x_start, top].into(),
                                         [x_end, top + height].into(),
                                     ]);
-                                    ui.put(rect, super::region::Model::new(region_param, region))
+                                    let res = ui
+                                        .put(rect, super::region::Model::new(region_param, region));
+                                    res.context_menu(|ui| {
+                                        let _ = add_fade_to_region(self.id, i, &self.action_tx, ui);
+                                    })
                                 })
                                 .last()
                         })

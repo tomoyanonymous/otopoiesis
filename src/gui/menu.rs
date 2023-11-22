@@ -63,7 +63,8 @@ fn make_region(trackid: usize, pos: f64, _c: String) -> Expr {
         format!("region{}", trackid + 1),
     );
 
-    with_fade(region)
+    // with_fade(region)
+    region
 }
 
 fn make_region_file(trackid: usize, pos: f64, path: String) -> Expr {
@@ -142,4 +143,23 @@ pub fn add_region_button(
     })
     .response
     .on_hover_text("Add new clip")
+}
+
+pub fn add_fade_to_region(
+    trackid: usize,
+    region_num: usize,
+    sender: &mpsc::Sender<Action>,
+    ui: &mut egui::Ui,
+) -> egui::Response {
+    let res = ui.button("Apply Fade");
+    if res.clicked() {
+        let a = action::AddFadeInOut {
+            track_num: trackid,
+            pos: region_num,
+            time_in: 0.1,
+            time_out: 0.1,
+        };
+        let _ = sender.send(a.into());
+    }
+    res
 }

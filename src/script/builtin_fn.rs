@@ -286,10 +286,18 @@ impl ApplyFadeInOut {
     }
 }
 impl ApplyFadeInOut {
-    pub fn apply(input: f64, now: u64, start: u64, dur: u64, time_in: u64, time_out: u64) -> f64 {
+    pub fn apply(
+        input: f64,
+        now: u64,
+        start: u64,
+        dur: u64,
+        time_in: u64,
+        time_out: u64,
+    ) -> Result<f64, EvalError> {
         let fadeinfo = FadeInfo::new(&start, &dur, &time_in, &time_out);
-        let gain = fadeinfo.unwrap().calc(now).get_gain();
-        input * gain
+        fadeinfo
+            .map(|info| info.calc(now).get_gain() * input)
+            .ok_or(EvalError::InvalidConversion)
     }
 }
 impl ExtFunT for ApplyFadeInOut {
@@ -323,9 +331,8 @@ impl ExtFunT for ApplyFadeInOut {
                 let time_in = (time_in.get_as_float().unwrap() * sr) as u64;
                 let time_out = (time_out.get_as_float().unwrap() * sr) as u64;
                 // Ok(Value::Number(input))//なんかおかしい
-                Ok(Value::Number(Self::apply(
-                    input, now as u64, start, dur, time_in, time_out,
-                )))
+                Self::apply(input, now as u64, start, dur, time_in, time_out)
+                    .map(|res| Value::Number(res))
             }
             _ => Err(EvalError::InvalidNumArgs(5, v.len())),
         }
