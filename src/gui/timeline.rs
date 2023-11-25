@@ -83,13 +83,16 @@ impl<'a> egui::Widget for Model<'a> {
             let res = ui
                 .vertical(|ui| {
                     for (i, state) in self.state.track.iter_mut().enumerate() {
-                        ui.add(gui::track::Model::new(
-                            i,
-                            self.app.action_tx.clone(),
-                            self.app.get_track_for_id_mut(i).unwrap(),
-                            state,
-                        ));
-                        ui.add_space(30.0);
+                        ui.push_id(i, |ui| {
+                            ui.add(gui::track::Model::new(
+                                i,
+                                self.app.action_tx.clone(),
+                                self.app.get_track_for_id_mut(i).unwrap(),
+                                state,
+                            ));
+                            ui.add_space(30.0);
+                        })
+                        .inner
                     }
                 })
                 .response;

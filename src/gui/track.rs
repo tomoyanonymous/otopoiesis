@@ -88,18 +88,24 @@ impl<'a> egui::Widget for Model<'a> {
                                 .zip(region_params.iter())
                                 .enumerate()
                                 .map(|(i, (region, region_param))| {
-                                    let range = region_param.getrange().clone();
-                                    let x_start = area.left() + scale(*range.start());
-                                    let x_end = area.left() + scale(*range.end());
-                                    let rect = egui::Rect::from_points(&[
-                                        [x_start, top].into(),
-                                        [x_end, top + height].into(),
-                                    ]);
-                                    let res = ui
-                                        .put(rect, super::region::Model::new(region_param, region));
-                                    res.context_menu(|ui| {
-                                        let _ = add_fade_to_region(self.id, i, &self.action_tx, ui);
+                                    ui.push_id(i, |ui| {
+                                        let range = region_param.getrange().clone();
+                                        let x_start = area.left() + scale(*range.start());
+                                        let x_end = area.left() + scale(*range.end());
+                                        let rect = egui::Rect::from_points(&[
+                                            [x_start, top].into(),
+                                            [x_end, top + height].into(),
+                                        ]);
+                                        let res = ui.put(
+                                            rect,
+                                            super::region::Model::new(region_param, region),
+                                        );
+                                        res.context_menu(|ui| {
+                                            let _ =
+                                                add_fade_to_region(self.id, i, &self.action_tx, ui);
+                                        })
                                     })
+                                    .inner
                                 })
                                 .last()
                         })

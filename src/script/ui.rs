@@ -17,12 +17,15 @@ pub fn eval_ui_val(v: &Value, ui: &mut egui::Ui) -> egui::InnerResponse<Result<V
             }
         }
         Value::Array(vec, _t) => {
-            ui.group(|ui| {
-                vec.iter().for_each(|v| {
-                    let _ = eval_ui_val(v, ui);
+            ui.push_id(ui.next_auto_id(), |ui| {
+                ui.group(|ui| {
+                    vec.iter().for_each(|v| {
+                        let _ = eval_ui_val(v, ui);
+                    })
                 })
+                .response
             })
-            .response
+            .inner
         }
         Value::Function(_, _) => todo!(),
         Value::Closure(_ids, env, body) => {
@@ -56,20 +59,25 @@ pub fn eval_ui_val(v: &Value, ui: &mut egui::Ui) -> egui::InnerResponse<Result<V
 }
 
 pub fn eval_ui(
-    e: & Expr,
+    e: &Expr,
     env: Arc<Environment>,
     ui: &mut egui::Ui,
 ) -> egui::InnerResponse<Result<Value, EvalError>> {
     match e {
         Expr::Literal(v) => eval_ui_val(v, ui),
-        Expr::Array(vec) => ui.group(|ui| {
-            ui.label("array");
-            let res = vec
-                .iter()
-                .map(|e| eval_ui(e, env.clone(), ui).inner)
-                .try_collect::<Vec<_>>()?;
-            Ok(Value::Array(res, Type::Unknown))
-        }),
+        Expr::Array(vec) => {
+            ui.push_id(ui.next_auto_id(), |ui| {
+                ui.group(|ui| {
+                    ui.label("array");
+                    let res = vec
+                        .iter()
+                        .map(|e| eval_ui(e, env.clone(), ui).inner)
+                        .try_collect::<Vec<_>>()?;
+                    Ok(Value::Array(res, Type::Unknown))
+                })
+            })
+            .inner
+        }
         Expr::Var(v) => {
             if let Some(mut val) = env.lookup(&v) {
                 eval_ui_val(&mut val, ui)
