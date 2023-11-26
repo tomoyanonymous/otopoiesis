@@ -1,17 +1,15 @@
 use crate::data;
 use crate::data::Region;
 use crate::gui;
-use crate::parameter::Parameter;
-use crate::parameter::RangedNumeric;
-use crate::script;
-use crate::script::Expr;
-use crate::script::Value;
+use crate::parameter::{Parameter, RangedNumeric};
+use crate::script::{self, Expr, Value};
+
 use crate::utils::atomic::SimpleAtomic;
 use crate::utils::AtomicRange;
 mod region_handle;
 pub mod regionfilter;
 use region_handle::{HandleMode, UiBar, UiBarState};
-
+use super::generator::waveform::State as WaveFormState;
 use self::regionfilter::fadeinout::FadeInOut;
 use self::regionfilter::replicate::Replicate;
 use self::regionfilter::RegionFilterState;
@@ -19,12 +17,12 @@ use self::regionfilter::{fadeinout, replicate};
 
 pub enum ContentModel {
     RegionFilter(regionfilter::RegionFilterState),
-    Generator(script::Value, super::generator::State),
+    Generator(script::Value, WaveFormState),
 }
 
 pub struct State {
     pub label: String,
-    content: ContentModel,
+    waveform: WaveFormState,
     range_handles: [UiBarState; 2],
     #[allow(dead_code)]
     is_interactive: bool,
@@ -36,7 +34,7 @@ impl State {
         let handle_right = UiBarState::new(params.dur.get().into()..=f64::INFINITY);
         let content = match &params.content {
             data::Content::Generator(param) => {
-                ContentModel::Generator(param.clone(), super::generator::State::new())
+                ContentModel::Generator(param.clone(), WaveFormState::new(data))
             }
             data::Content::Transformer(filter, origin) => {
                 ContentModel::RegionFilter(match filter {

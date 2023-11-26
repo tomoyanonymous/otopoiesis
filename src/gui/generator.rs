@@ -4,6 +4,7 @@ use crate::{
     utils::AtomicRange,
 };
 use egui::{epaint::Shape, Pos2, Sense, Vec2};
+pub mod waveform;
 
 pub struct State {
     samples: Vec<f32>,
