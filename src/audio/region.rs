@@ -216,19 +216,12 @@ impl Model {
     pub fn new(params: data::Region, channels: u64) -> Self {
         // assert!(params.range.getrange() < params.max_size);
 
-        let content: Box<dyn RangedComponent + Send + Sync> = match &params.content {
-            data::Content::Generator(g) => {
-                let c = get_component_for_value(g);
-                let ranged_component = RangedComponentDyn::new(
-                    c,
-                    AtomicRange::new(params.start.clone(), params.dur.clone()),
-                );
-                Box::new(ranged_component)
-            }
-            data::Content::Transformer(filter, origin) => {
-                TransformerModel::new(filter, *origin.clone()).0
-            }
-        };
+        let c = get_component_for_value(&params.content);
+        let content = Box::new(RangedComponentDyn::new(
+            c,
+            AtomicRange::new(params.start.clone(), params.dur.clone()),
+        ));
+
         Self {
             params,
             _channels: channels,
@@ -282,7 +275,7 @@ mod test {
     use crate::{
         data::Content,
         parameter::{FloatParameter, Parameter, RangedNumeric},
-        script::{builtin_fn, Expr, ExtFun, Value},
+        script::{builtin_fn, Environment, Expr, ExtFun, Value},
     };
 
     use super::*;
@@ -382,7 +375,7 @@ mod test {
         let data = data::Region::new(
             start.clone(),
             dur.clone(),
-            data::Content::Generator(Value::ExtFunction(ExtFun::new(builtin_fn::SineWave::new()))),
+            Value::ExtFunction(ExtFun::new(builtin_fn::SineWave::new())),
             "test_sin",
         );
         let mut model = Model::new(data, channel);
@@ -405,51 +398,55 @@ mod test {
     }
 
     fn run_fade_region(in_time: f32, out_time: f32) {
-        let fade_param = data::region::FadeParam::new_with(
-            Arc::new(FloatParameter::new(in_time, "time_in").set_range(0.0..=1000.0)),
-            Arc::new(FloatParameter::new(out_time, "time_out").set_range(0.0..=1000.0)),
-        );
-        let channel = 2;
+        let time_in = FloatParameter::new(in_time, "time_in").set_range(0.0..=1000.0);
+        let time_out = FloatParameter::new(out_time, "time_out").set_range(0.0..=1000.0);
+        let channels = 2;
         let sample_rate = 48000;
-        let start = Arc::new(FloatParameter::new(0.1, "start"));
-        let dur = Arc::new(FloatParameter::new(0.1, "dur"));
+        let start = FloatParameter::new(0.1, "start");
+        let dur = FloatParameter::new(0.1, "dur");
 
-        // let generator = data::Content::Generator(data::Generator::Constant(Arc::new(
-        //     FloatParameter::new(1.0, "test").set_range(0.0..=1.0),
-        // )));
-        let generator = Value::new_lazy(Expr::App(
-            Expr::Var("constant".to_string()).into(),
-            vec![Expr::Literal(Value::Number(0.0))],
-        ));
-
-        let data = data::Region::new(
-            start.clone(),
-            dur.clone(),
-            data::Content::Transformer(
-                data::RegionFilter::FadeInOut(fade_param.clone()),
-                Box::new(data::Region::new(
-                    start.clone(),
-                    dur.clone(),
-                    Content::Generator(generator),
-                    "generator",
-                )),
-            ),
-            "test_sin",
+        let generator = Expr::App(
+            Expr::Literal(Value::new_lazy(Expr::Literal(Value::Number(1.0))).into()).into(),
+            vec![],
         );
-        let mut model = Model::new(data, channel);
-        model.render_offline(sample_rate, channel);
-        let range_samps = (dur.get() as f64 * sample_rate as f64) as usize * channel as usize;
+
+        let region = Expr::Region(
+            Expr::Literal(Value::new_param(start.clone())).into(),
+            Expr::Literal(Value::new_param(dur.clone())).into(),
+            generator.into(),
+            "generator".into(),
+        );
+        let region_with_fade = Expr::App(
+            Expr::Var("fadeinout".to_string()).into(),
+            vec![
+                region.clone(),
+                Expr::Literal(Value::new_param(time_in.clone())),
+                Expr::Literal(Value::new_param(time_out.clone())),
+            ],
+        );
+        let env = Arc::new(Environment::new());
+        let info = PlaybackInfo {
+            sample_rate,
+            current_time: 0,
+            frame_per_buffer: 256,
+            channels,
+        };
+        let region_res = region_with_fade.eval(env, &Some(&info), &mut None).unwrap();
+        let data = data::Region::try_from(&region_res).unwrap();
+        let mut model = Model::new(data, channels);
+        model.render_offline(sample_rate, channels);
+        let range_samps = (dur.get() as f64 * sample_rate as f64) as usize * channels as usize;
         assert_eq!(model.interleaved_samples_cache.len(), range_samps);
 
         let mut answer = vec![1.0f32; range_samps];
 
-        gen_constant(answer.as_mut_slice(), channel as u32);
+        gen_constant(answer.as_mut_slice(), channels as u32);
         apply_fadeinout(
             answer.as_mut_slice(),
-            fade_param.time_in.get().into(),
-            fade_param.time_out.get().into(),
+            time_in.get().into(),
+            time_out.get().into(),
             sample_rate,
-            channel as u32,
+            channels as u32,
         );
         assert!(model.cache_completed);
         validate_answer_array(&model.interleaved_samples_cache, &answer);

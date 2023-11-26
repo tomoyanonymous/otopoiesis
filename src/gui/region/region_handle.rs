@@ -64,13 +64,15 @@ impl<'a> egui::Widget for UiBar<'a> {
             HandleMode::Start => egui::CursorIcon::ResizeWest,
             HandleMode::End => egui::CursorIcon::ResizeEast,
         };
+        let color = ui.style().visuals.strong_text_color();
         response = response.on_hover_cursor(icon);
+        painter.rect_filled(rect, 0.,egui::Color32::DARK_GRAY);
         if response.hovered() {
-            painter.rect_filled(rect, 0., ui.style().visuals.weak_text_color());
+            painter.rect_filled(rect, 0.,color);
         }
 
         if response.dragged() {
-            painter.rect_filled(rect, 0., ui.style().visuals.strong_text_color());
+            painter.rect_filled(rect, 0., color.linear_multiply(0.8));
             ui.ctx().output_mut(|o| o.cursor_icon = icon);
         }
 

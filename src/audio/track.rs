@@ -29,13 +29,11 @@ impl Model {
     ) -> Vec<Box<dyn RangedComponent + Send + Sync>> {
         param
             .iter()
-            .map(|region| match &region.content {
-                data::Content::Generator(g) => Box::new(RangedComponentDyn::new(
-                    Box::new(ScriptComponent::try_new(&g).expect("not an generator")),
+            .map(|region| {
+                Box::new(RangedComponentDyn::new(
+                    Box::new(ScriptComponent::try_new(&region.content).expect("not an generator")),
                     AtomicRange::new(region.start.clone(), region.dur.clone()),
-                ))
-                    as Box<dyn RangedComponent + Send + Sync>,
-                data::Content::Transformer(_, _) => todo!(),
+                )) as Box<dyn RangedComponent + Send + Sync>
             })
             .collect::<Vec<_>>()
     }
@@ -48,14 +46,10 @@ impl Model {
             self.param
                 .iter()
                 .map(|region| {
-                    let model = match &region.content {
-                        data::Content::Generator(g) => Box::new(RangedComponentDyn::new(
-                            Box::new(ScriptComponent::try_new(&g).expect("not an generator")),
-                            AtomicRange::new(region.start.clone(), region.dur.clone()),
-                        ))
-                            as Box<dyn RangedComponent + Send + Sync>,
-                        data::Content::Transformer(_, _) => todo!(),
-                    };
+                  let model =   Box::new(RangedComponentDyn::new(
+                        Box::new(ScriptComponent::try_new(&region.content).expect("not an generator")),
+                        AtomicRange::new(region.start.clone(), region.dur.clone()),
+                    )) as Box<dyn RangedComponent + Send + Sync>;
                     super::component::render_region_offline_async(model, info)
                 })
                 .map(|h| h.join().expect("failed to join threads"))
