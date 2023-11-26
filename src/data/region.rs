@@ -66,7 +66,7 @@ pub struct Region {
     /// start and dur stores a real time, not in sample.
     pub start: Arc<FloatParameter>,
     pub dur: Arc<FloatParameter>,
-    pub content: Content,
+    pub content: Value,
     pub label: String,
 }
 
@@ -76,7 +76,7 @@ impl Region {
     pub fn new(
         start: Arc<FloatParameter>,
         dur: Arc<FloatParameter>,
-        content: Content,
+        content: Value,
         label: impl Into<String>,
     ) -> Self {
         Self {
@@ -85,17 +85,6 @@ impl Region {
             content,
             label: label.into(),
         }
-    }
-    pub fn with_fade(origin: Self) -> Self {
-        Self::new(
-            origin.start.clone(),
-            origin.dur.clone(),
-            Content::Transformer(
-                RegionFilter::FadeInOut(FadeParam::new()),
-                Box::new(origin.clone()),
-            ),
-            origin.label,
-        )
     }
     pub fn getrange(&self) -> RangeInclusive<f64> {
         let start = self.start.get() as f64;
@@ -109,7 +98,7 @@ impl std::default::Default for Region {
         Self {
             start: Arc::new(FloatParameter::default()),
             dur: Arc::new(FloatParameter::default()),
-            content: Content::Generator(Value::None),
+            content: Value::None,
             label: "".to_string(),
         }
     }
@@ -126,8 +115,7 @@ fn make_region_from_param(
     content: &Value,
     label: &str,
 ) -> Result<Region, EvalError> {
-    let content = Content::Generator(content.clone());
-    let res = Region::new(start.clone(), dur.clone(), content, label);
+    let res = Region::new(start.clone(), dur.clone(), content.clone(), label);
     Ok(res)
 }
 

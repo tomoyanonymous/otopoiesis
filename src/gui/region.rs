@@ -1,24 +1,25 @@
+use crate::audio::component::ScriptComponent;
+use crate::audio::{RangedComponent, RangedComponentDyn};
 use crate::data;
-use crate::data::Region;
 use crate::gui;
 use crate::parameter::{Parameter, RangedNumeric};
-use crate::script::{self, Expr, Value};
-
-use crate::utils::atomic::SimpleAtomic;
+use crate::script;
+pub(crate) const BAR_WIDTH: f32 = 3.0;
+use crate::script::ui::eval_ui_val;
 use crate::utils::AtomicRange;
 mod region_handle;
-pub mod regionfilter;
+// pub mod regionfilter;
+// use self::regionfilter::fadeinout::FadeInOut;
+// use self::regionfilter::replicate::Replicate;
+// use self::regionfilter::RegionFilterState;
+// use self::regionfilter::{fadeinout, replicate};
+use super::generator::waveform::{State as WaveFormState, WaveForm};
 use region_handle::{HandleMode, UiBar, UiBarState};
-use super::generator::waveform::State as WaveFormState;
-use self::regionfilter::fadeinout::FadeInOut;
-use self::regionfilter::replicate::Replicate;
-use self::regionfilter::RegionFilterState;
-use self::regionfilter::{fadeinout, replicate};
 
-pub enum ContentModel {
-    RegionFilter(regionfilter::RegionFilterState),
-    Generator(script::Value, WaveFormState),
-}
+// pub enum ContentModel {
+//     RegionFilter(regionfilter::RegionFilterState),
+//     Generator(script::Value, WaveFormState),
+// }
 
 pub struct State {
     pub label: String,
@@ -29,59 +30,26 @@ pub struct State {
 }
 
 impl State {
+    pub fn renew_waveform(param: &data::Region) -> WaveFormState {
+        let mut component = RangedComponentDyn::new(
+            Box::new(ScriptComponent::try_new(&param.content).unwrap()),
+            AtomicRange::new(param.start.clone(), param.dur.clone()),
+        );
+        component.render_offline(44100, 2);
+
+        WaveFormState::new(
+            component.get_sample_cache(),
+            component.get_output_channels() as usize,
+        )
+    }
     pub fn new(params: &data::Region, labeltext: impl ToString, is_interactive: bool) -> Self {
+        let waveform = Self::renew_waveform(&params);
         let handle_left = UiBarState::new(0.0..=params.dur.get().into());
         let handle_right = UiBarState::new(params.dur.get().into()..=f64::INFINITY);
-        let content = match &params.content {
-            data::Content::Generator(param) => {
-                ContentModel::Generator(param.clone(), WaveFormState::new(data))
-            }
-            data::Content::Transformer(filter, origin) => {
-                ContentModel::RegionFilter(match filter {
-                    data::RegionFilter::Gain => todo!(),
-                    data::RegionFilter::Reverse => todo!(),
-                    data::RegionFilter::FadeInOut(_p) => {
-                        regionfilter::RegionFilterState::FadeInOut(fadeinout::State::new(
-                            origin,
-                            origin.start.clone(),
-                            origin.dur.clone(),
-                        ))
-                    }
-                    data::RegionFilter::Replicate(p) => regionfilter::RegionFilterState::Replicate(
-                        replicate::State::new(origin.as_ref(), p.count.load() as u64),
-                    ),
-                    data::RegionFilter::Script(v) => {
-                        let (rg, _time_in, _time_out) = match v {
-                            Value::Closure(
-                                _ids,
-                                _env,
-                                box Expr::App(box Expr::Var(fname), args),
-                            ) => match (fname.as_str(), args.as_slice()) {
-                                (
-                                    "apply_fade_in_out",
-                                    [Expr::Literal(region), Expr::Literal(Value::Number(time_in)), Expr::Literal(Value::Number(time_out))],
-                                ) => (
-                                    Region::try_from(region).expect("not a function"),
-                                    time_in,
-                                    time_out,
-                                ),
-                                _ => todo!(),
-                            },
-                            _ => todo!(),
-                        };
-                        regionfilter::RegionFilterState::FadeInOut(fadeinout::State::new(
-                            &rg,
-                            rg.start.clone(),
-                            rg.dur.clone(),
-                        ))
-                    }
-                })
-            }
-        };
         let range_handles = [handle_left, handle_right];
         Self {
             label: labeltext.to_string(),
-            content,
+            waveform,
             range_handles,
             is_interactive,
         }
@@ -121,7 +89,6 @@ impl<'a> egui::Widget for Model<'a> {
     fn ui(mut self, ui: &mut egui::Ui) -> egui::Response {
         let height = gui::TRACK_HEIGHT + 30.0;
 
-        let bar_width = 5.;
         let start = self.params.start.get();
         let end = start + self.params.dur.get();
         let max_end = (end + self.params.dur.get_range().end()) as f64;
@@ -133,95 +100,47 @@ impl<'a> egui::Widget for Model<'a> {
         ui.spacing_mut().item_spacing = egui::vec2(0., 0.);
 
         ui.horizontal_top(|ui| {
-            let bar_size = egui::vec2(bar_width, height);
+            let bar_size = egui::vec2(BAR_WIDTH, height);
             let mut start = self.params.start.get() as f64;
             let mut end = self.params.dur.get() as f64 + start;
+            let mut handle_start = UiBar::new(
+                &mut start,
+                &mut self.state.range_handles[0],
+                HandleMode::Start,
+            );
 
-            let (mut main, is_interactive) = match (&self.params.content, &mut self.state.content) {
-                (data::Content::Transformer(filter, origin), ContentModel::RegionFilter(state)) => {
-                    match (filter, state) {
-                        (data::RegionFilter::Gain, _) => todo!(),
-                        (data::RegionFilter::FadeInOut(param), RegionFilterState::FadeInOut(s)) => {
-                            //not needed to sync?
-                            self.params.start.set(origin.start.get());
-                            self.params.dur.set(origin.dur.get());
-                            (
-                                ui.add(regionfilter::RegionFilter::FadeInOut(FadeInOut::new(
-                                    param,
-                                    origin.as_ref(),
-                                    s,
-                                ))),
-                                false,
-                            )
-                        }
-                        (data::RegionFilter::Reverse, _) => todo!(),
-                        (data::RegionFilter::Replicate(param), RegionFilterState::Replicate(s)) => {
-                            (
-                                ui.add(regionfilter::RegionFilter::Replicate(Replicate::new(
-                                    param,
-                                    origin.as_ref(),
-                                    s,
-                                ))),
-                                false,
-                            )
-                        }
-                        (_, _) => panic!(
-                            "invalid combination of parameter and gui state in pattern matching "
-                        ),
-                    }
-                }
-                (data::Content::Generator(param), ContentModel::Generator(_genmodel, genstate)) => {
-                    let main = ui
-                        .group(|ui| {
-                            ui.add_space(-bar_width);
-                            let mut handle_start = UiBar::new(
-                                &mut start,
-                                &mut self.state.range_handles[0],
-                                HandleMode::Start,
-                            );
-                            handle_start.set_limit(0.0..=*self.params.getrange().end() as f64);
-                            let startui = ui.add_sized(bar_size, handle_start);
-                            let gen = super::generator::Generator::new(
-                                param,
-                                AtomicRange::new(
-                                    self.params.start.clone(),
-                                    self.params.dur.clone(),
-                                ),
-                                genstate,
-                            );
-                            let main = ui.add(gen);
-                            let mut handle_end = UiBar::new(
-                                &mut end,
-                                &mut self.state.range_handles[1],
-                                HandleMode::End,
-                            );
-                            handle_end.set_limit(*self.params.getrange().start()..=max_end);
-                            let endui = ui.add_sized(bar_size, handle_end);
-                            if startui.union(endui).drag_released() {
-                                let mut gen = super::generator::Generator::new(
-                                    param,
-                                    AtomicRange::new(
-                                        self.params.start.clone(),
-                                        self.params.dur.clone(),
-                                    ),
-                                    genstate,
-                                );
-                                gen.update_shape(&ui.ctx().style());
-                            }
-                            main
-                        })
-                        .inner;
-                    (main, true)
-                }
-                _ => unreachable!(),
-            };
+            handle_start.set_limit(0.0..=*self.params.getrange().end() as f64);
+            let startui = ui.add_sized(bar_size, handle_start);
 
-            if is_interactive {
+            let wave_ui = WaveForm::new(&mut self.state.waveform, &44100.);
+            let mut main = ui
+                .add(wave_ui)
+                .on_hover_cursor(egui::CursorIcon::Grab);
+ 
+            let mut handle_end =
+                UiBar::new(&mut end, &mut self.state.range_handles[1], HandleMode::End);
+            handle_end.set_limit(*self.params.getrange().start()..=max_end);
+            let endui = ui.add_sized(bar_size, handle_end);
+            if startui.union(endui).drag_released() {
+                self.state.waveform = State::renew_waveform(self.params);
+            }
+
+            if self.state.is_interactive {
                 self.params.start.set(start as f32);
                 self.params.dur.set((end - start) as f32);
                 self.interact_main(&mut main);
             }
-        })
-        .response
+            let menu_rect1 = main.rect.right_bottom();
+            let menu_rect2 = menu_rect1- egui::vec2(20.,20.);
+            let menu_rect = egui::Rect::from_two_pos(menu_rect1,menu_rect2);
+            ui.allocate_ui_at_rect(menu_rect, |ui|{
+                ui.push_id(ui.next_auto_id(), |ui| {
+                    egui::menu::menu_button(ui, "...", |ui| {
+                        eval_ui_val(&self.params.content, ui).response
+                    });
+                });
+            });
+            main
+        }).inner
     }
 }

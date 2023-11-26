@@ -39,6 +39,9 @@ pub enum Value {
 }
 
 impl Value {
+    pub fn new_param(p:FloatParameter)->Self{
+        Self::Parameter(Arc::new(p))
+    }
     pub fn new_lazy(expr: Expr) -> Self {
         //wrap expression with function without arguments
         Self::Closure(vec![], Arc::new(Environment::new()), Box::new(expr))

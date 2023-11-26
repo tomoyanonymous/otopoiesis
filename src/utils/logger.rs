@@ -55,4 +55,4 @@ impl log::Log for Logger {
         }
     }
 }
-pub static GLOBAL_LOGGER: OnceLock<Logger> = OnceLock::new();
+pub(crate) static GLOBAL_LOGGER: OnceLock<Logger> = OnceLock::new();

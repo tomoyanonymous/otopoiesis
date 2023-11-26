@@ -1,5 +1,6 @@
 use crate::gui::PIXELS_PER_SEC_DEFAULT;
 use std::{ops::RangeInclusive, slice::Chunks};
+use crate::gui::region::BAR_WIDTH;
 
 const THUMBNAIL_REDUCTION_RATE: usize = 256;
 // const WIDTH_PER_SAMPLE_DEFAULT: f32 = 1.0;
@@ -30,21 +31,25 @@ where
 {
     let mut mesh = egui::Mesh::default();
     let mut x = 0.0;
-    data.fold(0, |prev_top_id, range| {
-        let prev_bottom_id = prev_top_id + 1;
-        let min = range.start();
-        let max = range.end();
-        let bottom_id = prev_bottom_id + 1;
-        let top_id = bottom_id + 1;
 
-        mesh.colored_vertex(egui::pos2(x, min * height), color);
-        mesh.colored_vertex(egui::pos2(x, max * height), color);
-        mesh.add_triangle(prev_bottom_id, prev_top_id, top_id);
-        mesh.add_triangle(top_id, prev_bottom_id, bottom_id);
-        x += width_per_sample;
-
-        top_id + 1
-    });
+    data.enumerate()
+        .map(|(i, range)| {
+            let min = range.start();
+            let max = range.end();
+            mesh.colored_vertex(egui::pos2(x, min * 0.5 * height), color);
+            mesh.colored_vertex(egui::pos2(x, max * 0.5 * height), color);
+            x += width_per_sample * THUMBNAIL_REDUCTION_RATE as f32;
+            i as u32 * 2
+        })
+        .collect::<Vec<_>>()
+        .iter()
+        .reduce(|id0, id2| {
+            let id1 = id0 + 1;
+            let id3 = id2 + 1;
+            mesh.add_triangle(*id0, id1, *id2);
+            mesh.add_triangle(id1, *id2, id3);
+            id2
+        });
     mesh
 }
 
@@ -62,15 +67,22 @@ impl State {
             gen_mesh_from_minmax(minmaxs.into_iter(), width_per_sample, y, height, color);
         mesh_peak
     }
-    pub fn new(data: &[f32]) -> Self {
+    pub fn new(data: &[f32], channels: usize) -> Self {
         //only mono
-        let chunks = data.chunks(THUMBNAIL_REDUCTION_RATE);
+        let chunks = data.chunks(THUMBNAIL_REDUCTION_RATE * channels);
         let reduced_samples = chunks
             .into_iter()
             .map(|chunk| {
-                let min = chunk.into_iter().fold(0.0f32, |a, b| a.min(*b));
-                let max = chunk.into_iter().fold(0.0f32, |a, b| a.max(*b));
+                let min = chunk
+                    .into_iter()
+                    .step_by(channels)
+                    .fold(0.0f32, |a, b| a.min(*b));
+                let max = chunk
+                    .into_iter()
+                    .step_by(channels)
+                    .fold(0.0f32, |a, b| a.max(*b));
                 let rms = calc_rms_average(chunk);
+
                 (min..=max, rms)
             })
             .collect::<Vec<_>>();
@@ -79,27 +91,27 @@ impl State {
             reduced_samples,
         }
     }
-    pub fn gen_peak_shape(&self, width_per_sample: f32, height: f32) -> impl Into<egui::Shape> {
-        let color = egui::Color32::WHITE;
+    pub fn gen_peak_shape(&self, width_per_sample: f32, height: f32) -> egui::Shape {
+        let color = egui::Color32::LIGHT_GRAY;
         let chunks = self.reduced_samples.iter().map(|(range, _)| range.clone());
-        gen_mesh_from_minmax(
+        egui::Shape::Mesh(gen_mesh_from_minmax(
             chunks.into_iter(),
             width_per_sample,
             Y_DEFAULT,
             height,
-            color.linear_multiply(0.8),
-        )
+            color,
+        ))
     }
-    pub fn gen_rms_shape(&self, width_per_sample: f32, height: f32) -> impl Into<egui::Shape> {
-        let color = egui::Color32::WHITE;
+    pub fn gen_rms_shape(&self, width_per_sample: f32, height: f32) -> egui::Shape {
+        let color = egui::Color32::LIGHT_GRAY;
         let chunks = self.reduced_samples.iter().map(|(_range, rms)| -rms..=*rms);
-        gen_mesh_from_minmax(
+        egui::Shape::Mesh(gen_mesh_from_minmax(
             chunks.into_iter(),
             width_per_sample,
             Y_DEFAULT,
             height,
             color.linear_multiply(0.8),
-        )
+        ))
     }
 }
 
@@ -123,20 +135,28 @@ impl<'a> egui::Widget for WaveForm<'a> {
         // `ui.max_rect().right()`
         let available_rect = ui.max_rect();
         // However, we only wanna draw whatever's visible
-        let visible_rect = ui.clip_rect().intersect(available_rect);
 
-        let response = ui.allocate_rect(available_rect, egui::Sense::hover());
+        let visible_rect = ui
+            .clip_rect()
+            .intersect(available_rect)
+            .translate(egui::vec2(BAR_WIDTH, 0.0));
+
+        let response = ui.allocate_rect(visible_rect, egui::Sense::click_and_drag());
         let painter = ui.painter();
         //todo:when zoomed in, draw lines directly
-        painter.rect_filled(visible_rect, 0.0, egui::Color32::BLACK);
-        painter.add(
+        painter.rect_filled(visible_rect, 0.0, egui::Color32::DARK_GRAY);
+        let translate_vec = visible_rect.left_center().to_vec2();
+        let mut peak = egui::Shape::from(
             self.state
                 .gen_peak_shape(width_per_sample, visible_rect.height()),
         );
-        painter.add(
-            self.state
-                .gen_rms_shape(width_per_sample, visible_rect.height()),
-        );
+        peak.translate(translate_vec);
+        painter.add(peak);
+        let mut rms = self
+            .state
+            .gen_rms_shape(width_per_sample, visible_rect.height());
+        rms.translate(translate_vec);
+        painter.add(rms);
 
         // painter.add(self.state.shape_rms);
         response
