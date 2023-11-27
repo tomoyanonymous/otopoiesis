@@ -1,8 +1,11 @@
 use super::*;
-use std::collections::{ vec_deque, LinkedList, VecDeque};
+use std::{
+    cell::OnceCell,
+    collections::{vec_deque, LinkedList, VecDeque},
+};
 
 pub type EnvI = dyn Iterator<Item = Vec<(Symbol, Value)>>;
-pub fn lookup_env<'a,T: Iterator<Item = &'a Vec<(Symbol, Value)>>>(
+pub fn lookup_env<'a, T: Iterator<Item = &'a Vec<(Symbol, Value)>>>(
     e: &T,
     symbol: &mut Symbol,
 ) -> Option<Value> {
@@ -37,43 +40,56 @@ pub fn extend_envi(
 
 pub trait EnvTrait {
     type Value;
+    fn clone(&self) -> Self;
+    fn extend(&self) -> Self;
     fn bind(&mut self, key: &str, val: Self::Value);
-    fn lookup(&self,  key: &mut Symbol) -> Option<Self::Value>;
+    fn lookup(&self, key: &mut Symbol) -> Option<Self::Value>;
 }
-pub struct EnvDeque<'e> {
-    root: &'e mut VecDeque<Vec<(Symbol, value::Value)>>,
+type Env = VecDeque<Vec<(Symbol, value::Value)>>;
+
+pub struct EnvView<'e> {
+    root: &'e mut Env,
     level: usize,
 }
-impl<'e> EnvDeque<'e> {
-    pub fn new(root: &'e mut VecDeque<Vec<(Symbol, value::Value)>>) -> Self {
+impl<'e> EnvView<'e> {
+    pub fn new(root: &'e mut Env) -> Self {
         Self { root, level: 0 }
     }
-    pub fn extend(&self) -> Self {
-        Self {
-            root: self.root,
-            level: self.level + 1,
-        }
-    }
-    pub fn get_or_insert_local_mut(&mut self)->&mut Vec<(Symbol, value::Value)>{
-        if let Some(ref mut v)=  self.root.get_mut(self.level){
+
+    pub fn get_or_insert_local_mut(&mut self) -> &mut Vec<(Symbol, value::Value)> {
+        if let Some(ref mut v) = self.root.get_mut(self.level) {
             v
-        }else{
+        } else {
             self.root.push_front(vec![]);
             self.root.get_mut(0).unwrap()
         }
     }
 }
-impl<'e> EnvTrait for EnvDeque<'e>{
-    type Value =  value::Value;
-
+impl<'e> EnvTrait for EnvView<'e> {
+    type Value = value::Value;
+    fn extend(&self) -> Self {
+        Self {
+            root: self.root,
+            level: self.level + 1,
+        }
+    }
+    fn clone(&self) -> Self {
+        EnvView {
+            root: self.root,
+            level: self.level,
+        }
+    }
     fn bind(&mut self, key: &str, val: Self::Value) {
-        self.get_or_insert_local_mut().push((Symbol::new(key),val.clone()))
+        self.get_or_insert_local_mut()
+            .push((Symbol::new(key), val.clone()))
     }
 
     fn lookup(&self, key: &mut Symbol) -> Option<Self::Value> {
-        lookup_env(&self.root.range(self.level..),key)
+        lookup_env(&self.root.range(self.level..), key)
     }
-    
+}
+pub fn gen_default_env() -> Env {
+    VecDeque::from(Env::default())
 }
 
 // Lexical Environment.

@@ -1,4 +1,4 @@
-use crate::runtime::PlayInfo;
+use crate::{runtime::PlayInfo, environment::EnvTrait};
 
 use super::{value::Param, *,Symbol};
 
@@ -30,7 +30,7 @@ pub enum EvalError {
 impl Expr {
     pub fn eval(
         &self,
-        env: Arc<Environment>,
+        env: impl EnvTrait,
         play_info: &Option<&Box<dyn PlayInfo + Send + Sync>>,
     ) -> Result<Value, EvalError> {
         match self {

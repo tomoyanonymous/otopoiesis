@@ -1,5 +1,5 @@
 use crate::{
-    parameter::{FloatParameter, Parameter, RangedNumeric}, runtime::PlayInfo,
+    parameter::{FloatParameter, Parameter, RangedNumeric}, runtime::PlayInfo, environment::EnvTrait,
 };
 
 use super::{extend_env, value::Param, Environment, EvalError, Expr, ExtFun, ExtFunT, Type, Value};
@@ -298,7 +298,7 @@ impl ApplyFadeInOut {
 impl ExtFunT for ApplyFadeInOut {
     fn exec(
         &self,
-        _env: &Arc<Environment>,
+        _env: &impl EnvTrait,
         play_info: &Option<&Box<dyn PlayInfo+Send+Sync>>,
         v: &[Value],
     ) -> Result<Value, EvalError> {

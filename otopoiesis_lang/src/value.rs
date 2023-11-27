@@ -31,7 +31,7 @@ pub enum Value {
     String(Arc<Mutex<String>>),
     Array(Vec<Value>, Type), //typed array
     Function(Vec<Param>, Box<Expr>),
-    Closure(Vec<Param>, Arc<Environment>, Box<Expr>),
+    Closure(Vec<Param>, Env, Box<Expr>),
     ExtFunction(ExtFun),
     Track(Arc<Environment>, Box<Expr>, Type), //input type, output type
     Region(Arc<Environment>, Box<Expr>, Box<Expr>, Box<Expr>, Id, Type), //start,dur,content,label,type

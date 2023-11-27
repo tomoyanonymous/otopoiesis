@@ -26,6 +26,11 @@ impl Symbol {
         self.name
     }
 }
+impl Into<Symbol> for &'static str{
+    fn into(self) -> Symbol {
+        Symbol::new(self)
+    }
+}
 
 pub mod environment;
 pub mod expr;
