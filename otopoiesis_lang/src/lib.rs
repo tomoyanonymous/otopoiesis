@@ -3,13 +3,37 @@
 
 pub mod atomic;
 pub mod builtin_fn;
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub(crate) struct EnvId {
+    level: u64,
+    count: u64,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct Symbol {
+    name: String,
+    id: Option<EnvId>,
+}
+impl Symbol {
+    pub fn new(name: impl ToString) -> Self {
+        Self {
+            name: name.to_string(),
+            id: None,
+        }
+    }
+    fn to_string(&self) -> String {
+        self.name
+    }
+}
+
 pub mod environment;
 pub mod expr;
 pub mod parameter;
 pub mod runtime;
 pub mod value;
-use runtime::PlayInfo;
 use self::value::Param;
+use runtime::PlayInfo;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
@@ -26,7 +50,7 @@ pub trait ExtFunT: std::fmt::Debug {
     fn exec(
         &self,
         env: &Arc<Environment>,
-        play_info: &Option<&Box<dyn PlayInfo+Send+Sync>>,
+        play_info: &Option<&Box<dyn PlayInfo + Send + Sync>>,
         v: &[Value],
     ) -> Result<Value, EvalError>;
     fn get_name(&self) -> &str;
@@ -77,7 +101,7 @@ impl<'d> serde::de::Visitor<'d> for ExtFunVisitor {
     }
 }
 
-impl<'d> Deserialize<'d> for ExtFun{
+impl<'d> Deserialize<'d> for ExtFun {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: serde::Deserializer<'d>,

@@ -1,4 +1,80 @@
 use super::*;
+use std::collections::{ vec_deque, LinkedList, VecDeque};
+
+pub type EnvI = dyn Iterator<Item = Vec<(Symbol, Value)>>;
+pub fn lookup_env<'a,T: Iterator<Item = &'a Vec<(Symbol, Value)>>>(
+    e: &T,
+    symbol: &mut Symbol,
+) -> Option<Value> {
+    if let Some(EnvId { level, count }) = symbol.id {
+        e.nth(level as usize)
+            .map(|locals| locals.get(count as usize))
+            .flatten()
+            .map(|v| v.1.clone())
+    } else {
+        let result = e.enumerate().find_map(|(level, locals)| {
+            locals
+                .iter()
+                .enumerate()
+                .find(|(local, (s, v))| s.name == symbol.name)
+                .map(|v| (level as u64, v))
+        });
+        result.map(|(level, (count, (sym, val)))| {
+            symbol.id = Some(EnvId {
+                level,
+                count: count as u64,
+            });
+            val.clone()
+        })
+    }
+}
+pub fn extend_envi(
+    env: &mut VecDeque<Vec<(Symbol, value::Value)>>,
+) -> vec_deque::Iter<'_, Vec<(Symbol, value::Value)>> {
+    env.push_front(vec![]);
+    env.iter()
+}
+
+pub trait EnvTrait {
+    type Value;
+    fn bind(&mut self, key: &str, val: Self::Value);
+    fn lookup(&self,  key: &mut Symbol) -> Option<Self::Value>;
+}
+pub struct EnvDeque<'e> {
+    root: &'e mut VecDeque<Vec<(Symbol, value::Value)>>,
+    level: usize,
+}
+impl<'e> EnvDeque<'e> {
+    pub fn new(root: &'e mut VecDeque<Vec<(Symbol, value::Value)>>) -> Self {
+        Self { root, level: 0 }
+    }
+    pub fn extend(&self) -> Self {
+        Self {
+            root: self.root,
+            level: self.level + 1,
+        }
+    }
+    pub fn get_or_insert_local_mut(&mut self)->&mut Vec<(Symbol, value::Value)>{
+        if let Some(ref mut v)=  self.root.get_mut(self.level){
+            v
+        }else{
+            self.root.push_front(vec![]);
+            self.root.get_mut(0).unwrap()
+        }
+    }
+}
+impl<'e> EnvTrait for EnvDeque<'e>{
+    type Value =  value::Value;
+
+    fn bind(&mut self, key: &str, val: Self::Value) {
+        self.get_or_insert_local_mut().push((Symbol::new(key),val.clone()))
+    }
+
+    fn lookup(&self, key: &mut Symbol) -> Option<Self::Value> {
+        lookup_env(&self.root.range(self.level..),key)
+    }
+    
+}
 
 // Lexical Environment.
 // It is doubley-linked for UI Generation

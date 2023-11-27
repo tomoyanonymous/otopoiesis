@@ -1,12 +1,14 @@
 use crate::runtime::PlayInfo;
 
-use super::{value::Param, *};
+use super::{value::Param, *,Symbol};
+
+
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum Expr {
     Literal(Value),
     Array(Vec<Expr>),
-    Var(Id),
+    Var(Symbol),
     Let(Id, Box<Expr>, Box<Expr>),
     App(Box<Expr>, Vec<Expr>), //currently only single argument
     Lambda(Vec<Param>, Box<Expr>),
@@ -29,7 +31,7 @@ impl Expr {
     pub fn eval(
         &self,
         env: Arc<Environment>,
-        play_info: &Option<&Box<dyn PlayInfo+Send+Sync>>,
+        play_info: &Option<&Box<dyn PlayInfo + Send + Sync>>,
     ) -> Result<Value, EvalError> {
         match self {
             Expr::Literal(v) => Ok(v.clone()),
