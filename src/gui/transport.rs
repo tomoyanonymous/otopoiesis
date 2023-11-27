@@ -1,5 +1,5 @@
 use crate::data;
-use crate::utils::atomic::SimpleAtomic;
+use crate::atomic::SimpleAtomic;
 use std::sync::Arc;
 struct Toggle {
     transport: Arc<data::Transport>,

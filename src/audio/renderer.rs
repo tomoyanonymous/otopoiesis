@@ -1,6 +1,6 @@
+use crate::atomic::{self, SimpleAtomic};
 use crate::audio::{Component, PlaybackInfo};
 use crate::data;
-use crate::utils::{atomic, SimpleAtomic};
 
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use cpal::{self, Stream};
@@ -171,8 +171,8 @@ fn pass_out(
         let _num = model.consumer.pop_slice(&mut buf);
 
         let info = PlaybackInfo {
-            sample_rate: info.sample_rate.0,
-            current_time: t as usize,
+            sample_rate: info.sample_rate.0 as f64,
+            current_time: t,
             channels: info.channels as u64,
             frame_per_buffer,
         };
@@ -258,7 +258,7 @@ where
 
         if let Ok(mut model) = self.omodel.try_lock() {
             let info = PlaybackInfo {
-                sample_rate: config.sample_rate.0,
+                sample_rate: config.sample_rate.0 as f64,
                 current_time: 0,
                 frame_per_buffer: buffer_size as u64,
                 channels: config.channels as u64,

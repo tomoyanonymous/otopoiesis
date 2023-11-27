@@ -1,6 +1,6 @@
 use std::sync::Mutex;
 
-use crate::{data::AppModel, parameter::Parameter};
+use crate::parameter::Parameter;
 
 use super::*;
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -39,7 +39,7 @@ pub enum Value {
 }
 
 impl Value {
-    pub fn new_param(p:FloatParameter)->Self{
+    pub fn new_param(p: FloatParameter) -> Self {
         Self::Parameter(Arc::new(p))
     }
     pub fn new_lazy(expr: Expr) -> Self {
@@ -48,11 +48,10 @@ impl Value {
     }
     pub fn eval_closure(
         &self,
-        play_info: &Option<&PlaybackInfo>,
-        app: &mut Option<&mut AppModel>,
+        play_info: &Option<&Box<dyn PlayInfo+Send+Sync>>,
     ) -> Result<Self, EvalError> {
         match self {
-            Self::Closure(_ids, env, expr) => expr.eval(env.clone(), play_info, app),
+            Self::Closure(_ids, env, expr) => expr.eval(env.clone(), play_info),
 
             _ => Err(EvalError::TypeMismatch("Not a Closure".into())),
         }
@@ -62,7 +61,7 @@ impl Value {
             Value::Parameter(p) => Ok(p.get() as f64),
             Value::Number(f) => Ok(*f),
             Value::Closure(_ids, env, body) => {
-                let res = body.eval(env.clone(), &None, &mut None)?;
+                let res = body.eval(env.clone(), &None)?;
                 res.get_as_float()
             }
             _ => Err(EvalError::TypeMismatch("not a float".into())),

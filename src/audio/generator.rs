@@ -4,7 +4,7 @@ pub trait GeneratorComponent {
     type Params;
     fn get_params(&self) -> &Self::Params;
     fn reset_phase(&mut self);
-    fn render_sample(&mut self, out: &mut f32, info: &PlaybackInfo);
+    fn render_sample(&mut self, out: &mut f32, info:  &PlaybackInfo);
 }
 impl<T> Component for T
 where

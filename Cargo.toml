@@ -1,3 +1,6 @@
+[workspace]
+members = ["otopoiesis_lang"]
+
 [package]
 name = "otopoiesis"
 version = "0.1.0"
@@ -12,10 +15,11 @@ description = "a constructive audio programming environment with timeline-based 
 
 [lib]
 crate-type = ["cdylib", "rlib"]
+
 [dependencies]
 # mimium-rs = { git = "https://github.com/tomoyanonymous/mimium-rs.git", branch = "otopoiesis" }
+otopoiesis_lang = {path = "./otopoiesis_lang"}
 ringbuf = "*"
-atomic_float = "*"
 serde = { version = "*", features = ["rc"] }
 serde_json = "*"
 serde_with = "2.1.0"

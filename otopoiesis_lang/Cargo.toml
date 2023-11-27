@@ -1,0 +1,20 @@
+[package]
+name = "otopoiesis_lang"
+version = "0.1.0"
+authors = ["Tomoya Matsuura <me@matsuuratomoya.com>"]
+repository = "https://github.com/tomoyanonymous/otopoiesis"
+license = "MPL 2.0"
+edition = "2021"
+resolver = "2"
+description = "a constructive audio programming environment with timeline-based view"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+
+[dependencies]
+serde = { version = "*", features = ["rc"] }
+serde_json = "*"
+serde_with = "2.1.0"
+
+atomic_float = "*"

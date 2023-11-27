@@ -1,9 +1,11 @@
 use std::{ops::RangeInclusive, sync::Arc};
 
+use script::runtime::PlayInfo;
+
 use crate::{
+    atomic::AtomicRange,
     data::Region,
     script::{self, Environment, EvalError, Expr, Value},
-    utils::AtomicRange,
 };
 
 use super::{region, PlaybackInfo};
@@ -33,12 +35,10 @@ impl ScriptComponent {
     }
     fn compute_sample(&self, info: &PlaybackInfo) -> f64 {
         match &self.val {
-            Value::Closure(_ids, env, box body) => {
-                match body.eval(env.clone(), &Some(info), &mut None) {
-                    Ok(Value::Number(res)) => res,
-                    _ => 0.0,
-                }
-            }
+            Value::Closure(_ids, env, box body) => match body.eval(env.clone(), &Some(&info.boxed())) {
+                Ok(Value::Number(res)) => res,
+                _ => 0.0,
+            },
             _ => 0.0,
         }
     }
@@ -67,7 +67,7 @@ impl Component for ScriptComponent {
             .chunks_mut(self.get_output_channels() as usize)
             .enumerate()
         {
-            info.current_time += 1;
+            info.increment_time();
             for (ch, s) in out_per_channel.iter_mut().enumerate() {
                 if ch == 0 {
                     *s = self.compute_sample(&info) as f32;
@@ -90,11 +90,11 @@ pub trait RangedComponent: std::fmt::Debug {
     fn get_output_channels(&self) -> u64;
     fn get_sample_cache(&self) -> &[f32];
     fn get_sample_cache_mut(&mut self) -> &mut [f32];
-    fn render_offline(&mut self, sample_rate: u32, channels: u64);
-    fn get_cache_len(&self, sample_rate: u32) -> usize {
+    fn render_offline(&mut self, sample_rate: f64, channels: u64);
+    fn get_cache_len(&self, sample_rate: f64) -> usize {
         let range = self.get_range();
         let len_sec = range.end() - range.start();
-        (len_sec * sample_rate as f64) as usize
+        (len_sec * sample_rate) as usize
     }
     fn get_sample(&self, time: f64, sample_rate: u32) -> Option<f64> {
         if self.get_range().contains(&time) {
@@ -105,7 +105,7 @@ pub trait RangedComponent: std::fmt::Debug {
             None
         }
     }
-    fn get_default_playback_info(&self, sample_rate: u32, channels: u64) -> PlaybackInfo {
+    fn get_default_playback_info(&self, sample_rate: f64, channels: u64) -> PlaybackInfo {
         let dur = self.get_range().end() - self.get_range().start();
         let numsamples = (dur * sample_rate as f64).ceil() as u64;
         PlaybackInfo {
@@ -127,7 +127,7 @@ pub fn render_region_offline_async(
     std::thread::Builder::new()
         .name(name)
         .spawn(move || {
-            region.render_offline(info.sample_rate, info.channels);
+            region.render_offline(info.get_samplerate(), info.get_channels());
             region
         })
         .expect("failed to launch thread")
@@ -161,7 +161,7 @@ impl RangedComponent for RangedComponentDyn {
         self.generator.get_output_channels()
     }
 
-    fn render_offline(&mut self, sample_rate: u32, channels: u64) {
+    fn render_offline(&mut self, sample_rate: f64, channels: u64) {
         let len = (self.range.getrange() as f64 * sample_rate as f64) as usize * channels as usize;
         let info_local = PlaybackInfo {
             sample_rate,
@@ -226,7 +226,7 @@ impl RangedScriptComponent {
                 Expr::Literal(self.dur.clone()),
             ],
         );
-        let sample = expr.eval(self.env.clone(), &Some(info), &mut None);
+        let sample = expr.eval(self.env.clone(), &Some(&info.boxed()));
         sample.unwrap().get_as_float().unwrap()
     }
 }
@@ -242,10 +242,11 @@ impl RangedComponent for RangedScriptComponent {
         2
     }
 
-    fn render_offline(&mut self, sample_rate: u32, channels: u64) {
+    fn render_offline(&mut self, sample_rate: f64, channels: u64) {
         //リバースとかノンリニアな処理のものとフェードインアウトとかリニアな処理（リアルタイム加工できるもの）は形を分けるべきかもしれない
         self.cache.resize(self.get_cache_len(sample_rate), 0.0);
         let mut info = self.get_default_playback_info(sample_rate, channels);
+
         let origin_rg = Region::try_from(&self.origin).expect("not a region");
         let mut origin_model = region::Model::new(origin_rg, 2);
         origin_model.render_offline(sample_rate, channels);
@@ -256,7 +257,7 @@ impl RangedComponent for RangedScriptComponent {
             .zip(dest.chunks_mut(channels as usize))
             .enumerate()
         {
-            info.current_time += 1;
+            info.increment_time();
             for (ch, (i, o)) in input_per_channel
                 .iter()
                 .zip(out_per_channel.iter_mut())

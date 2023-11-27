@@ -1,6 +1,6 @@
 use crate::action::{self, Action};
-use crate::script::{builtin_fn, Expr, ExtFun, Value};
-use crate::{data, param_float};
+use crate::data;
+use crate::script::{builtin_fn, param_float, Expr, ExtFun, Value};
 
 use crate::parameter::{FloatParameter, Parameter, RangedNumeric};
 use std::sync::{mpsc, Arc, Mutex};

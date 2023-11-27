@@ -1,7 +1,5 @@
 use crate::{
-    audio::PlaybackInfo,
-    data::AppModel,
-    parameter::{FloatParameter, Parameter, RangedNumeric},
+    parameter::{FloatParameter, Parameter, RangedNumeric}, runtime::PlayInfo,
 };
 
 use super::{extend_env, value::Param, Environment, EvalError, Expr, ExtFun, ExtFunT, Type, Value};
@@ -14,8 +12,7 @@ impl ExtFunT for ArrayReverse {
     fn exec(
         &self,
         _env: &Arc<Environment>,
-        _app: &mut Option<&mut AppModel>,
-        _play_info: &Option<&PlaybackInfo>,
+        _play_info: &Option<&Box<dyn PlayInfo+Send+Sync>>,
         v: &[Value],
     ) -> Result<Value, EvalError> {
         if v.len() != 1 {
@@ -49,8 +46,7 @@ impl ExtFunT for Print {
     fn exec(
         &self,
         _env: &Arc<Environment>,
-        _app: &mut Option<&mut AppModel>,
-        _play_info: &Option<&PlaybackInfo>,
+        _play_info: &Option<&Box<dyn PlayInfo+Send+Sync>>,
         v: &[Value],
     ) -> Result<Value, EvalError> {
         let str = v
@@ -93,8 +89,7 @@ impl ExtFunT for SineWave {
     fn exec(
         &self,
         _env: &Arc<Environment>,
-        _app: &mut Option<&mut AppModel>,
-        play_info: &Option<&PlaybackInfo>,
+        play_info: &Option<&Box<dyn PlayInfo+Send+Sync>>,
         v: &[Value],
     ) -> Result<Value, EvalError> {
         match play_info {
@@ -102,8 +97,8 @@ impl ExtFunT for SineWave {
                 &[freq, amp, phase] => {
                     let res = {
                         //2Hzなら (now/sr)
-                        let now = info.current_time;
-                        let now_s = now as f64 / info.sample_rate as f64;
+                        let now = info.get_current_time_in_sample();
+                        let now_s = now as f64 / info.get_samplerate();
                         let f = freq.get_as_float()?;
                         let a = amp.get_as_float()?;
                         let p = phase.get_as_float()?;
@@ -150,8 +145,7 @@ impl ExtFunT for FadeInOut {
     fn exec(
         &self,
         env: &Arc<Environment>,
-        _app: &mut Option<&mut AppModel>,
-        _play_info: &Option<&PlaybackInfo>,
+        _play_info: &Option<&Box<dyn PlayInfo+Send+Sync>>,
         v: &[Value],
     ) -> Result<Value, EvalError> {
         // ここでは実際のフェードイン、アウトはしない。
@@ -304,12 +298,11 @@ impl ExtFunT for ApplyFadeInOut {
     fn exec(
         &self,
         _env: &Arc<Environment>,
-        app: &mut Option<&mut AppModel>,
-        play_info: &Option<&PlaybackInfo>,
+        play_info: &Option<&Box<dyn PlayInfo+Send+Sync>>,
         v: &[Value],
     ) -> Result<Value, EvalError> {
-        let now = play_info.unwrap().current_time;
-        let sr = play_info.unwrap().sample_rate as f64;
+        let now = play_info.unwrap().get_current_time_in_sample();
+        let sr = play_info.unwrap().get_samplerate() ;
         // do nothing for now
         match v {
             [input_sample, _start, dur, time_in, time_out] => {
@@ -317,7 +310,7 @@ impl ExtFunT for ApplyFadeInOut {
                     Value::Number(n) => Ok(*n as f64),
                     Value::Parameter(p) => Ok(p.get() as f64),
                     Value::Closure(_ids, env, body) => {
-                        let n = body.eval(env.clone(), play_info, app)?;
+                        let n = body.eval(env.clone(), play_info)?;
                         Ok(n.get_as_float()?)
                     }
                     _ => Err(EvalError::InvalidConversion),
@@ -354,8 +347,7 @@ impl ExtFunT for Nop {
     fn exec(
         &self,
         _env: &Arc<Environment>,
-        _app: &mut Option<&mut crate::data::AppModel>,
-        _play_info: &Option<&PlaybackInfo>,
+        _play_info: &Option<&Box<dyn PlayInfo+Send+Sync>>,
         _v: &[Value],
     ) -> Result<Value, EvalError> {
         Ok(Value::None)

@@ -3,7 +3,7 @@
 
 use crate::parameter::{FloatParameter, Parameter, RangedNumeric};
 use crate::script::{Expr, Value};
-use crate::{data, param_float};
+use crate::{data, script::param_float};
 use std::sync::{Arc, MutexGuard, PoisonError};
 use undo;
 
@@ -272,11 +272,11 @@ impl undo::Action for AddFadeInOut {
                                 match (name.as_str(), r.as_slice()) {
                                     ("fadeinout", [v, time_in, time_out]) => {
                                         self.time_in = time_in
-                                            .eval(env.clone(), &None, &mut None)
+                                            .eval(env.clone(), &None)
                                             .and_then(|v| v.get_as_float())
                                             .unwrap_or(0.0);
                                         self.time_out = time_out
-                                            .eval(env.clone(), &None, &mut None)
+                                            .eval(env.clone(), &None)
                                             .and_then(|v| v.get_as_float())
                                             .unwrap_or(0.0);
 

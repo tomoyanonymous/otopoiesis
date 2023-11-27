@@ -2301,7 +2301,6 @@ dependencies = [
 name = "otopoiesis"
 version = "0.1.0"
 dependencies = [
- "atomic_float",
  "clap",
  "console_error_panic_hook",
  "coreaudio-sys",
@@ -2311,6 +2310,7 @@ dependencies = [
  "egui",
  "egui_extras",
  "log",
+ "otopoiesis_lang",
  "rand",
  "rfd",
  "ringbuf",
@@ -2323,6 +2323,16 @@ dependencies = [
  "wasm-bindgen-futures",
  "wasm-bindgen-test",
  "wee_alloc",
+]
+
+[[package]]
+name = "otopoiesis_lang"
+version = "0.1.0"
+dependencies = [
+ "atomic_float",
+ "serde",
+ "serde_json",
+ "serde_with",
 ]
 
 [[package]]

@@ -1,7 +1,7 @@
 use crate::data;
 use crate::gui;
 
-use crate::utils::atomic::SimpleAtomic;
+use crate::atomic::SimpleAtomic;
 use std::sync::{Arc, Mutex};
 pub struct State {
     timeline: gui::timeline::State,

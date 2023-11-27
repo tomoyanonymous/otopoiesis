@@ -1,6 +1,6 @@
 use crate::{
     parameter::{FloatParameter, Parameter},
-    utils::SimpleAtomic,
+    atomic::SimpleAtomic,
 };
 
 pub(crate) fn slider_from_parameter(

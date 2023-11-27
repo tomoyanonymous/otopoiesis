@@ -1,15 +1,20 @@
-use serde::{Deserialize, Serialize};
-use std::sync::Arc;
+#![feature(box_patterns)]
+#![feature(iterator_try_collect)]
 
-use crate::{audio::PlaybackInfo, data, parameter::FloatParameter};
-
-use self::value::Param;
-
+pub mod atomic;
 pub mod builtin_fn;
 pub mod environment;
 pub mod expr;
+pub mod parameter;
+pub mod runtime;
 pub mod value;
-pub mod ui;
+use runtime::PlayInfo;
+use self::value::Param;
+use serde::{Deserialize, Serialize};
+use std::sync::Arc;
+
+use crate::parameter::FloatParameter;
+
 pub use {
     environment::{extend_env, Environment},
     expr::{EvalError, Expr},
@@ -21,17 +26,16 @@ pub trait ExtFunT: std::fmt::Debug {
     fn exec(
         &self,
         env: &Arc<Environment>,
-        app: &mut Option<&mut data::AppModel>,
-        play_info: &Option<&PlaybackInfo>,
+        play_info: &Option<&Box<dyn PlayInfo+Send+Sync>>,
         v: &[Value],
     ) -> Result<Value, EvalError>;
     fn get_name(&self) -> &str;
     fn get_params(&self) -> &[Param];
 }
 
-pub trait MixerT: std::fmt::Debug {
-    fn exec(&self, app: &mut data::AppModel, tracks: &[Value]) -> Result<Value, EvalError>;
-}
+// pub trait MixerT: std::fmt::Debug {
+//     fn exec(&self, app: &mut data::AppModel, tracks: &[Value]) -> Result<Value, EvalError>;
+// }
 
 #[derive(Debug, Clone)]
 pub struct ExtFun(Arc<dyn ExtFunT>);
@@ -73,7 +77,7 @@ impl<'d> serde::de::Visitor<'d> for ExtFunVisitor {
     }
 }
 
-impl<'d> Deserialize<'d> for ExtFun {
+impl<'d> Deserialize<'d> for ExtFun{
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: serde::Deserializer<'d>,
@@ -82,7 +86,7 @@ impl<'d> Deserialize<'d> for ExtFun {
     }
 }
 
-pub type Mixer = Arc<dyn MixerT>;
+// pub type Mixer = Arc<dyn MixerT>;
 pub type Id = String;
 pub type Time = f64;
 

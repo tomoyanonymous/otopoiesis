@@ -1,5 +1,5 @@
 extern crate log;
-use crate::utils::atomic::{self, SimpleAtomic};
+use crate::atomic::{self, SimpleAtomic};
 use std::{
     collections::VecDeque,
     sync::{Arc, Mutex, OnceLock},

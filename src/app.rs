@@ -1,12 +1,12 @@
 use atomic::SimpleAtomic;
 use log::Log;
-use std::sync::{Arc, Mutex, OnceLock};
+use std::sync::{Arc, Mutex};
 
-use crate::audio::renderer::{Renderer, RendererBase};
-use crate::data::Project;
+use crate::{atomic, audio, data, gui};
+use audio::renderer::{Renderer, RendererBase};
+use data::Project;
 use crate::script::Expr;
 use crate::utils::{Logger, GLOBAL_LOGGER};
-use crate::{audio, data, gui, utils::atomic};
 
 pub(crate) mod filemanager;
 
@@ -43,7 +43,7 @@ impl Model {
         Self::setup_custom_fonts(&cc.egui_ctx);
         let mut appmodel = data::AppModel::new(data::Transport::new(), data::GlobalSetting {}, arg);
         let _ = appmodel.code_to_ui();
-        
+
         let ui = gui::app::State::new(&appmodel);
         #[allow(clippy::arc_with_non_send_sync)]
         let app = Arc::new(Mutex::new(appmodel));

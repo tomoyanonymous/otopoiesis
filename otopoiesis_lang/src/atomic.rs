@@ -15,7 +15,6 @@ pub trait IsAtomicNumber<T>:
     SimpleAtomicTest + std::ops::Add<Output = T> + std::ops::Sub<Output = T> + Default
 {
 }
-
 pub trait SimpleAtomic {
     const ORDER: atomic::Ordering = atomic::Ordering::Relaxed;
     type Primitive: Copy + PartialOrd;

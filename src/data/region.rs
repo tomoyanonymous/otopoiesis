@@ -125,10 +125,10 @@ impl TryFrom<&Value> for Region {
     fn try_from(value: &Value) -> Result<Self, Self::Error> {
         match value {
             Value::Region(env, start, dur, content, label, _) => {
-                let start = start.eval(env.clone(), &None, &mut None)?;
-                let dur = dur.eval(env.clone(), &None, &mut None)?;
+                let start = start.eval(env.clone(), &None)?;
+                let dur = dur.eval(env.clone(), &None)?;
 
-                let content = content.eval(env.clone(), &None, &mut None)?;
+                let content = content.eval(env.clone(), &None)?;
                 match (start, dur) {
                     (Value::Parameter(start), Value::Parameter(dur)) => {
                         make_region_from_param(start.clone(), dur.clone(), &content, label)

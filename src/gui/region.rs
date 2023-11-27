@@ -3,10 +3,9 @@ use crate::audio::{RangedComponent, RangedComponentDyn};
 use crate::data;
 use crate::gui;
 use crate::parameter::{Parameter, RangedNumeric};
-use crate::script;
 pub(crate) const BAR_WIDTH: f32 = 3.0;
-use crate::script::ui::eval_ui_val;
-use crate::utils::AtomicRange;
+use gui::script::eval_ui_val;
+use crate::atomic::AtomicRange;
 mod region_handle;
 // pub mod regionfilter;
 // use self::regionfilter::fadeinout::FadeInOut;
@@ -35,7 +34,7 @@ impl State {
             Box::new(ScriptComponent::try_new(&param.content).unwrap()),
             AtomicRange::new(param.start.clone(), param.dur.clone()),
         );
-        component.render_offline(44100, 2);
+        component.render_offline(44100., 2);
 
         WaveFormState::new(
             component.get_sample_cache(),

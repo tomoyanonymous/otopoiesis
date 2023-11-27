@@ -1,3 +1,5 @@
+use script::runtime::PlayInfo;
+
 use crate::audio::{Component, PlaybackInfo};
 use crate::data;
 use std::sync::Arc;
@@ -40,20 +42,20 @@ impl Component for Model {
     fn get_output_channels(&self) -> u64 {
         2
     }
-    fn prepare_play(&mut self, info: &PlaybackInfo) {
+    fn prepare_play(&mut self, info: &PlaybackInfo ) {
         self.tracks = Self::get_new_tracks(&self.param);
-        let new_len = (info.frame_per_buffer) as usize;
+        let new_len = (info.get_frame_per_buffer()) as usize;
         self.tmp_buffer.resize(new_len, 0.0);
 
         for track in self.tracks.iter_mut() {
             track.prepare_play(info);
         }
     }
-    fn render(&mut self, input: &[f32], output: &mut [f32], info: &PlaybackInfo) {
+    fn render(&mut self, input: &[f32], output: &mut [f32], info:  &PlaybackInfo) {
         output.fill(0.0);
         assert_eq!(
             output.len(),
-            (info.channels * info.frame_per_buffer) as usize
+            (info.get_channels() * info.get_frame_per_buffer()) as usize
         );
         //sometimes buffer size at first block is shorter than the specified size
         // assert_eq!(output.len(), self.tmp_buffer.len());

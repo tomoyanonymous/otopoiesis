@@ -38,7 +38,7 @@ impl TryFrom<&Value> for Track {
     fn try_from(value: &Value) -> Result<Self, Self::Error> {
         match value {
             Value::Track(env, box regions, _t) => {
-                if let Value::Array(regions, _) = regions.eval(env.clone(), &None, &mut None)? {
+                if let Value::Array(regions, _) = regions.eval(env.clone(), &None)? {
                     let regions: Vec<Region> = regions
                         .iter()
                         .map(|rg| {

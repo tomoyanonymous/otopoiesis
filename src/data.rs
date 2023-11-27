@@ -3,7 +3,7 @@
 use crate::action;
 use crate::app::filemanager::{self, FileManager};
 use crate::script::{Environment, EvalError};
-use crate::utils::{atomic, AtomicRange, SimpleAtomic};
+use crate::atomic::{self, SimpleAtomic};
 
 use rfd;
 use serde::{Deserialize, Serialize};
@@ -60,7 +60,7 @@ impl TryFrom<&Value> for Project {
                     .iter()
                     .map(|t| {
                         let res = t
-                            .eval(env.clone(), &None, &mut None)
+                            .eval(env.clone(), &None)
                             .and_then(|t| Track::try_from(&t));
                         res
                     })
@@ -222,7 +222,7 @@ impl AppModel {
         log::debug!("compiling source...");
         let env = Arc::new(Environment::new());
         let res = source
-            .eval(env, &mut None, &mut Some(self))
+            .eval(env, &mut None)
             .and_then(|v| Project::try_from(&v));
         match res {
             Ok(pj) => {

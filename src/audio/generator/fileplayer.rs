@@ -195,7 +195,7 @@ mod test {
         let (param, len_samples) = data::FilePlayerParam::new_test_file();
         let player = FilePlayer::new(Arc::new(param));
         let info = PlaybackInfo {
-            sample_rate: 48000,
+            sample_rate: 48000.,
             current_time: 0,
             frame_per_buffer: 256,
             channels: 2,
@@ -230,7 +230,7 @@ mod test {
         let read_count_max = (len_samples as f32 / samples as f32).floor() as usize;
         for _i in 0..read_count_max {
             player.render(&input_buf, output_buf.as_mut_slice(), &info);
-            info.current_time += samples;
+            info.current_time += samples as u64;
             println!("test read {}", info.current_time);
         }
         assert!(!player.is_finished_playing());

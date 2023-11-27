@@ -2,7 +2,7 @@ use crate::action::{Action, AddTrack};
 use crate::data;
 use crate::gui;
 use crate::script::Expr;
-use crate::utils::atomic::{self, SimpleAtomic};
+use crate::atomic::{self, SimpleAtomic};
 use std::sync::Arc;
 
 pub struct State {

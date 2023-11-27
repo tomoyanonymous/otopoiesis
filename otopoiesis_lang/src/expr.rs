@@ -1,3 +1,5 @@
+use crate::runtime::PlayInfo;
+
 use super::{value::Param, *};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -27,15 +29,14 @@ impl Expr {
     pub fn eval(
         &self,
         env: Arc<Environment>,
-        play_info: &Option<&PlaybackInfo>,
-        app: &mut Option<&mut data::AppModel>,
+        play_info: &Option<&Box<dyn PlayInfo+Send+Sync>>,
     ) -> Result<Value, EvalError> {
         match self {
             Expr::Literal(v) => Ok(v.clone()),
             Expr::Array(vec) => {
                 let v = vec
                     .iter()
-                    .map(|e| e.eval(env.clone(), play_info, app))
+                    .map(|e| e.eval(env.clone(), play_info))
                     .try_collect()?;
                 Ok(Value::Array(
                     v,
@@ -47,16 +48,16 @@ impl Expr {
             Expr::Let(id, body, then) => {
                 let mut newenv = extend_env(env.clone());
 
-                let body_v = body.eval(env, play_info, app)?;
+                let body_v = body.eval(env, play_info)?;
                 newenv.bind(id, body_v);
 
-                then.eval(Arc::new(newenv), play_info, app)
+                then.eval(Arc::new(newenv), play_info)
             }
             Expr::App(fe, args) => {
-                let f = fe.eval(env.clone(), play_info, app)?;
+                let f = fe.eval(env.clone(), play_info)?;
                 let mut arg_res = vec![];
                 for a in args.iter() {
-                    match a.eval(env.clone(), play_info, app) {
+                    match a.eval(env.clone(), play_info) {
                         Ok(res) => {
                             arg_res.push(res);
                         }
@@ -72,9 +73,9 @@ impl Expr {
                         ids.iter().zip(arg_res.iter()).for_each(|(id, a)| {
                             newenv.bind(&id.get_label(), a.clone());
                         });
-                        body.eval(Arc::new(newenv), play_info, app)
+                        body.eval(Arc::new(newenv), play_info)
                     }
-                    Value::ExtFunction(f) => f.0.exec(&env, app, play_info, &arg_res),
+                    Value::ExtFunction(f) => f.0.exec(&env, play_info, &arg_res),
                     _ => Err(EvalError::TypeMismatch("Not a Function".into())),
                 }
             }

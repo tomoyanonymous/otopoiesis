@@ -1,10 +1,10 @@
 use crate::audio::{get_component_for_value, PlaybackInfo, RangedComponent, RangedComponentDyn};
 
 // use crate::parameter::UIntParameter
+use crate::atomic::{AtomicRange, SimpleAtomic};
 use crate::data::{self, Region};
 use crate::parameter::Parameter;
 use crate::script::{Expr, Value};
-use crate::utils::{AtomicRange, SimpleAtomic};
 use std::ops::RangeInclusive;
 
 // 基本はオフラインレンダリング
@@ -31,7 +31,7 @@ impl RangedComponent for FadeModel {
         2
     }
 
-    fn render_offline(&mut self, sample_rate: u32, channels: u64) {
+    fn render_offline(&mut self, sample_rate: f64, channels: u64) {
         // resize should be the caller.
         // dest.resize(self.origin.interleaved_samples_cache.len(), 0.0);
         todo!();
@@ -125,7 +125,7 @@ impl RangedComponent for RegionArray {
         2
     }
 
-    fn render_offline(&mut self, sample_rate: u32, channels: u64) {
+    fn render_offline(&mut self, sample_rate: f64, channels: u64) {
         //todo: asynchrounous render
         todo!();
         // self.0.iter_mut().for_each(|region| {
@@ -230,7 +230,7 @@ impl Model {
             cache_completed: false,
         }
     }
-    pub fn render_offline(&mut self, sample_rate: u32, channels: u64) {
+    pub fn render_offline(&mut self, sample_rate: f64, channels: u64) {
         self.interleaved_samples_cache.resize(
             (self.params.dur.get() as f64 * sample_rate as f64) as usize * channels as usize,
             0.0,
@@ -244,7 +244,7 @@ impl Model {
         let start = t_range.start();
         let end = t_range.end();
         let c1 = range.contains(&start) || range.contains(&end);
-        let c2 = t_range.contains(range.start()) && t_range.contains(range.end());
+        let c2 = t_range.contains(range.start()) & t_range.contains(range.end());
         c1 || c2
     }
 }
@@ -255,6 +255,8 @@ pub fn render_region_offline_async(
     region: Model,
     info: &PlaybackInfo,
 ) -> std::thread::JoinHandle<Model> {
+    use script::runtime::PlayInfo;
+
     let name = region.params.label.clone();
     let info = info.clone();
 
@@ -262,7 +264,7 @@ pub fn render_region_offline_async(
         .name(name)
         .spawn(move || {
             let mut r = region;
-            r.render_offline(info.sample_rate, info.channels);
+            r.render_offline(info.sample_rate, info.get_channels());
             r
         })
         .expect("failed to launch thread")
@@ -271,6 +273,8 @@ pub fn render_region_offline_async(
 #[cfg(test)]
 mod test {
     use std::sync::Arc;
+
+    use script::runtime::PlayInfo;
 
     use crate::{
         data::Content,
@@ -284,7 +288,7 @@ mod test {
         arr: &mut [f32],
         osc_param: &data::OscillatorParam,
         phase_init: f32,
-        sample_rate: u32,
+        sample_rate: f64,
         channel: u32,
     ) {
         let mut phase = phase_init;
@@ -315,7 +319,7 @@ mod test {
         arr: &mut [f32],
         in_time: f64,
         out_time: f64,
-        sample_rate: u32,
+        sample_rate: f64,
         channel: u32,
     ) {
         let in_sample = (in_time * sample_rate as f64) as usize;
@@ -368,7 +372,7 @@ mod test {
     #[test]
     pub fn run_generator_region() {
         let channel = 2;
-        let sample_rate = 48000;
+        let sample_rate = 48000.;
         let start = Arc::new(FloatParameter::new(0.1, "start"));
         let dur = Arc::new(FloatParameter::new(0.1, "dur"));
         let osc_param = data::generator::OscillatorParam::default();
@@ -401,7 +405,7 @@ mod test {
         let time_in = FloatParameter::new(in_time, "time_in").set_range(0.0..=1000.0);
         let time_out = FloatParameter::new(out_time, "time_out").set_range(0.0..=1000.0);
         let channels = 2;
-        let sample_rate = 48000;
+        let sample_rate = 48000.;
         let start = FloatParameter::new(0.1, "start");
         let dur = FloatParameter::new(0.1, "dur");
 
@@ -430,8 +434,9 @@ mod test {
             current_time: 0,
             frame_per_buffer: 256,
             channels,
-        };
-        let region_res = region_with_fade.eval(env, &Some(&info), &mut None).unwrap();
+        }.boxed();
+
+        let region_res = region_with_fade.eval(env, &Some(&info)).unwrap();
         let data = data::Region::try_from(&region_res).unwrap();
         let mut model = Model::new(data, channels);
         model.render_offline(sample_rate, channels);

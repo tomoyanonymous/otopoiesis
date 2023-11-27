@@ -1,7 +1,7 @@
 use egui::InnerResponse;
 
-use super::{Environment, EvalError, Expr, Type, Value};
 use crate::gui::parameter::slider_from_parameter;
+use crate::script::{Environment, EvalError, Expr, Type, Value};
 use std::sync::Arc;
 
 pub fn eval_ui_val(v: &Value, ui: &mut egui::Ui) -> egui::InnerResponse<Result<Value, EvalError>> {
