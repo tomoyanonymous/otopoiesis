@@ -5,7 +5,7 @@ use crate::audio::{Component, PlaybackInfo};
 use crate::data;
 
 use super::component::ScriptComponent;
-use super::{RangedComponent, GenericRangedComponent};
+use super::{GenericRangedComponent, RangedComponent};
 
 #[derive(Debug)]
 pub struct Model {
@@ -41,42 +41,26 @@ impl Model {
     }
     fn renew_regions(&mut self, info: &PlaybackInfo) {
         //fetch update.
-
-        // let channels = info.get_channels();
         #[cfg(not(target_arch = "wasm32"))]
         let res = {
             self.param
                 .iter()
                 .map(|region| {
-                    let model = Box::new(GenericRangedComponent::new(
-                        Box::new(
-                            ScriptComponent::try_new(&region.content).expect("not an generator"),
-                        ),
-                        AtomicRange::new(region.start.clone(), region.dur.clone()),
-                    )) as Box<dyn RangedComponent + Send + Sync>;
-                    super::component::render_region_offline_async(model, info)
+                    let model =
+                        crate::audio::region::Model::new(region.clone(), info.get_channels());
+                    super::component::render_region_offline_async(model.content, info)
                 })
                 .map(|h| h.join().expect("failed to join threads"))
                 .collect::<Vec<_>>()
-
-            // self.param
-            //     .iter()
-            //     .map(|region| {
-            //         //temporary moves value to
-            //         let model = super::region::Model::new(region.clone(), channels);
-            //         super::region::render_region_offline_async(model, info)
-            //     })
-            //     .map(move |h| h.join().expect("hoge"))
-            //     .collect::<Vec<_>>()
         };
         #[cfg(target_arch = "wasm32")]
         let res = self
             .param
             .iter()
             .map(|region| {
-                let mut model = super::region::Model::new(region.clone(), channels);
+                let mut model = super::region::Model::new(region.clone(), info.get_channels());
                 model.render_offline(info.sample_rate, info.get_channels());
-                model
+                model.content
             })
             .collect::<Vec<_>>();
 

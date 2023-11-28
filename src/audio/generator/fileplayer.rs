@@ -195,12 +195,12 @@ impl Component for FilePlayer {
                             // Consume the decoded audio samples (see below)
                             self.audiobuffer.copy_interleaved_ref(decoded.clone());
                             let _nsamples = prod.push_slice(self.audiobuffer.samples());
-                            log::debug!(
-                                "frames:{}, timestamp:{}, n_samples: {}",
-                                decoded.frames(),
-                                packet.ts(),
-                                _nsamples
-                            );
+                            // log::debug!(
+                            //     "frames:{}, timestamp:{}, n_samples: {}",
+                            //     decoded.frames(),
+                            //     packet.ts(),
+                            //     _nsamples
+                            // );
                         });
                         res.map(|()| false)
                     }
