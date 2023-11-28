@@ -1,10 +1,10 @@
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 /// Generator is a similar concept to Unit Generator in the other popular sound programming environments.
 /// These generators are loaded from Region or Track.
 ///
 use crate::data::atomic;
-use crate::parameter::{FloatParameter, Parameter, RangedNumeric, UIntParameter};
+use crate::parameter::{FloatParameter, Parameter, RangedNumeric};
 use serde::{Deserialize, Serialize};
 /// Utility Parameter for oscillator with some default values.
 
@@ -38,10 +38,10 @@ pub enum OscillatorFun {
 }
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct FilePlayerParam {
-    pub path: String,
-    pub channels: UIntParameter,
-    pub start_sec: FloatParameter,
-    pub duration: FloatParameter,
+    pub path: Arc<Mutex<String>>,
+    // pub channels: UIntParameter,
+    pub start_sec: Arc<FloatParameter>,
+    pub duration: Arc<FloatParameter>,
 }
 
 impl FilePlayerParam {
@@ -54,10 +54,10 @@ impl FilePlayerParam {
         let length_in_samples = 119608;
         (
             Self {
-                path,
-                channels: UIntParameter::new(2, "channels").set_range(0..=2),
-                start_sec: FloatParameter::new(0.0, "start").set_range(0.0..=10.0),
-                duration: FloatParameter::new(1.0, "duration").set_range(0.0..=10.0),
+                path: Arc::new(Mutex::new(path)),
+                // channels: UIntParameter::new(2, "channels").set_range(0..=2),
+                start_sec: Arc::new(FloatParameter::new(0.0, "start").set_range(0.0..=10.0)),
+                duration: Arc::new(FloatParameter::new(1.0, "duration").set_range(0.0..=10.0)),
             },
             length_in_samples,
         )

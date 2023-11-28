@@ -1,4 +1,6 @@
-use crate::audio::{get_component_for_value, PlaybackInfo, RangedComponent, RangedComponentDyn};
+use crate::audio::{
+    get_component_for_value, GenericRangedComponent, PlaybackInfo, RangedComponent,
+};
 
 // use crate::parameter::UIntParameter
 use crate::atomic::{AtomicRange, SimpleAtomic};
@@ -9,199 +11,199 @@ use std::ops::RangeInclusive;
 
 // 基本はオフラインレンダリング
 
-#[derive(Debug)]
-pub struct FadeModel {
-    pub param: data::FadeParam,
-    pub origin: Box<Model>,
-}
-impl FadeModel {
-    fn new(p: data::FadeParam, origin: data::Region) -> Self {
-        Self {
-            param: p,
-            origin: Box::new(Model::new(origin, 2)),
-        }
-    }
-}
+// #[derive(Debug)]
+// pub struct FadeModel {
+//     pub param: data::FadeParam,
+//     pub origin: Box<Model>,
+// }
+// impl FadeModel {
+//     fn new(p: data::FadeParam, origin: data::Region) -> Self {
+//         Self {
+//             param: p,
+//             origin: Box::new(Model::new(origin, 2)),
+//         }
+//     }
+// }
 
-impl RangedComponent for FadeModel {
-    fn get_range(&self) -> RangeInclusive<f64> {
-        self.origin.params.getrange()
-    }
-    fn get_output_channels(&self) -> u64 {
-        2
-    }
+// impl RangedComponent for FadeModel {
+//     fn get_range(&self) -> RangeInclusive<f64> {
+//         self.origin.params.getrange()
+//     }
+//     fn get_output_channels(&self) -> u64 {
+//         2
+//     }
 
-    fn render_offline(&mut self, sample_rate: f64, channels: u64) {
-        // resize should be the caller.
-        // dest.resize(self.origin.interleaved_samples_cache.len(), 0.0);
-        todo!();
-        self.origin.render_offline(sample_rate, channels);
-        let dest = self.get_sample_cache_mut();
-        assert_eq!(self.origin.interleaved_samples_cache.len(), dest.len());
-        let chs = self.get_output_channels() as usize;
-        let in_time = (self.param.time_in.get() as f64 * sample_rate as f64) as usize;
-        let out_time = (self.param.time_out.get() as f64 * sample_rate as f64) as usize;
-        let slice = &self.origin.interleaved_samples_cache[0..dest.len()];
-        dest.copy_from_slice(slice);
+//     fn render_offline(&mut self, sample_rate: u32, channels: u64) {
+//         // resize should be the caller.
+//         // dest.resize(self.origin.interleaved_samples_cache.len(), 0.0);
+//         todo!();
+//         self.origin.render_offline(sample_rate, channels);
+//         let dest = self.get_sample_cache_mut();
+//         assert_eq!(self.origin.interleaved_samples_cache.len(), dest.len());
+//         let chs = self.get_output_channels() as usize;
+//         let in_time = (self.param.time_in.get() as f64 * sample_rate as f64) as usize;
+//         let out_time = (self.param.time_out.get() as f64 * sample_rate as f64) as usize;
+//         let slice = &self.origin.interleaved_samples_cache[0..dest.len()];
+//         dest.copy_from_slice(slice);
 
-        if in_time > 0 {
-            self.origin.interleaved_samples_cache[0..in_time]
-                .chunks(chs)
-                .zip(dest[0..in_time].chunks_mut(chs))
-                .enumerate()
-                .for_each(|(count, (v_per_channel, o_per_channel))| {
-                    let now = count as u32;
+//         if in_time > 0 {
+//             self.origin.interleaved_samples_cache[0..in_time]
+//                 .chunks(chs)
+//                 .zip(dest[0..in_time].chunks_mut(chs))
+//                 .enumerate()
+//                 .for_each(|(count, (v_per_channel, o_per_channel))| {
+//                     let now = count as u32;
 
-                    let gain = now as f64 / in_time as f64;
+//                     let gain = now as f64 / in_time as f64;
 
-                    v_per_channel
-                        .iter()
-                        .zip(o_per_channel.iter_mut())
-                        .for_each(|(v, o)| {
-                            *o = (*v as f64 * gain) as f32;
-                        });
-                });
-        }
-        let len_arr = self.origin.interleaved_samples_cache.len();
-        if out_time > 0 {
-            self.origin.interleaved_samples_cache[out_time..len_arr]
-                .rchunks(chs)
-                .zip(dest[(len_arr - out_time)..len_arr].rchunks_mut(chs))
-                .enumerate()
-                .for_each(|(count, (v_per_channel, o_per_channel))| {
-                    let now = count as u32;
-                    let gain = if out_time > 0 {
-                        now as f64 / out_time as f64
-                    } else {
-                        1.0
-                    };
-                    v_per_channel
-                        .iter()
-                        .zip(o_per_channel.iter_mut())
-                        .for_each(|(v, o)| {
-                            *o = (*v as f64 * gain) as f32;
-                        });
-                });
-        }
-    }
+//                     v_per_channel
+//                         .iter()
+//                         .zip(o_per_channel.iter_mut())
+//                         .for_each(|(v, o)| {
+//                             *o = (*v as f64 * gain) as f32;
+//                         });
+//                 });
+//         }
+//         let len_arr = self.origin.interleaved_samples_cache.len();
+//         if out_time > 0 {
+//             self.origin.interleaved_samples_cache[out_time..len_arr]
+//                 .rchunks(chs)
+//                 .zip(dest[(len_arr - out_time)..len_arr].rchunks_mut(chs))
+//                 .enumerate()
+//                 .for_each(|(count, (v_per_channel, o_per_channel))| {
+//                     let now = count as u32;
+//                     let gain = if out_time > 0 {
+//                         now as f64 / out_time as f64
+//                     } else {
+//                         1.0
+//                     };
+//                     v_per_channel
+//                         .iter()
+//                         .zip(o_per_channel.iter_mut())
+//                         .for_each(|(v, o)| {
+//                             *o = (*v as f64 * gain) as f32;
+//                         });
+//                 });
+//         }
+//     }
 
-    fn get_sample_cache(&self) -> &[f32] {
-        todo!()
-    }
+//     fn get_sample_cache(&self) -> &[f32] {
+//         todo!()
+//     }
 
-    fn get_sample(&self, time: f64, sample_rate: u32) -> Option<f64> {
-        todo!()
-    }
+//     fn get_sample(&self, time: f64, sample_rate: u32) -> Option<f64> {
+//         todo!()
+//     }
 
-    fn get_sample_cache_mut(&mut self) -> &mut [f32] {
-        todo!()
-    }
-}
+//     fn get_sample_cache_mut(&mut self) -> &mut [f32] {
+//         todo!()
+//     }
+// }
 
-#[derive(Debug)]
-pub struct RegionArray(Vec<Model>);
-impl RegionArray {
-    pub fn new(param: &[Region]) -> Self {
-        Self(param.iter().map(|p| Model::new(p.clone(), 2)).collect())
-    }
-}
+// #[derive(Debug)]
+// pub struct RegionArray(Vec<Model>);
+// impl RegionArray {
+//     pub fn new(param: &[Region]) -> Self {
+//         Self(param.iter().map(|p| Model::new(p.clone(), 2)).collect())
+//     }
+// }
 
-impl RangedComponent for RegionArray {
-    /// panics  if the end is earlier than the start.
-    ///
-    fn get_range(&self) -> RangeInclusive<f64> {
-        todo!()
-        // if !self.0.is_empty() {
-        //     let start = self.0[0].params.range.start();
-        //     let end = self.0.last().unwrap().params.range.end();
-        //     assert!(end >= start);
-        //     start..=end
-        // } else {
-        //     0.0..=0.0
-        // }
-    }
+// impl RangedComponent for RegionArray {
+//     /// panics  if the end is earlier than the start.
+//     ///
+//     fn get_range(&self) -> RangeInclusive<f64> {
+//         todo!()
+//         // if !self.0.is_empty() {
+//         //     let start = self.0[0].params.range.start();
+//         //     let end = self.0.last().unwrap().params.range.end();
+//         //     assert!(end >= start);
+//         //     start..=end
+//         // } else {
+//         //     0.0..=0.0
+//         // }
+//     }
 
-    fn get_output_channels(&self) -> u64 {
-        2
-    }
+//     fn get_output_channels(&self) -> u64 {
+//         2
+//     }
 
-    fn render_offline(&mut self, sample_rate: f64, channels: u64) {
-        //todo: asynchrounous render
-        todo!();
-        // self.0.iter_mut().for_each(|region| {
-        //     let range = &region.params.range;
-        //     let scale_to_index = |x: f64| (x * sample_rate as f64) as usize * channels as usize;
-        //     region
-        //         .interleaved_samples_cache
-        //         .resize(scale_to_index(range.getrange()), 0.0); // no need?
-        //     region.render_offline(sample_rate, channels);
-        //     self.get_sample_cache_mut()
-        //         .copy_from_slice(&region.interleaved_samples_cache);
-        // });
-    }
+//     fn render_offline(&mut self, sample_rate: u32, channels: u64) {
+//         //todo: asynchrounous render
+//         todo!();
+//         // self.0.iter_mut().for_each(|region| {
+//         //     let range = &region.params.range;
+//         //     let scale_to_index = |x: f64| (x * sample_rate as f64) as usize * channels as usize;
+//         //     region
+//         //         .interleaved_samples_cache
+//         //         .resize(scale_to_index(range.getrange()), 0.0); // no need?
+//         //     region.render_offline(sample_rate, channels);
+//         //     self.get_sample_cache_mut()
+//         //         .copy_from_slice(&region.interleaved_samples_cache);
+//         // });
+//     }
 
-    fn get_sample(&self, time: f64, sample_rate: u32) -> Option<f64> {
-        todo!()
-    }
+//     fn get_sample(&self, time: f64, sample_rate: u32) -> Option<f64> {
+//         todo!()
+//     }
 
-    fn get_sample_cache(&self) -> &[f32] {
-        todo!()
-    }
+//     fn get_sample_cache(&self) -> &[f32] {
+//         todo!()
+//     }
 
-    fn get_sample_cache_mut(&mut self) -> &mut [f32] {
-        todo!()
-    }
-}
+//     fn get_sample_cache_mut(&mut self) -> &mut [f32] {
+//         todo!()
+//     }
+// }
 
-#[derive(Debug)]
-pub struct TransformerModel(Box<dyn RangedComponent + Send + Sync>);
+// #[derive(Debug)]
+// pub struct TransformerModel(Box<dyn RangedComponent + Send + Sync>);
 
-impl TransformerModel {
-    fn new(filter: &data::RegionFilter, origin: data::Region) -> Self {
-        let component: Box<dyn RangedComponent + Send + Sync> = match filter {
-            data::RegionFilter::Gain => todo!(),
-            data::RegionFilter::FadeInOut(param) => Box::new(FadeModel::new(param.clone(), origin)),
-            data::RegionFilter::Reverse => todo!(),
-            data::RegionFilter::Replicate(c) => Box::new(RegionArray(
-                (0..c.count.load())
-                    .map(|_| Model::new(origin.clone(), 2))
-                    .collect::<Vec<_>>(),
-            )),
-            data::RegionFilter::Script(val) => {
-                match val {
-                    Value::Closure(_ids, env, box Expr::App(box Expr::Var(fname), args)) => {
-                        todo!()
-                        // match (fname.as_str(), args.as_slice()) {
-                        //     (
-                        //         "apply_fade_in_out",
-                        //         [Expr::Literal(region), Expr::Literal(Value::Parameter(time_in)), Expr::Literal(Value::Parameter(time_out))],
-                        //     ) => {
-                        //         let (start, dur) =
-                        //             if let Value::Region(start, dur, _content, _label, _t) = region
-                        //             {
-                        //                 (start, dur)
-                        //             } else {
-                        //                 panic!("not a region")
-                        //             };
-                        //         Box::new(RangedScriptComponent::new(
-                        //             Value::Parameter(start.clone()),
-                        //             Value::Parameter(dur.clone()),
-                        //             region.clone(),
-                        //             Value::ExtFunction(()),
-                        //             env.clone(),
-                        //         ))
-                        //     }
-                        //     _ => todo!(),
-                        // }
-                    }
-                    _ => todo!(),
-                }
-                //rg and origin should be same...
-            }
-        };
-        Self(component)
-    }
-}
+// impl TransformerModel {
+//     fn new(filter: &data::RegionFilter, origin: data::Region) -> Self {
+//         let component: Box<dyn RangedComponent + Send + Sync> = match filter {
+//             data::RegionFilter::Gain => todo!(),
+//             data::RegionFilter::FadeInOut(param) => Box::new(FadeModel::new(param.clone(), origin)),
+//             data::RegionFilter::Reverse => todo!(),
+//             data::RegionFilter::Replicate(c) => Box::new(RegionArray(
+//                 (0..c.count.load())
+//                     .map(|_| Model::new(origin.clone(), 2))
+//                     .collect::<Vec<_>>(),
+//             )),
+//             data::RegionFilter::Script(val) => {
+//                 match val {
+//                     Value::Closure(_ids, env, box Expr::App(box Expr::Var(fname), args)) => {
+//                         todo!()
+//                         // match (fname.as_str(), args.as_slice()) {
+//                         //     (
+//                         //         "apply_fade_in_out",
+//                         //         [Expr::Literal(region), Expr::Literal(Value::Parameter(time_in)), Expr::Literal(Value::Parameter(time_out))],
+//                         //     ) => {
+//                         //         let (start, dur) =
+//                         //             if let Value::Region(start, dur, _content, _label, _t) = region
+//                         //             {
+//                         //                 (start, dur)
+//                         //             } else {
+//                         //                 panic!("not a region")
+//                         //             };
+//                         //         Box::new(RangedScriptComponent::new(
+//                         //             Value::Parameter(start.clone()),
+//                         //             Value::Parameter(dur.clone()),
+//                         //             region.clone(),
+//                         //             Value::ExtFunction(()),
+//                         //             env.clone(),
+//                         //         ))
+//                         //     }
+//                         //     _ => todo!(),
+//                         // }
+//                     }
+//                     _ => todo!(),
+//                 }
+//                 //rg and origin should be same...
+//             }
+//         };
+//         Self(component)
+//     }
+// }
 
 #[derive(Debug)]
 pub struct Model {
@@ -216,9 +218,8 @@ impl Model {
     pub fn new(params: data::Region, channels: u64) -> Self {
         // assert!(params.range.getrange() < params.max_size);
 
-        let c = get_component_for_value(&params.content);
-        let content = Box::new(RangedComponentDyn::new(
-            c,
+        let content = Box::new(GenericRangedComponent::from_value(
+            &params.content,
             AtomicRange::new(params.start.clone(), params.dur.clone()),
         ));
 

@@ -1,14 +1,13 @@
 use std::{ops::RangeInclusive, sync::Arc};
 
-use script::runtime::PlayInfo;
+use script::{runtime::PlayInfo, atomic::AtomicRange};
 
 use crate::{
-    atomic::AtomicRange,
-    data::Region,
+    data::{ConversionError, Region},
     script::{self, Environment, EvalError, Expr, Value},
 };
 
-use super::{region, PlaybackInfo};
+use super::{generator::fileplayer::FilePlayer, region, PlaybackInfo};
 pub trait Component: std::fmt::Debug {
     fn get_input_channels(&self) -> u64;
     fn get_output_channels(&self) -> u64;
@@ -41,6 +40,13 @@ impl ScriptComponent {
             },
             _ => 0.0,
         }
+    }
+}
+impl TryFrom<&Value> for ScriptComponent {
+    type Error = ConversionError;
+
+    fn try_from(value: &Value) -> Result<Self, Self::Error> {
+        Self::try_new(value).map_err(|_| ConversionError {})
     }
 }
 impl Component for ScriptComponent {
@@ -80,8 +86,10 @@ impl Component for ScriptComponent {
 }
 
 pub fn get_component_for_value(v: &script::Value) -> Box<dyn Component + Send + Sync> {
-    let generator = ScriptComponent::try_new(v).expect("not a valid component");
-    Box::new(generator)
+    FilePlayer::try_from(v)
+        .map(|c| Box::new(c) as Box<dyn Component + Send + Sync>)
+        .or(ScriptComponent::try_from(v).map(|c| Box::new(c) as Box<dyn Component + Send + Sync>))
+        .expect("not a valid component")
 }
 
 /// Interface for offline rendering.
@@ -136,13 +144,13 @@ pub fn render_region_offline_async(
 //convert any generator component into region
 
 #[derive(Debug)]
-pub struct RangedComponentDyn {
+pub struct GenericRangedComponent {
     generator: Box<dyn Component + Sync + Send>,
     range: AtomicRange,
     buffer: Vec<f32>,
 }
 
-impl RangedComponentDyn {
+impl GenericRangedComponent {
     pub fn new(generator: Box<dyn Component + Sync + Send>, range: AtomicRange) -> Self {
         Self {
             generator,
@@ -150,9 +158,13 @@ impl RangedComponentDyn {
             buffer: vec![],
         }
     }
+    pub fn from_value(value: &script::Value, range: AtomicRange) -> Self {
+        let c = get_component_for_value(value);
+        Self::new(c, range)
+    }
 }
 
-impl RangedComponent for RangedComponentDyn {
+impl RangedComponent for GenericRangedComponent {
     fn get_range(&self) -> RangeInclusive<f64> {
         self.range.start() as f64..=self.range.end() as f64
     }

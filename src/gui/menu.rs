@@ -1,6 +1,6 @@
 use crate::action::{self, Action};
-use crate::data;
-use crate::script::{builtin_fn, param_float, Expr, ExtFun, Value};
+
+use crate::script::{param_float,builtin_fn, Expr, ExtFun, Value};
 
 use crate::parameter::{FloatParameter, Parameter, RangedNumeric};
 use std::sync::{mpsc, Arc, Mutex};
@@ -68,9 +68,26 @@ fn make_region(trackid: usize, pos: f64, _c: String) -> Expr {
 }
 
 fn make_region_file(trackid: usize, pos: f64, path: String) -> Expr {
-    let generator = Expr::App(
-        Expr::Var("fileplayer".into()).into(),
-        vec![Expr::Literal(Value::String(Arc::new(Mutex::new(path))))],
+    //todo: link parameter with let binding
+    let generator = Expr::Lambda(
+        vec![],
+        Expr::App(
+            Expr::Var("fileplayer".into()).into(),
+            vec![
+                Expr::Literal(Value::String(Arc::new(Mutex::new(path)))),
+                Expr::Literal(Value::Parameter(Arc::new(param_float!(
+                    pos as f32,
+                    "file_start",
+                    0.0..=f32::INFINITY
+                )))),
+                Expr::Literal(Value::Parameter(Arc::new(param_float!(
+                    pos as f32 + 1.0,
+                    "file_dur",
+                    0.0..=f32::INFINITY
+                )))),
+            ],
+        )
+        .into(),
     );
     let region = Expr::Region(
         Expr::Literal(Value::Parameter(Arc::new(param_float!(
@@ -81,14 +98,14 @@ fn make_region_file(trackid: usize, pos: f64, path: String) -> Expr {
         .into(),
         Expr::Literal(Value::Parameter(Arc::new(param_float!(
             pos as f32 + 1.0,
-            "start",
+            "dur",
             0.0..=f32::INFINITY
         ))))
         .into(),
         generator.into(),
         format!("region{}", trackid + 1),
     );
-    with_fade(region)
+    region
 }
 
 pub fn add_region_button(
@@ -130,11 +147,17 @@ pub fn add_region_button(
             let _ = sender.send(action::AddRegion::new(region, trackid).into());
         }
         if addfile.clicked() {
-            let (file, _len) = data::generator::FilePlayerParam::new_test_file();
             //todo!
-
-            let region = make_region_file(trackid, pos, file.path);
-            let _ = sender.send(action::AddRegion::new(region, trackid).into());
+            let dir = env!("CARGO_MANIFEST_DIR");
+            let path = rfd::FileDialog::new()
+                .set_directory(dir)
+                .pick_file()
+                .map(|path| path.to_str().map(String::from))
+                .flatten();
+            if let Some(path_str) = path {
+                let region = make_region_file(trackid, pos, path_str);
+                let _ = sender.send(action::AddRegion::new(region, trackid).into());
+            }
         }
         if addarray.clicked() {
             // self.add_region_array(self.id, self.state.new_array_count);

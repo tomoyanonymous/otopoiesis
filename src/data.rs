@@ -3,7 +3,7 @@
 use crate::action;
 use crate::app::filemanager::{self, FileManager};
 use crate::script::{Environment, EvalError};
-use crate::atomic::{self, SimpleAtomic};
+use crate::atomic::{self,SimpleAtomic};
 
 use rfd;
 use serde::{Deserialize, Serialize};
