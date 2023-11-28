@@ -3,7 +3,7 @@ use crate::data;
 use crate::utils::AtomicRange;
 
 use super::component::ScriptComponent;
-use super::{RangedComponent, RangedComponentDyn};
+use super::{RangedComponent, GenericRangedComponent};
 
 #[derive(Debug)]
 pub struct Model {
@@ -30,7 +30,7 @@ impl Model {
         param
             .iter()
             .map(|region| {
-                Box::new(RangedComponentDyn::new(
+                Box::new(GenericRangedComponent::new(
                     Box::new(ScriptComponent::try_new(&region.content).expect("not an generator")),
                     AtomicRange::new(region.start.clone(), region.dur.clone()),
                 )) as Box<dyn RangedComponent + Send + Sync>
@@ -46,7 +46,7 @@ impl Model {
             self.param
                 .iter()
                 .map(|region| {
-                  let model =   Box::new(RangedComponentDyn::new(
+                  let model =   Box::new(GenericRangedComponent::new(
                         Box::new(ScriptComponent::try_new(&region.content).expect("not an generator")),
                         AtomicRange::new(region.start.clone(), region.dur.clone()),
                     )) as Box<dyn RangedComponent + Send + Sync>;

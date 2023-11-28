@@ -50,7 +50,7 @@ npm install
 npm run build 
 ```
 
-### debug
+#### debug
 
 ```sh
 npm start
@@ -59,17 +59,26 @@ npm start
 
 # Todo
 
-- [ ] project file export/import
+- [ ] implement language
+  - [ ] basic ast evaluation
+    - [x] simple sine-wave generator
+    - [ ] region-to-region conversion
+      - [x] fade in/out
+      - [ ] nonlinear operation like reverse
+    - [ ] referring track in track
+  - [ ] static typing system
+  - [ ] integrated static analysis for generating ui in the compilation
+- [x] project file export/import
 - [ ] Wav file loading
   - [ ] file io streaming / caching system
     - [x] open wav file in native app
-  - [ ] thumbnail generation for audio files
+    - [ ] wasm compatibility
+  - [x] thumbnail generation for audio files
   - [ ] drug & drop of file?
 - [ ] Channel adaptation between different configurations of channels
 - [ ] Audio region/track transformer
   - [ ] region reprecator
   - [x] fadein/out filter
-- [ ] primitive scripting environment
 
 (c) Tomoya Matsuura/松浦知也 2022
 

@@ -20,7 +20,7 @@ impl PlaybackInfo {
 }
 
 pub mod component;
-pub use component::{get_component_for_value, Component, RangedComponent, RangedComponentDyn};
+pub use component::{get_component_for_value, Component, RangedComponent, GenericRangedComponent};
 pub mod generator;
 pub mod region;
 pub mod renderer;

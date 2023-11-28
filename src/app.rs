@@ -1,6 +1,6 @@
 use atomic::SimpleAtomic;
 use log::Log;
-use std::sync::{Arc, Mutex, OnceLock};
+use std::sync::{Arc, Mutex};
 
 use crate::audio::renderer::{Renderer, RendererBase};
 use crate::data::Project;

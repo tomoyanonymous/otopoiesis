@@ -1,12 +1,11 @@
-use crate::audio::component::ScriptComponent;
-use crate::audio::{RangedComponent, RangedComponentDyn};
+
 use crate::data;
 use crate::gui;
 use crate::parameter::{Parameter, RangedNumeric};
-use crate::script;
+
 pub(crate) const BAR_WIDTH: f32 = 3.0;
 use crate::script::ui::eval_ui_val;
-use crate::utils::AtomicRange;
+
 mod region_handle;
 // pub mod regionfilter;
 // use self::regionfilter::fadeinout::FadeInOut;
@@ -31,15 +30,12 @@ pub struct State {
 
 impl State {
     pub fn renew_waveform(param: &data::Region) -> WaveFormState {
-        let mut component = RangedComponentDyn::new(
-            Box::new(ScriptComponent::try_new(&param.content).unwrap()),
-            AtomicRange::new(param.start.clone(), param.dur.clone()),
-        );
-        component.render_offline(44100, 2);
+        let mut model = crate::audio::region::Model::new(param.clone(),2);
+        model.render_offline(44100, 2);
 
         WaveFormState::new(
-            component.get_sample_cache(),
-            component.get_output_channels() as usize,
+            model.content.get_sample_cache(),
+            model.content.get_output_channels() as usize,
         )
     }
     pub fn new(params: &data::Region, labeltext: impl ToString, is_interactive: bool) -> Self {

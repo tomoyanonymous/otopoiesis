@@ -1,10 +1,10 @@
 use crate::app::filemanager::{self, FileManager};
-use crate::audio::RangedComponent;
-use crate::audio::{Component, PlaybackInfo};
-use crate::data::FilePlayerParam;
+
+use crate::audio::Component;
+use crate::data::{ConversionError, FilePlayerParam};
 use crate::parameter::Parameter;
+use crate::script::{Expr, Value};
 use std::io::ErrorKind;
-use std::sync::Arc;
 
 use symphonia::core::audio::{Layout, SampleBuffer, SignalSpec};
 use symphonia::core::codecs::{Decoder, DecoderOptions, CODEC_TYPE_NULL};
@@ -16,9 +16,10 @@ use symphonia::core::probe::{Hint, ProbeResult};
 use symphonia::core::units::Time;
 
 pub struct FilePlayer {
-    param: Arc<FilePlayerParam>,
+    param: FilePlayerParam,
     decoder: Box<dyn Decoder>,
     track_id: u32,
+    channels: u64,
     format: Box<dyn FormatReader>,
     audiobuffer: SampleBuffer<f32>,
     ringbuf: ringbuf::HeapRb<f32>,
@@ -53,15 +54,16 @@ fn get_default_decoder(path: impl ToString) -> Result<DecoderSet, Box<dyn std::e
     let dec_opts: DecoderOptions = Default::default();
     // Create a decoder for the track.
     let decoder = symphonia::default::get_codecs().make(&track.codec_params, &dec_opts)?;
+
     Ok((decoder, probed, id))
 }
 
 impl FilePlayer {
-    pub fn new(param: Arc<FilePlayerParam>) -> Self {
+    pub fn new(param: FilePlayerParam) -> Self {
         let buf_len = MediaSourceStreamOptions::default().buffer_len;
-        let (decoder, probed, track_id) =
-            get_default_decoder(param.path.clone()).expect("decoder not found");
-
+        let path_str = param.path.try_lock().expect("failed to lock");
+        let (decoder, probed, track_id) = get_default_decoder(path_str).expect("decoder not found");
+        let channels = decoder.codec_params().channels.unwrap().count() as u64;
         let max_frames = decoder.codec_params().max_frames_per_packet.unwrap();
         let audiobuffer = SampleBuffer::<f32>::new(
             max_frames,
@@ -73,6 +75,7 @@ impl FilePlayer {
             param,
             decoder,
             track_id,
+            channels,
             format: probed.format,
             audiobuffer,
             ringbuf,
@@ -83,7 +86,7 @@ impl FilePlayer {
         self.is_finished_playing
     }
     pub fn get_channels(&self) -> u64 {
-        self.param.channels.get()
+        self.channels
     }
 }
 impl std::fmt::Debug for FilePlayer {
@@ -92,6 +95,51 @@ impl std::fmt::Debug for FilePlayer {
             .field("param", &self.param)
             // .field("decoder", ("symphonia decoder(todo)"))
             .finish()
+    }
+}
+
+impl TryFrom<&Value> for FilePlayer {
+    type Error = ConversionError;
+
+    fn try_from(value: &Value) -> Result<Self, Self::Error> {
+        match value {
+            Value::Closure(
+                _ids,
+                env,
+                box Expr::App(box Expr::Var(fname), args),
+                // _name,
+                // _type,
+            ) if fname == "fileplayer" && args.len() == 3 => {
+                let pathv = args
+                    .get(0)
+                    .and_then(|a| a.eval(env.clone(), &None, &mut None).ok())
+                    .ok_or(ConversionError {})?;
+                let start_sec = args
+                    .get(1)
+                    .and_then(|a| a.eval(env.clone(), &None, &mut None).ok())
+                    .ok_or(ConversionError {})?;
+                let duration = args
+                    .get(2)
+                    .and_then(|a| a.eval(env.clone(), &None, &mut None).ok())
+                    .ok_or(ConversionError {})?;
+                if let (
+                    Value::String(path),
+                    Value::Parameter(start_sec),
+                    Value::Parameter(duration),
+                ) = (pathv, start_sec, duration)
+                {
+                    let param = FilePlayerParam {
+                        path,
+                        start_sec,
+                        duration,
+                    };
+                    Ok(Self::new(param))
+                } else {
+                    Err(Self::Error {})
+                }
+            }
+            _ => Err(Self::Error {}),
+        }
     }
 }
 
@@ -188,12 +236,11 @@ impl Component for FilePlayer {
 #[cfg(test)]
 mod test {
     use crate::{audio::PlaybackInfo, data};
-    use std::sync::Arc;
 
     use super::*;
     fn read_prep() -> (FilePlayer, PlaybackInfo, usize) {
         let (param, len_samples) = data::FilePlayerParam::new_test_file();
-        let player = FilePlayer::new(Arc::new(param));
+        let player = FilePlayer::new(param);
         let info = PlaybackInfo {
             sample_rate: 48000,
             current_time: 0,

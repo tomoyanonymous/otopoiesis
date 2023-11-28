@@ -5,6 +5,7 @@ use crate::{
 };
 
 use super::{extend_env, value::Param, Environment, EvalError, Expr, ExtFun, ExtFunT, Type, Value};
+pub mod loadwav;
 use std::sync::Arc;
 
 #[derive(Clone, Debug)]
@@ -374,6 +375,7 @@ pub fn lookup_extfun(name: &str) -> Result<ExtFun, EvalError> {
         "sinewave" => Ok(ExtFun::new(SineWave::new())),
         "fadeinout" => Ok(ExtFun::new(FadeInOut::new())),
         "apply_fade_in_out" => Ok(ExtFun::new(ApplyFadeInOut::new())),
+        // "fileplayer"=>Ok(ExtFun::new(Nop{})),
         _ => Err(EvalError::NotFound),
     }
 }
