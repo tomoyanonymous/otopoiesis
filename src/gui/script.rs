@@ -1,4 +1,5 @@
 use egui::InnerResponse;
+use script::EnvTrait;
 
 use crate::gui::parameter::slider_from_parameter;
 use crate::script::{Environment, EvalError, Expr, Type, Value};
@@ -84,7 +85,7 @@ pub fn eval_ui(
             } else {
                 InnerResponse::new(
                     Err(EvalError::NotFound),
-                    ui.label(format!("{} not found", v)),
+                    ui.label(format!("{:?} not found", v)),
                 )
             }
         }

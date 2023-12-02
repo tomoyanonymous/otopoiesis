@@ -5,6 +5,7 @@ use crate::parameter::{FloatParameter, Parameter, RangedNumeric};
 use crate::script::{Expr, Value};
 use crate::{data, script::param_float};
 use std::sync::{Arc, MutexGuard, PoisonError};
+use script::Symbol;
 use undo;
 
 #[derive(Debug)]
@@ -244,7 +245,7 @@ impl undo::Action for AddFadeInOut {
                                 0.0..=10.0
                             ))));
                             *reg = Expr::App(
-                                Expr::Var("fadeinout".to_string()).into(),
+                                Expr::Var(Symbol::new("fadeinout")).into(),
                                 vec![reg.clone(), time_in.into(), time_out.into()],
                             );
                             Ok(())
@@ -269,7 +270,7 @@ impl undo::Action for AddFadeInOut {
                         } else {
                             let reg = regions.get_mut(self.pos).unwrap();
                             if let Expr::App(box Expr::Var(name), r) = reg {
-                                match (name.as_str(), r.as_slice()) {
+                                match (name.to_string().as_str(), r.as_slice()) {
                                     ("fadeinout", [v, time_in, time_out]) => {
                                         self.time_in = time_in
                                             .eval(env.clone(), &None)

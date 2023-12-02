@@ -218,7 +218,7 @@ impl AppModel {
             .any(|v| v)
     }
 
-    pub fn compile(&mut self, source: Expr) -> bool {
+    pub fn compile(&mut self, mut source: Expr) -> bool {
         log::debug!("compiling source...");
         let env = Arc::new(Environment::new());
         let res = source

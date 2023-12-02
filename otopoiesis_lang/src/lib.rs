@@ -3,7 +3,7 @@
 
 pub mod atomic;
 pub mod builtin_fn;
-
+pub mod compiler;
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub(crate) struct EnvId {
     level: u64,
@@ -22,11 +22,11 @@ impl Symbol {
             id: None,
         }
     }
-    fn to_string(&self) -> String {
-        self.name
+    pub fn to_string(&self) -> String {
+        self.name.clone()
     }
 }
-impl Into<Symbol> for &'static str{
+impl Into<Symbol> for &'static str {
     fn into(self) -> Symbol {
         Symbol::new(self)
     }
@@ -45,7 +45,7 @@ use std::sync::Arc;
 use crate::parameter::FloatParameter;
 
 pub use {
-    environment::{extend_env, Environment},
+    environment::{EnvTrait, Environment},
     expr::{EvalError, Expr},
     value::Value,
 };
@@ -54,7 +54,6 @@ pub use {
 pub trait ExtFunT: std::fmt::Debug {
     fn exec(
         &self,
-        env: &Arc<Environment>,
         play_info: &Option<&Box<dyn PlayInfo + Send + Sync>>,
         v: &[Value],
     ) -> Result<Value, EvalError>;

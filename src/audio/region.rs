@@ -275,7 +275,7 @@ pub fn render_region_offline_async(
 mod test {
     use std::sync::Arc;
 
-    use script::runtime::PlayInfo;
+    use script::{runtime::PlayInfo, Symbol};
 
     use crate::{
         data::Content,
@@ -422,7 +422,7 @@ mod test {
             "generator".into(),
         );
         let region_with_fade = Expr::App(
-            Expr::Var("fadeinout".to_string()).into(),
+            Expr::Var(Symbol::new("fadeinout")).into(),
             vec![
                 region.clone(),
                 Expr::Literal(Value::new_param(time_in.clone())),

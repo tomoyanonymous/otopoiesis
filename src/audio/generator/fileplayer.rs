@@ -109,7 +109,7 @@ impl TryFrom<&Value> for FilePlayer {
                 box Expr::App(box Expr::Var(fname), args),
                 // _name,
                 // _type,
-            ) if fname == "fileplayer" && args.len() == 3 => {
+            ) if fname.to_string() == "fileplayer" && args.len() == 3 => {
                 let pathv = args
                     .get(0)
                     .and_then(|a| a.eval(env.clone(), &None).ok())

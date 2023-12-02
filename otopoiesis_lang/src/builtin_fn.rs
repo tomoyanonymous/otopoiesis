@@ -1,8 +1,10 @@
 use crate::{
-    parameter::{FloatParameter, Parameter, RangedNumeric}, runtime::PlayInfo, environment::EnvTrait,
+    environment::EnvTrait,
+    parameter::{FloatParameter, Parameter, RangedNumeric},
+    runtime::PlayInfo,
 };
 
-use super::{extend_env, value::Param, Environment, EvalError, Expr, ExtFun, ExtFunT, Type, Value};
+use super::{value::Param, Environment, EvalError, Expr, ExtFun, ExtFunT, Type, Value};
 pub mod loadwav;
 use std::sync::Arc;
 
@@ -12,8 +14,7 @@ pub struct ArrayReverse {}
 impl ExtFunT for ArrayReverse {
     fn exec(
         &self,
-        _env: &Arc<Environment>,
-        _play_info: &Option<&Box<dyn PlayInfo+Send+Sync>>,
+        _play_info: &Option<&Box<dyn PlayInfo + Send + Sync>>,
         v: &[Value],
     ) -> Result<Value, EvalError> {
         if v.len() != 1 {
@@ -44,10 +45,10 @@ pub struct Print {
 }
 
 impl ExtFunT for Print {
+
     fn exec(
         &self,
-        _env: &Arc<Environment>,
-        _play_info: &Option<&Box<dyn PlayInfo+Send+Sync>>,
+        _play_info: &Option<&Box<dyn PlayInfo + Send + Sync>>,
         v: &[Value],
     ) -> Result<Value, EvalError> {
         let str = v
@@ -87,10 +88,10 @@ impl SineWave {
     }
 }
 impl ExtFunT for SineWave {
+
     fn exec(
         &self,
-        _env: &Arc<Environment>,
-        play_info: &Option<&Box<dyn PlayInfo+Send+Sync>>,
+        play_info: &Option<&Box<dyn PlayInfo + Send + Sync>>,
         v: &[Value],
     ) -> Result<Value, EvalError> {
         match play_info {
@@ -127,9 +128,10 @@ impl ExtFunT for SineWave {
 #[derive(Debug)]
 pub struct FadeInOut {
     params: [Param; 2],
+    env: Arc<Environment>,
 }
 impl FadeInOut {
-    pub fn new() -> Self {
+    pub fn new(env: &Arc<Environment>) -> Self {
         let time_in = Param::Number(Arc::new(
             FloatParameter::new(0.01, "fade_in").set_range(0.0..=10.0),
         ));
@@ -138,15 +140,16 @@ impl FadeInOut {
         ));
         Self {
             params: [time_in, time_out],
+            env:env.clone(),
         }
     }
 }
 
 impl ExtFunT for FadeInOut {
+
     fn exec(
         &self,
-        env: &Arc<Environment>,
-        _play_info: &Option<&Box<dyn PlayInfo+Send+Sync>>,
+        _play_info: &Option<&Box<dyn PlayInfo + Send + Sync>>,
         v: &[Value],
     ) -> Result<Value, EvalError> {
         // ここでは実際のフェードイン、アウトはしない。
@@ -162,7 +165,7 @@ impl ExtFunT for FadeInOut {
                     }
                     _ => panic!("not a region"),
                 };
-                let env = Arc::new(extend_env(env.clone()));
+                let env = self.env.extend_with(&vec![]);
                 let content = Box::new(Expr::Lambda(
                     vec![],
                     Expr::App(
@@ -178,7 +181,7 @@ impl ExtFunT for FadeInOut {
                     .into(),
                 ));
                 Ok(Value::Region(
-                    env.clone(),
+                    self.env.clone(),
                     start.clone(),
                     dur.clone(),
                     content,
@@ -298,12 +301,11 @@ impl ApplyFadeInOut {
 impl ExtFunT for ApplyFadeInOut {
     fn exec(
         &self,
-        _env: &impl EnvTrait,
-        play_info: &Option<&Box<dyn PlayInfo+Send+Sync>>,
+        play_info: &Option<&Box<dyn PlayInfo + Send + Sync>>,
         v: &[Value],
     ) -> Result<Value, EvalError> {
         let now = play_info.unwrap().get_current_time_in_sample();
-        let sr = play_info.unwrap().get_samplerate() ;
+        let sr = play_info.unwrap().get_samplerate();
         // do nothing for now
         match v {
             [input_sample, _start, dur, time_in, time_out] => {
@@ -347,8 +349,7 @@ pub struct Nop {}
 impl ExtFunT for Nop {
     fn exec(
         &self,
-        _env: &Arc<Environment>,
-        _play_info: &Option<&Box<dyn PlayInfo+Send+Sync>>,
+        _play_info: &Option<&Box<dyn PlayInfo + Send + Sync>>,
         _v: &[Value],
     ) -> Result<Value, EvalError> {
         Ok(Value::None)
@@ -362,10 +363,10 @@ impl ExtFunT for Nop {
         &[]
     }
 }
-pub fn lookup_extfun(name: &str) -> Result<ExtFun, EvalError> {
+pub fn lookup_extfun(name: &str,env:&Arc<Environment>) -> Result<ExtFun, EvalError> {
     match name {
         "sinewave" => Ok(ExtFun::new(SineWave::new())),
-        "fadeinout" => Ok(ExtFun::new(FadeInOut::new())),
+        "fadeinout" => Ok(ExtFun::new(FadeInOut::new(env))),
         "apply_fade_in_out" => Ok(ExtFun::new(ApplyFadeInOut::new())),
         // "fileplayer"=>Ok(ExtFun::new(Nop{})),
         _ => Err(EvalError::NotFound),

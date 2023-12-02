@@ -1,3 +1,5 @@
+use script::Symbol;
+
 use crate::action::{self, Action};
 
 use crate::script::{param_float,builtin_fn, Expr, ExtFun, Value};
@@ -6,7 +8,7 @@ use crate::parameter::{FloatParameter, Parameter, RangedNumeric};
 use std::sync::{mpsc, Arc, Mutex};
 fn with_fade(region: Expr) -> Expr {
     Expr::App(
-        Expr::Var("fadeinout".to_string()).into(),
+        Expr::Var(Symbol::new("fadeinout")).into(),
         vec![
             region,
             Expr::Literal(Value::Parameter(Arc::new(

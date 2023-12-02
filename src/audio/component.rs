@@ -229,7 +229,7 @@ impl RangedScriptComponent {
         }
     }
     pub fn compute_sample(&self, input: f64, info: &PlaybackInfo) -> f64 {
-        let expr = Expr::App(
+        let mut expr = Expr::App(
             //例えばFadeInOutなら、クロージャにtime_in、time_outの様なパラメータを閉じ込めておいて、apply_fade_in_outの中でenv.lookupで取り出す、とか？
             Expr::Literal(self.translator.clone()).into(),
             vec![

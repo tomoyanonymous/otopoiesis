@@ -1,8 +1,6 @@
-use crate::{runtime::PlayInfo, environment::EnvTrait};
+use crate::{environment::EnvTrait, runtime::PlayInfo};
 
-use super::{value::Param, *,Symbol};
-
-
+use super::{value::Param, Symbol, *};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum Expr {
@@ -30,7 +28,7 @@ pub enum EvalError {
 impl Expr {
     pub fn eval(
         &self,
-        env: impl EnvTrait,
+        env: Arc<Environment>,
         play_info: &Option<&Box<dyn PlayInfo + Send + Sync>>,
     ) -> Result<Value, EvalError> {
         match self {
@@ -45,15 +43,13 @@ impl Expr {
                     Type::Array(Type::Unknown.into(), vec.len() as u64),
                 ))
             }
-            Expr::Var(v) => env.lookup(v).ok_or(EvalError::NotFound),
+            Expr::Var(v) => env.lookup(v).cloned().ok_or(EvalError::NotFound),
             Expr::Lambda(ids, body) => Ok(Value::Closure(ids.clone(), env.clone(), body.clone())),
             Expr::Let(id, body, then) => {
-                let mut newenv = extend_env(env.clone());
+                let body_v = body.eval(env.clone(), play_info)?;
+                let newenv = env.extend_with(&[(Symbol::new(id), body_v)]);
 
-                let body_v = body.eval(env, play_info)?;
-                newenv.bind(id, body_v);
-
-                then.eval(Arc::new(newenv), play_info)
+                then.eval(newenv, play_info)
             }
             Expr::App(fe, args) => {
                 let f = fe.eval(env.clone(), play_info)?;
@@ -70,14 +66,17 @@ impl Expr {
                     Value::Function(_ids, _body) => {
                         todo!()
                     }
-                    Value::Closure(ids, env, body) => {
-                        let mut newenv = extend_env(env);
-                        ids.iter().zip(arg_res.iter()).for_each(|(id, a)| {
-                            newenv.bind(&id.get_label(), a.clone());
-                        });
-                        body.eval(Arc::new(newenv), play_info)
+                    Value::Closure(ids, env, mut body) => {
+                        let newenv = env.extend_with(
+                            ids.iter()
+                                .zip(arg_res.iter())
+                                .map(|(id, a)| (Symbol::new(id.get_label()), a.clone()))
+                                .collect::<Vec<_>>()
+                                .as_slice(),
+                        );
+                        body.eval(newenv, play_info)
                     }
-                    Value::ExtFunction(f) => f.0.exec(&env, play_info, &arg_res),
+                    Value::ExtFunction(f) => f.0.exec(play_info, &arg_res),
                     _ => Err(EvalError::TypeMismatch("Not a Function".into())),
                 }
             }
