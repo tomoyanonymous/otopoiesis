@@ -2,10 +2,11 @@
 
 use crate::action;
 use crate::app::filemanager::{self, FileManager};
+use crate::atomic::{self, SimpleAtomic};
 use crate::script::{Environment, EvalError};
-use crate::atomic::{self,SimpleAtomic};
 
 use rfd;
+use script::compiler;
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 
@@ -59,9 +60,7 @@ impl TryFrom<&Value> for Project {
                 let tracks: Vec<Track> = tr
                     .iter()
                     .map(|t| {
-                        let res = t
-                            .eval(env.clone(), &None)
-                            .and_then(|t| Track::try_from(&t));
+                        let res = t.eval(env.clone(), &None).and_then(|t| Track::try_from(&t));
                         res
                     })
                     .try_collect()?;
@@ -82,6 +81,7 @@ pub struct AppModel {
     pub transport: Arc<Transport>,
     pub global_setting: GlobalSetting,
     pub launch_arg: LaunchArg,
+    pub compile_ctx: compiler::Context,
     pub source: Option<script::Expr>,
     pub project: Project,
     pub project_str: String,
@@ -93,6 +93,7 @@ pub struct AppModel {
 
 impl AppModel {
     pub fn new(transport: Transport, global_setting: GlobalSetting, launch_arg: LaunchArg) -> Self {
+        let compile_ctx = compiler::Context::default();
         let transport = Arc::new(transport);
         let file = launch_arg.file.clone();
         let project_file = file.map(|file| {
@@ -103,13 +104,14 @@ impl AppModel {
         if let Some(file) = project_file.clone() {
             let _ = filemanager::get_global_file_manager().read_to_string(file, &mut project_str);
         }
-        let root_env = Arc::new(Environment::new());
-        let source = Some(Expr::Literal(Value::Project(root_env, 44100., vec![])));
+
+        let source = Some(Expr::Project(44100., vec![]));
         let (action_tx, action_rx) = mpsc::channel();
         Self {
             transport,
             global_setting,
             launch_arg,
+            compile_ctx,
             source,
             project: Project::new(44100),
             project_str,

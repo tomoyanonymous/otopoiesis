@@ -1,10 +1,14 @@
+use id_arena::Id;
+
 use crate::{
-    environment::EnvTrait,
+    compiler::Context,
+    expr::ExprRef,
     parameter::{FloatParameter, Parameter, RangedNumeric},
     runtime::PlayInfo,
+    value::{self, RawValue, Region},
 };
 
-use super::{value::Param, Environment, EvalError, Expr, ExtFun, ExtFunT, Type, Value};
+use super::{Environment, EvalError, Expr, ExtFun, ExtFunT, Type, Value};
 pub mod loadwav;
 use std::sync::Arc;
 
@@ -15,100 +19,84 @@ impl ExtFunT for ArrayReverse {
     fn exec(
         &self,
         _play_info: &Option<&Box<dyn PlayInfo + Send + Sync>>,
+        ctx: &mut Context,
         v: &[Value],
     ) -> Result<Value, EvalError> {
-        if v.len() != 1 {
-            return Err(EvalError::InvalidNumArgs(1, v.len()));
-        }
-        match v.get(0).unwrap() {
-            Value::Array(a, t) => {
-                let mut res = a.clone();
-                res.reverse();
-                Ok(Value::Array(res, t.clone()))
-            }
-            _ => Err(EvalError::TypeMismatch("Not an array".into())),
-        }
+        todo!()
+        // if v.len() != 1 {
+        //     return Err(EvalError::InvalidNumArgs(1, v.len()));
+        // }
+        // match v.get(0).unwrap() {
+        //     Value::Array(a, t) => {
+        //         let mut res = a.clone();
+        //         res.reverse();
+        //         Ok(Value::Array(res, t.clone()))
+        //     }
+        //     _ => Err(EvalError::TypeMismatch("Not an array".into())),
+        // }
     }
 
     fn get_name(&self) -> &str {
         "array_reverse"
     }
 
-    fn get_params(&self) -> &[super::value::Param] {
+    fn get_params(&self) -> &[String] {
         &[]
     }
 }
 
 #[derive(Clone, Debug)]
 pub struct Print {
-    params: Vec<Param>,
+    // params: Vec<Param>,
 }
 
 impl ExtFunT for Print {
-
     fn exec(
         &self,
         _play_info: &Option<&Box<dyn PlayInfo + Send + Sync>>,
+        ctx: &mut Context,
         v: &[Value],
     ) -> Result<Value, EvalError> {
-        let str = v
-            .iter()
-            .fold(String::new(), |acc, b| format!("{}, {:?}", acc, b));
-        println!("{}", str);
-        Ok(Value::None)
+        //todo! generics
+        // let str = v
+        //     .iter()
+        //     .fold(String::new(), |acc, b| format!("{}, {:?}", acc, b));
+        // println!("{}", str);
+        Ok(RawValue(0))
     }
 
     fn get_name(&self) -> &str {
         "print"
     }
 
-    fn get_params(&self) -> &[Param] {
-        &self.params
+    fn get_params(&self) -> &[String] {
+        &[]
     }
 }
 
 #[derive(Clone, Debug)]
-pub struct SineWave {
-    params: [Param; 3],
-}
-impl SineWave {
-    pub fn new() -> Self {
-        let freq = Param::Number(Arc::new(
-            FloatParameter::new(440., "frequency").set_range(20.0..=20000.),
-        ));
-        let amp = Param::Number(Arc::new(
-            FloatParameter::new(1.0, "amplitude").set_range(0.0..=1.0),
-        ));
-        let phase = Param::Number(Arc::new(
-            FloatParameter::new(0.0, "phase").set_range(0.0..=1.0),
-        ));
-        Self {
-            params: [freq, amp, phase],
-        }
-    }
-}
-impl ExtFunT for SineWave {
+pub struct SineWave {}
 
+impl ExtFunT for SineWave {
     fn exec(
         &self,
         play_info: &Option<&Box<dyn PlayInfo + Send + Sync>>,
+        ctx: &mut Context,
         v: &[Value],
     ) -> Result<Value, EvalError> {
         match play_info {
             Some(info) => match &v {
                 &[freq, amp, phase] => {
-                    let res = {
-                        //2Hzなら (now/sr)
-                        let now = info.get_current_time_in_sample();
-                        let now_s = now as f64 / info.get_samplerate();
-                        let f = freq.get_as_float()?;
-                        let a = amp.get_as_float()?;
-                        let p = phase.get_as_float()?;
-                        let phase_sample = f * now_s + p;
-                        Some((phase_sample * std::f64::consts::PI * 2.0).sin() * a)
-                    };
-                    res.map(|r| Value::Number(r))
-                        .ok_or(EvalError::TypeMismatch("sinewave type error".into()))
+                    //2Hzなら (now/sr)
+                    let now = info.get_current_time_in_sample();
+                    let now_s = now as f64 / info.get_samplerate();
+                    let f = freq.get_as_float();
+                    let a = amp.get_as_float();
+                    let p = phase.get_as_float();
+                    let phase_sample = f * now_s + p;
+                    Ok(RawValue::from(
+                        (phase_sample * std::f64::consts::PI * 2.0).sin() * a,
+                    ))
                 }
                 _ => Err(EvalError::InvalidNumArgs(3, v.len())),
             },
@@ -120,36 +108,19 @@ impl ExtFunT for SineWave {
         "sinewave"
     }
 
-    fn get_params(&self) -> &[Param] {
-        &self.params
+    fn get_params(&self) -> &[String] {
+        &[]
     }
 }
 
 #[derive(Debug)]
-pub struct FadeInOut {
-    params: [Param; 2],
-    env: Arc<Environment>,
-}
-impl FadeInOut {
-    pub fn new(env: &Arc<Environment>) -> Self {
-        let time_in = Param::Number(Arc::new(
-            FloatParameter::new(0.01, "fade_in").set_range(0.0..=10.0),
-        ));
-        let time_out = Param::Number(Arc::new(
-            FloatParameter::new(0.01, "fade_out").set_range(0.0..=10.0),
-        ));
-        Self {
-            params: [time_in, time_out],
-            env:env.clone(),
-        }
-    }
-}
+pub struct FadeInOut {}
 
 impl ExtFunT for FadeInOut {
-
     fn exec(
         &self,
         _play_info: &Option<&Box<dyn PlayInfo + Send + Sync>>,
+        ctx: &mut Context,
         v: &[Value],
     ) -> Result<Value, EvalError> {
         // ここでは実際のフェードイン、アウトはしない。
@@ -159,35 +130,21 @@ impl ExtFunT for FadeInOut {
         }
         match v {
             [origin, time_in, time_out] => {
-                let (start, dur, content, _label) = match origin {
-                    Value::Region(_env, start, dur, content, label, _type) => {
-                        (start, dur, content, label)
-                    }
-                    _ => panic!("not a region"),
-                };
-                let env = self.env.extend_with(&vec![]);
-                let content = Box::new(Expr::Lambda(
-                    vec![],
-                    Expr::App(
-                        Expr::Var("apply_fade_in_out".into()).into(),
-                        vec![
-                            *content.clone(),
-                            *start.clone(),
-                            *dur.clone(),
-                            Expr::Literal(time_in.clone()),
-                            Expr::Literal(time_out.clone()),
-                        ],
-                    )
-                    .into(),
-                ));
-                Ok(Value::Region(
-                    self.env.clone(),
-                    start.clone(),
-                    dur.clone(),
-                    content,
-                    "fade_in_out".into(),
-                    Type::Unknown,
-                ))
+                let value::Region(envid, start, dur, content) =
+                    origin.get_as_ref::<&value::Region>();
+                let env = ctx.env_storage.extend(envid.clone(), &[]);
+                let app = ExprRef(ctx.expr_storage.alloc(Expr::AppExt(
+                    ExtFun(Arc::new(ApplyFadeInOut {
+                        time_in: *time_in,
+                        time_out: *time_out,
+                    })),
+                    vec![content.clone(), start.clone(), dur.clone()],
+                )));
+                // let content = ctx.gen_closure(env, &vec![], &ExprRef(app));
+                let region = value::Region(env, start.clone(), dur.clone(), app);
+                let region = ctx.region_storage.alloc(region);
+                let region_ref = ctx.region_storage.get_mut(region).unwrap();
+                Ok(RawValue::from(region_ref as *mut Region))
             }
             _ => Err(EvalError::TypeMismatch("argument type mismatch".into())),
         }
@@ -197,8 +154,8 @@ impl ExtFunT for FadeInOut {
         "fadeinout"
     }
 
-    fn get_params(&self) -> &[Param] {
-        &self.params
+    fn get_params(&self) -> &[String] {
+        &[]
     }
 }
 
@@ -266,23 +223,10 @@ impl<'a> FadeInfo<'a> {
 
 #[derive(Clone, Debug)]
 pub struct ApplyFadeInOut {
-    params: [Param; 4],
+    pub time_in: RawValue,
+    pub time_out: RawValue,
 }
-impl ApplyFadeInOut {
-    pub fn new() -> Self {
-        let start = Param::Number(Arc::new(FloatParameter::new(0.01, "start")));
-        let dur = Param::Number(Arc::new(FloatParameter::new(0.01, "dur")));
-        let time_in = Param::Number(Arc::new(
-            FloatParameter::new(0.01, "fade_in").set_range(0.0..=10.0),
-        ));
-        let time_out = Param::Number(Arc::new(
-            FloatParameter::new(0.01, "fade_out").set_range(0.0..=10.0),
-        ));
-        Self {
-            params: [start, dur, time_in, time_out],
-        }
-    }
-}
+impl ApplyFadeInOut {}
 impl ApplyFadeInOut {
     pub fn apply(
         input: f64,
@@ -302,6 +246,7 @@ impl ExtFunT for ApplyFadeInOut {
     fn exec(
         &self,
         play_info: &Option<&Box<dyn PlayInfo + Send + Sync>>,
+        ctx: &mut Context,
         v: &[Value],
     ) -> Result<Value, EvalError> {
         let now = play_info.unwrap().get_current_time_in_sample();
@@ -309,26 +254,14 @@ impl ExtFunT for ApplyFadeInOut {
         // do nothing for now
         match v {
             [input_sample, _start, dur, time_in, time_out] => {
-                let input = match input_sample {
-                    Value::Number(n) => Ok(*n as f64),
-                    Value::Parameter(p) => Ok(p.get() as f64),
-                    Value::Closure(_ids, env, body) => {
-                        let n = body.eval(env.clone(), play_info)?;
-                        Ok(n.get_as_float()?)
-                    }
-                    _ => Err(EvalError::InvalidConversion),
-                }?;
-                // let input = input_sample
-                //     .eval_closure(play_info, app)
-                //     .map(|s| s.get_as_float().expect("not a float"))
-                //     .expect("not a closure");
+                let input = input_sample.get_as_float();
                 let start = 0;
-                let dur = (dur.get_as_float().unwrap() * sr) as u64;
-                let time_in = (time_in.get_as_float().unwrap() * sr) as u64;
-                let time_out = (time_out.get_as_float().unwrap() * sr) as u64;
+                let dur = (dur.get_as_float() * sr) as u64;
+                let time_in = (time_in.get_as_float() * sr) as u64;
+                let time_out = (time_out.get_as_float() * sr) as u64;
                 // Ok(Value::Number(input))//なんかおかしい
                 Self::apply(input, now as u64, start, dur, time_in, time_out)
-                    .map(|res| Value::Number(res))
+                    .map(|res| RawValue::from(res))
             }
             _ => Err(EvalError::InvalidNumArgs(5, v.len())),
         }
@@ -338,8 +271,8 @@ impl ExtFunT for ApplyFadeInOut {
         "apply_fade_in_out"
     }
 
-    fn get_params(&self) -> &[Param] {
-        &self.params
+    fn get_params(&self) -> &[String] {
+        &[]
     }
 }
 
@@ -350,36 +283,36 @@ impl ExtFunT for Nop {
     fn exec(
         &self,
         _play_info: &Option<&Box<dyn PlayInfo + Send + Sync>>,
+        ctx: &mut Context,
         _v: &[Value],
     ) -> Result<Value, EvalError> {
-        Ok(Value::None)
+        Ok(RawValue(0))
     }
 
     fn get_name(&self) -> &str {
         "nop"
     }
 
-    fn get_params(&self) -> &[Param] {
+    fn get_params(&self) -> &[String] {
         &[]
     }
 }
-pub fn lookup_extfun(name: &str,env:&Arc<Environment>) -> Result<ExtFun, EvalError> {
-    match name {
-        "sinewave" => Ok(ExtFun::new(SineWave::new())),
-        "fadeinout" => Ok(ExtFun::new(FadeInOut::new(env))),
-        "apply_fade_in_out" => Ok(ExtFun::new(ApplyFadeInOut::new())),
-        // "fileplayer"=>Ok(ExtFun::new(Nop{})),
-        _ => Err(EvalError::NotFound),
-    }
-}
-// pub fn gen_default_functions() -> Vec<(String, ExtFun)> {
-//     vec![
-//         ("reverse".into(), ExtFun::new(ArrayReverse {})),
-//         ("sinewave".into(), ExtFun::new(SineWave {})),
-//         ("fadeinout".into(), ExtFun::new(FadeInOut {})),
-//         ("apply_fade_in_out".into(), ExtFun::new(ApplyFadeInOut {})),
-//     ]
+// pub fn lookup_extfun(name: &str, env: &Arc<Environment>) -> Result<ExtFun, EvalError> {
+//     match name {
+//         "sinewave" => Ok(ExtFun::new(SineWave::new())),
+//         "fadeinout" => Ok(ExtFun::new(FadeInOut::new(env))),
+//         "apply_fade_in_out" => Ok(ExtFun::new(ApplyFadeInOut::new())),
+//         // "fileplayer"=>Ok(ExtFun::new(Nop{})),
+//         _ => Err(EvalError::NotFound),
+//     }
 // }
+pub fn gen_default_functions() -> Vec<(String, ExtFun)> {
+    vec![
+        ("reverse".into(), ExtFun::new(ArrayReverse {})),
+        ("sinewave".into(), ExtFun::new(SineWave {})),
+        ("fadeinout".into(), ExtFun::new(FadeInOut {})),
+    ]
+}
 // pub fn gen_global_env() -> Environment {
 // let v = gen_default_functions()
 //     .iter()

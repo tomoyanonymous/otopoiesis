@@ -4,61 +4,35 @@
 pub mod atomic;
 pub mod builtin_fn;
 pub mod compiler;
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub(crate) struct EnvId {
-    level: u64,
-    count: u64,
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct Symbol {
-    name: String,
-    id: Option<EnvId>,
-}
-impl Symbol {
-    pub fn new(name: impl ToString) -> Self {
-        Self {
-            name: name.to_string(),
-            id: None,
-        }
-    }
-    pub fn to_string(&self) -> String {
-        self.name.clone()
-    }
-}
-impl Into<Symbol> for &'static str {
-    fn into(self) -> Symbol {
-        Symbol::new(self)
-    }
-}
 
 pub mod environment;
 pub mod expr;
 pub mod parameter;
 pub mod runtime;
 pub mod value;
-use self::value::Param;
+
+use compiler::Context;
 use runtime::PlayInfo;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
 use crate::parameter::FloatParameter;
-
-pub use {
-    environment::{EnvTrait, Environment},
-    expr::{EvalError, Expr},
-    value::Value,
-};
+use id_arena::Id;
+use string_interner::DefaultSymbol;
+pub(crate) type Symbol = DefaultSymbol;
+pub use {compiler::EvalError, environment::Environment, expr::Expr};
+type Value = value::RawValue;
 // mod test;
 // use serde::{Deserialize, Serialize};
 pub trait ExtFunT: std::fmt::Debug {
     fn exec(
         &self,
         play_info: &Option<&Box<dyn PlayInfo + Send + Sync>>,
+        ctx: &mut Context,
         v: &[Value],
     ) -> Result<Value, EvalError>;
     fn get_name(&self) -> &str;
-    fn get_params(&self) -> &[Param];
+    fn get_params(&self) -> &[String];
 }
 
 // pub trait MixerT: std::fmt::Debug {
@@ -77,7 +51,7 @@ impl ExtFun {
     pub fn get_name(&self) -> &str {
         self.0.get_name()
     }
-    pub fn get_params(&self) -> &[Param] {
+    pub fn get_params(&self) -> &[String] {
         self.0.get_params()
     }
 }
@@ -115,7 +89,6 @@ impl<'d> Deserialize<'d> for ExtFun {
 }
 
 // pub type Mixer = Arc<dyn MixerT>;
-pub type Id = String;
 pub type Time = f64;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
