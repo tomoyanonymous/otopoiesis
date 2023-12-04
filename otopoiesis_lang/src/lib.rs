@@ -21,7 +21,7 @@ use id_arena::Id;
 use string_interner::DefaultSymbol;
 pub(crate) type Symbol = DefaultSymbol;
 pub use {compiler::EvalError, environment::Environment, expr::Expr};
-type Value = value::RawValue;
+pub type Value = value::RawValue;
 // mod test;
 // use serde::{Deserialize, Serialize};
 pub trait ExtFunT: std::fmt::Debug {

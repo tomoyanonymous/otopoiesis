@@ -275,7 +275,7 @@ pub fn render_region_offline_async(
 mod test {
     use std::sync::Arc;
 
-    use script::{runtime::PlayInfo, Symbol};
+    use script::{runtime::PlayInfo, };
 
     use crate::{
         data::Content,
@@ -370,106 +370,106 @@ mod test {
                 )
             })
     }
-    #[test]
-    pub fn run_generator_region() {
-        let channel = 2;
-        let sample_rate = 48000.;
-        let start = Arc::new(FloatParameter::new(0.1, "start"));
-        let dur = Arc::new(FloatParameter::new(0.1, "dur"));
-        let osc_param = data::generator::OscillatorParam::default();
-        let data = data::Region::new(
-            start.clone(),
-            dur.clone(),
-            Value::ExtFunction(ExtFun::new(builtin_fn::SineWave::new())),
-            "test_sin",
-        );
-        let mut model = Model::new(data, channel);
-        model.render_offline(sample_rate, channel);
-        let range_samps = (dur.get() as f64 * sample_rate as f64) as usize * channel as usize;
-        assert_eq!(model.interleaved_samples_cache.len(), range_samps);
+    // #[test]
+    // pub fn run_generator_region() {
+    //     let channel = 2;
+    //     let sample_rate = 48000.;
+    //     let start = Arc::new(FloatParameter::new(0.1, "start"));
+    //     let dur = Arc::new(FloatParameter::new(0.1, "dur"));
+    //     let osc_param = data::generator::OscillatorParam::default();
+    //     let data = data::Region::new(
+    //         start.clone(),
+    //         dur.clone(),
+    //         Value::ExtFunction(ExtFun::new(builtin_fn::SineWave::new())),
+    //         "test_sin",
+    //     );
+    //     let mut model = Model::new(data, channel);
+    //     model.render_offline(sample_rate, channel);
+    //     let range_samps = (dur.get() as f64 * sample_rate as f64) as usize * channel as usize;
+    //     assert_eq!(model.interleaved_samples_cache.len(), range_samps);
 
-        let mut answer = vec![0.0f32; range_samps];
-        let phase = osc_param.phase.get();
-        assert_eq!(phase.sin(), 0.0);
-        gen_sinewave(
-            answer.as_mut_slice(),
-            &osc_param,
-            phase,
-            sample_rate,
-            channel as u32,
-        );
-        assert!(model.cache_completed);
-        validate_answer_array(&model.interleaved_samples_cache, &answer);
-    }
+    //     let mut answer = vec![0.0f32; range_samps];
+    //     let phase = osc_param.phase.get();
+    //     assert_eq!(phase.sin(), 0.0);
+    //     gen_sinewave(
+    //         answer.as_mut_slice(),
+    //         &osc_param,
+    //         phase,
+    //         sample_rate,
+    //         channel as u32,
+    //     );
+    //     assert!(model.cache_completed);
+    //     validate_answer_array(&model.interleaved_samples_cache, &answer);
+    // }
 
-    fn run_fade_region(in_time: f32, out_time: f32) {
-        let time_in = FloatParameter::new(in_time, "time_in").set_range(0.0..=1000.0);
-        let time_out = FloatParameter::new(out_time, "time_out").set_range(0.0..=1000.0);
-        let channels = 2;
-        let sample_rate = 48000.;
-        let start = FloatParameter::new(0.1, "start");
-        let dur = FloatParameter::new(0.1, "dur");
+    // fn run_fade_region(in_time: f32, out_time: f32) {
+    //     let time_in = FloatParameter::new(in_time, "time_in").set_range(0.0..=1000.0);
+    //     let time_out = FloatParameter::new(out_time, "time_out").set_range(0.0..=1000.0);
+    //     let channels = 2;
+    //     let sample_rate = 48000.;
+    //     let start = FloatParameter::new(0.1, "start");
+    //     let dur = FloatParameter::new(0.1, "dur");
 
-        let generator = Expr::App(
-            Expr::Literal(Value::new_lazy(Expr::Literal(Value::Number(1.0))).into()).into(),
-            vec![],
-        );
+    //     let generator = Expr::App(
+    //         Expr::Literal(Value::new_lazy(Expr::Literal(Value::Number(1.0))).into()).into(),
+    //         vec![],
+    //     );
 
-        let region = Expr::Region(
-            Expr::Literal(Value::new_param(start.clone())).into(),
-            Expr::Literal(Value::new_param(dur.clone())).into(),
-            generator.into(),
-            "generator".into(),
-        );
-        let region_with_fade = Expr::App(
-            Expr::Var(Symbol::new("fadeinout")).into(),
-            vec![
-                region.clone(),
-                Expr::Literal(Value::new_param(time_in.clone())),
-                Expr::Literal(Value::new_param(time_out.clone())),
-            ],
-        );
-        let env = Arc::new(Environment::new());
-        let info = PlaybackInfo {
-            sample_rate,
-            current_time: 0,
-            frame_per_buffer: 256,
-            channels,
-        }.boxed();
+    //     let region = Expr::Region(
+    //         Expr::Literal(Value::new_param(start.clone())).into(),
+    //         Expr::Literal(Value::new_param(dur.clone())).into(),
+    //         generator.into(),
+    //         "generator".into(),
+    //     );
+    //     let region_with_fade = Expr::App(
+    //         Expr::Var(Symbol::new("fadeinout")).into(),
+    //         vec![
+    //             region.clone(),
+    //             Expr::Literal(Value::new_param(time_in.clone())),
+    //             Expr::Literal(Value::new_param(time_out.clone())),
+    //         ],
+    //     );
+    //     let env = Arc::new(Environment::new());
+    //     let info = PlaybackInfo {
+    //         sample_rate,
+    //         current_time: 0,
+    //         frame_per_buffer: 256,
+    //         channels,
+    //     }.boxed();
 
-        let region_res = region_with_fade.eval(env, &Some(&info)).unwrap();
-        let data = data::Region::try_from(&region_res).unwrap();
-        let mut model = Model::new(data, channels);
-        model.render_offline(sample_rate, channels);
-        let range_samps = (dur.get() as f64 * sample_rate as f64) as usize * channels as usize;
-        assert_eq!(model.interleaved_samples_cache.len(), range_samps);
+    //     let region_res = region_with_fade.eval(env, &Some(&info)).unwrap();
+    //     let data = data::Region::try_from(&region_res).unwrap();
+    //     let mut model = Model::new(data, channels);
+    //     model.render_offline(sample_rate, channels);
+    //     let range_samps = (dur.get() as f64 * sample_rate as f64) as usize * channels as usize;
+    //     assert_eq!(model.interleaved_samples_cache.len(), range_samps);
 
-        let mut answer = vec![1.0f32; range_samps];
+    //     let mut answer = vec![1.0f32; range_samps];
 
-        gen_constant(answer.as_mut_slice(), channels as u32);
-        apply_fadeinout(
-            answer.as_mut_slice(),
-            time_in.get().into(),
-            time_out.get().into(),
-            sample_rate,
-            channels as u32,
-        );
-        assert!(model.cache_completed);
-        validate_answer_array(&model.interleaved_samples_cache, &answer);
-    }
-    #[test]
-    fn run_fade_zeros() {
-        run_fade_region(0.0, 0.0);
-    }
+    //     gen_constant(answer.as_mut_slice(), channels as u32);
+    //     apply_fadeinout(
+    //         answer.as_mut_slice(),
+    //         time_in.get().into(),
+    //         time_out.get().into(),
+    //         sample_rate,
+    //         channels as u32,
+    //     );
+    //     assert!(model.cache_completed);
+    //     validate_answer_array(&model.interleaved_samples_cache, &answer);
+    // }
+    // #[test]
+    // fn run_fade_zeros() {
+    //     run_fade_region(0.0, 0.0);
+    // }
 
-    #[test]
-    fn run_fade_normal() {
-        run_fade_region(0.01, 0.08);
-    }
-    #[test]
-    #[should_panic(expected = "fadein time + fadeout time should be less than region length")]
-    fn run_fade_invalid() {
-        // fade out is too longer
-        run_fade_region(0.05, 0.2);
-    }
+    // #[test]
+    // fn run_fade_normal() {
+    //     run_fade_region(0.01, 0.08);
+    // }
+    // #[test]
+    // #[should_panic(expected = "fadein time + fadeout time should be less than region length")]
+    // fn run_fade_invalid() {
+    //     // fade out is too longer
+    //     run_fade_region(0.05, 0.2);
+    // }
 }

@@ -1,6 +1,6 @@
 use std::{ops::RangeInclusive, sync::Arc};
 
-use script::{runtime::PlayInfo, atomic::AtomicRange};
+use script::{atomic::AtomicRange, compiler::Context, runtime::PlayInfo, value::Closure};
 
 use crate::{
     data::{ConversionError, Region},
@@ -22,24 +22,12 @@ pub struct ScriptComponent {
 
 impl ScriptComponent {
     pub fn try_new(val: &Value) -> Result<Self, EvalError> {
-        let res = match val {
-            Value::Closure(_ids, _env, box _body) => true,
-            _ => false,
-        };
-        if res {
-            Ok(Self { val: val.clone() })
-        } else {
-            Err(EvalError::TypeMismatch("not a closure".into()))
-        }
+        let _cls = val.get_as_ref::<Closure>();
+
+        Ok(Self { val: val.clone() })
     }
-    fn compute_sample(&self, info: &PlaybackInfo) -> f64 {
-        match &self.val {
-            Value::Closure(_ids, env, box body) => match body.eval(env.clone(), &Some(&info.boxed())) {
-                Ok(Value::Number(res)) => res,
-                _ => 0.0,
-            },
-            _ => 0.0,
-        }
+    fn compute_sample(&self, info: &PlaybackInfo, ctx: &mut Context) -> f64 {
+        ctx.eval_closure(&self.val, args).unwrap().get_as_float()
     }
 }
 impl TryFrom<&Value> for ScriptComponent {
@@ -208,7 +196,7 @@ pub struct RangedScriptComponent {
     pub dur: Value,
     pub origin: Value, //expect:region
     pub translator: Value,
-    pub env: Arc<Environment>,
+    pub env: Id<Environment>,
     cache: Vec<f32>,
 }
 impl RangedScriptComponent {

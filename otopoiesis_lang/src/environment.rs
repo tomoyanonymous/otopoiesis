@@ -8,9 +8,10 @@ pub struct Environment {
     parent: Option<Id<Self>>,
     locals: Range<usize>,
 }
+pub type EnvironmentRef = Id<Environment>;
 
 #[derive(Default)]
-pub(crate) struct EnvironmentStorage {
+pub struct EnvironmentStorage {
     store: Arena<Environment>,
     data: Vec<(Symbol, RawValue)>,
 }

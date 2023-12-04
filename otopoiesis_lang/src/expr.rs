@@ -3,7 +3,7 @@ use std::sync::Mutex;
 use super::{Symbol, *};
 
 #[derive(Debug, Clone)]
-pub(crate) struct ExprRef(pub id_arena::Id<Expr>);
+pub struct ExprRef(pub id_arena::Id<Expr>);
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum Literal {
