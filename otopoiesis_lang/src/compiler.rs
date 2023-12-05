@@ -112,6 +112,7 @@ impl Context {
         let e = self.expr_storage.get(e.0).ok_or(EvalError::InvalidId)?;
 
         match e.clone() {
+            Expr::Nop=>Err(EvalError::InvalidConversion),
             Expr::Literal(l) => self.eval_literal(&l),
             Expr::Var(sym) => self
                 .env_storage

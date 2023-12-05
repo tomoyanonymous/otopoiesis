@@ -2,7 +2,7 @@ use std::sync::Mutex;
 
 use super::{Symbol, *};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct ExprRef(pub id_arena::Id<Expr>);
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -18,6 +18,7 @@ pub struct Pattern {
 }
 #[derive(Debug, Clone)]
 pub enum Expr {
+    Nop,
     Literal(Literal),
     Array(Vec<ExprRef>),
     Var(Symbol),

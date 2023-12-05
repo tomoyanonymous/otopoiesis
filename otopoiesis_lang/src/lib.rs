@@ -1,9 +1,11 @@
 #![feature(box_patterns)]
 #![feature(iterator_try_collect)]
-
+pub mod error;
+pub mod parser;
 pub mod atomic;
 pub mod builtin_fn;
 pub mod compiler;
+pub mod metadata;
 
 pub mod environment;
 pub mod expr;
