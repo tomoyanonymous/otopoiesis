@@ -1,12 +1,13 @@
 mod tokens;
 use std::cell::RefCell;
+use std::collections::BTreeMap;
 use std::rc::Rc;
 
 use string_interner::StringInterner;
 use tokens::{Op, Token};
 mod error;
 mod lexer;
-
+pub mod stringifier;
 use crate::error::ReportableError;
 use crate::metadata::*;
 use crate::Symbol;
@@ -18,13 +19,24 @@ use crate::expr::{Expr, ExprRef, Literal};
 use id_arena::{Arena, Id};
 struct ParseContext {
     pub expr_storage: Arena<Expr>,
-    pub span_storage: Arena<Span>,
+    pub span_storage: BTreeMap<Id<Expr>, Span>,
     pub interner: StringInterner,
 }
+impl ParseContext {
+    pub fn get_expr(&self, id: ExprRef) -> Option<&Expr> {
+        self.expr_storage.get(id.0)
+    }
+}
+
 #[derive(Clone)]
 pub struct ParseContextRef(Rc<RefCell<ParseContext>>);
 
 impl ParseContextRef {
+    pub fn make_span(&self, e: ExprRef, span: Span) -> ExprRef {
+        let mut ctx = self.0.borrow_mut();
+        ctx.span_storage.insert(e.0, span);
+        e
+    }
     pub fn make_lvar(&self, id: &str) -> Symbol {
         let mut ctx = self.0.borrow_mut();
         ctx.interner.get_or_intern(id)
@@ -64,29 +76,34 @@ fn lvar_parser(ctx: ParseContextRef) -> impl Parser<Token, Symbol, Error = Simpl
 fn literal_parser(
     ctx: ParseContextRef,
 ) -> impl Parser<Token, ExprRef, Error = Simple<Token>> + Clone {
+    let ctxref = ctx.clone();
     select! {
-        Token::Ident(v)=> ctx.make_var(&v),
+        Token::Ident(v)=> ctxref.make_var(&v),
         // Token::Int(x) => Expr::Literal(Literal::Int(x)),
-        Token::Float(x) =>ctx.make_literal(Literal::Number(x.parse().unwrap())),
-        Token::Str(s) => ctx.make_literal(Literal::String(s)),
+        Token::Float(x) =>ctxref.make_literal(Literal::Number(x.parse().unwrap())),
+        Token::Str(s) => ctxref.make_literal(Literal::String(s)),
         // Token::SelfLit => Expr::Literal(Literal::SelfLit),
         // Token::Now => Expr::Literal(Literal::Now),
     }
-    // .map_with_span(|e, s| WithMeta(e, s))
+    .map_with_span(move |e, s| {
+        ctx.make_span(e.clone(), s);
+        e
+    })
     .labelled("value")
 }
 struct BinopParser(ParseContextRef);
 impl BinopParser {
     pub fn exec(&self, x: ExprRef, y: ExprRef, op: Op, _opspan: Span) -> ExprRef {
-        self.0.clone().make_apply(
-            self.0.clone().make_var(op.get_associated_fn_name()),
-            &[x.clone(), y.clone()],
-        )
+            self.0.clone().make_apply(
+                self.0.clone().make_var(op.get_associated_fn_name()),
+                &[x.clone(), y.clone()],
+            )
+
     }
 }
 
 fn expr_parser(ctx: ParseContextRef) -> impl Parser<Token, ExprRef, Error = Simple<Token>> + Clone {
-    // let ctx_ref = ctx.borrow_mut();
+    let ctxref = ctx.clone();
 
     let expr = recursive(|expr| {
         let lvar = lvar_parser(ctx.clone());
@@ -104,13 +121,14 @@ fn expr_parser(ctx: ParseContextRef) -> impl Parser<Token, ExprRef, Error = Simp
             .then(expr.clone())
             .then_ignore(just(Token::LineBreak).or(just(Token::SemiColon)).repeated())
             .then(expr.clone().or_not())
-            .map(move |((ident, body), then)| {
+            .map_with_span(move |((ident, body), then), span| {
                 let ctx = ctxref.clone();
                 let then = match then {
                     Some(then) => then,
                     None => ctx.clone().make_nop(),
                 };
-                ctx.clone().make_let(ident, body, then)
+                let res = ctx.clone().make_let(ident, body, then);
+                ctx.make_span(res.clone(), span)
             })
             .boxed()
             .labelled("let");
@@ -128,9 +146,10 @@ fn expr_parser(ctx: ParseContextRef) -> impl Parser<Token, ExprRef, Error = Simp
                     // .ignore_then(type_parser()).or_not())
                     .ignore_then(expr.clone()),
             )
-            .map(move |(ids, body)| ctxref.clone().make_lambda(&ids, body))
+            .map_with_span(move |(ids, body), _span| {
+               ctxref.clone().make_lambda(&ids, body)
+            })
             .labelled("lambda");
-        let ctxref = ctx.clone();
 
         // let macro_expand = select! { Token::MacroExpand(s) => Expr::Var(s,None) }
         //     .map_with_span(|e, s| WithMeta(e, s))
@@ -149,10 +168,11 @@ fn expr_parser(ctx: ParseContextRef) -> impl Parser<Token, ExprRef, Error = Simp
             .or(lambda)
             // .or(macro_expand)
             .or(let_e)
-            // .map_with_span(|e, s| WithMeta(e, s))
+            // .map_with_span(move|e, s| ctxref.make_span(e, s))
             .or(parenexpr)
             .boxed()
             .labelled("atoms");
+        let ctxref = ctx.clone();
 
         let items = expr
             .clone()
@@ -163,20 +183,14 @@ fn expr_parser(ctx: ParseContextRef) -> impl Parser<Token, ExprRef, Error = Simp
         let parenitems = items
             .clone()
             .delimited_by(just(Token::ParenBegin), just(Token::ParenEnd))
-            // .map_with_span(|e, s| WithMeta(e, s))
             .repeated();
         // let folder = |f, args| ctx.clone().borrow_mut().make_apply(f, args);
         let apply = atom
             .then(parenitems)
             .foldl(move |f, args: Vec<ExprRef>| ctxref.clone().make_apply(f, &args))
+
             .labelled("apply");
 
-        // let op_cls = move |x: ExprRef, y: ExprRef, op: Op, _opspan: Span| {
-        //     ctxref.clone().make_apply(
-        //         ctxref.clone().make_var(op.get_associated_fn_name()),
-        //         &[x.clone(), y.clone()],
-        //     )
-        // };
         let optoken = move |o: Op| {
             just(Token::Op(o)).map_with_span(|e, s| {
                 (
@@ -297,7 +311,8 @@ fn expr_parser(ctx: ParseContextRef) -> impl Parser<Token, ExprRef, Error = Simp
     //     .or(if_)
     //     .or(expr.clone())
     // });
-    expr
+    let ctxref = ctxref.clone();
+    expr.map_with_span(move |e,s| ctxref.make_span(e, s))
 }
 fn parser(ctx: ParseContextRef) -> impl Parser<Token, ExprRef, Error = Simple<Token>> + Clone {
     expr_parser(ctx)
@@ -307,7 +322,7 @@ pub fn parse(src: &str, ctx: ParseContextRef) -> Result<ExprRef, Vec<Box<dyn Rep
     let len = src.chars().count();
     let mut errs = Vec::<Box<dyn ReportableError>>::new();
 
-    let (tokens, lex_errs) = lexer::lexer().parse_recovery(src.clone());
+    let (tokens, lex_errs) = lexer::lexer().parse_recovery(src);
     lex_errs
         .iter()
         .for_each(|e| errs.push(Box::new(error::ParseError::<char>(e.clone()))));
