@@ -27,6 +27,24 @@
         {
             "type": "lldb",
             "request": "launch",
+            "name": "Debug Mini Editor",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--bin=otopoiesis-minieditor",
+                    "--package=otopoiesis-minieditor"
+                ],
+                "filter": {
+                    "name": "otopoiesis-minieditor",
+                    "kind": "bin",
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
             "name": "Debug unit tests in executable 'otopoiesis'",
             "cargo": {
                 "args": [

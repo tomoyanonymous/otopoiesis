@@ -1,5 +1,5 @@
 [workspace]
-members = ["otopoiesis_lang"]
+members = ["otopoiesis_lang", "otopoiesis_minieditor"]
 
 [package]
 name = "otopoiesis"
@@ -18,7 +18,7 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 # mimium-rs = { git = "https://github.com/tomoyanonymous/mimium-rs.git", branch = "otopoiesis" }
-otopoiesis_lang = {path = "./otopoiesis_lang"}
+otopoiesis_lang = { path = "./otopoiesis_lang" }
 ringbuf = "*"
 serde = { version = "*", features = ["rc"] }
 serde_json = "*"
@@ -39,7 +39,7 @@ rand = "0.8.5"
 dirs = "5.0"
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
-cpal = { version = "0.15.2" ,features = ["wasm-bindgen"]}
+cpal = { version = "0.15.2", features = ["wasm-bindgen"] }
 wasm-bindgen = "0.2.88"
 wasm-bindgen-futures = "0.4.38"
 wee_alloc = "0.4.5"
@@ -49,7 +49,7 @@ console_error_panic_hook = "0.1.6"
 wasm-opt = false
 
 [target.'cfg(all(target_arch = "wasm32"))'.dev_dependencies]
-wasm-bindgen-test = "0.3" 
+wasm-bindgen-test = "0.3"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 coreaudio-sys = "0.2.12"

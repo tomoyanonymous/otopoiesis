@@ -1,0 +1,22 @@
+[package]
+name = "otopoiesis-minieditor"
+version = "0.1.0"
+authors = ["Tomoya Matsuura <me@matsuuratomoya.com>"]
+repository = "https://github.com/tomoyanonymous/otopoiesis"
+license = "MPL 2.0"
+edition = "2021"
+resolver = "2"
+description = "minimal editor of otopoiesis-lang"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+
+[dependencies]
+# mimium-rs = { git = "https://github.com/tomoyanonymous/mimium-rs.git", branch = "otopoiesis" }
+otopoiesis_lang = {path = "../otopoiesis_lang"}
+
+egui = "0.23.*"
+eframe = { version = "0.23.*" }
+egui_extras = { version = "0.23.*", features = ["image"] }
+# symphonia = { version = "0.5.2", features = ["wav"] }
+log = "0.4.20"

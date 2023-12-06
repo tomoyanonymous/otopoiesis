@@ -21,7 +21,10 @@ impl EnvironmentStorage {
     pub fn set_root(&mut self, svs: &[(Symbol, RawValue)]) {
         assert!(self.data.is_empty());
         let range = self.data.len()..(self.data.len() + svs.len());
-        self.data.clone_from_slice(svs);
+        self.data.clear();
+        svs.iter().for_each(|v|{
+            self.data.push(*v);
+        });
         self.store.alloc(Environment {
             parent: None,
             locals: range,

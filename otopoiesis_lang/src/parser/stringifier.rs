@@ -5,7 +5,7 @@ use crate::{
 };
 use std::fmt::Display;
 
-struct Stringifier<'a> {
+pub struct Stringifier<'a> {
     ctx: &'a ParseContext,
     level: u32,
     e: ExprRef,

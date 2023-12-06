@@ -2383,6 +2383,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "otopoiesis-minieditor"
+version = "0.1.0"
+dependencies = [
+ "eframe",
+ "egui",
+ "egui_extras",
+ "log",
+ "otopoiesis_lang",
+]
+
+[[package]]
 name = "otopoiesis_lang"
 version = "0.1.0"
 dependencies = [

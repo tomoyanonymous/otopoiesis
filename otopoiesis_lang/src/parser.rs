@@ -17,7 +17,8 @@ use chumsky::Parser;
 use crate::compiler::Context;
 use crate::expr::{Expr, ExprRef, Literal};
 use id_arena::{Arena, Id};
-struct ParseContext {
+#[derive(Default)]
+pub struct ParseContext {
     pub expr_storage: Arena<Expr>,
     pub span_storage: BTreeMap<Id<Expr>, Span>,
     pub interner: StringInterner,
@@ -29,9 +30,12 @@ impl ParseContext {
 }
 
 #[derive(Clone)]
-pub struct ParseContextRef(Rc<RefCell<ParseContext>>);
+pub struct ParseContextRef(pub Rc<RefCell<ParseContext>>);
 
 impl ParseContextRef {
+    pub fn new(c:ParseContext)->Self{
+        Self(Rc::new(RefCell::new(c)))
+    }
     pub fn make_span(&self, e: ExprRef, span: Span) -> ExprRef {
         let mut ctx = self.0.borrow_mut();
         ctx.span_storage.insert(e.0, span);
@@ -94,11 +98,10 @@ fn literal_parser(
 struct BinopParser(ParseContextRef);
 impl BinopParser {
     pub fn exec(&self, x: ExprRef, y: ExprRef, op: Op, _opspan: Span) -> ExprRef {
-            self.0.clone().make_apply(
-                self.0.clone().make_var(op.get_associated_fn_name()),
-                &[x.clone(), y.clone()],
-            )
-
+        self.0.clone().make_apply(
+            self.0.clone().make_var(op.get_associated_fn_name()),
+            &[x.clone(), y.clone()],
+        )
     }
 }
 
@@ -121,14 +124,13 @@ fn expr_parser(ctx: ParseContextRef) -> impl Parser<Token, ExprRef, Error = Simp
             .then(expr.clone())
             .then_ignore(just(Token::LineBreak).or(just(Token::SemiColon)).repeated())
             .then(expr.clone().or_not())
-            .map_with_span(move |((ident, body), then), span| {
+            .map_with_span(move |((ident, body), then), _span| {
                 let ctx = ctxref.clone();
                 let then = match then {
                     Some(then) => then,
                     None => ctx.clone().make_nop(),
                 };
-                let res = ctx.clone().make_let(ident, body, then);
-                ctx.make_span(res.clone(), span)
+                ctx.clone().make_let(ident, body, then)
             })
             .boxed()
             .labelled("let");
@@ -146,9 +148,7 @@ fn expr_parser(ctx: ParseContextRef) -> impl Parser<Token, ExprRef, Error = Simp
                     // .ignore_then(type_parser()).or_not())
                     .ignore_then(expr.clone()),
             )
-            .map_with_span(move |(ids, body), _span| {
-               ctxref.clone().make_lambda(&ids, body)
-            })
+            .map_with_span(move |(ids, body), _span| ctxref.clone().make_lambda(&ids, body))
             .labelled("lambda");
 
         // let macro_expand = select! { Token::MacroExpand(s) => Expr::Var(s,None) }
@@ -188,7 +188,6 @@ fn expr_parser(ctx: ParseContextRef) -> impl Parser<Token, ExprRef, Error = Simp
         let apply = atom
             .then(parenitems)
             .foldl(move |f, args: Vec<ExprRef>| ctxref.clone().make_apply(f, &args))
-
             .labelled("apply");
 
         let optoken = move |o: Op| {
@@ -312,7 +311,7 @@ fn expr_parser(ctx: ParseContextRef) -> impl Parser<Token, ExprRef, Error = Simp
     //     .or(expr.clone())
     // });
     let ctxref = ctxref.clone();
-    expr.map_with_span(move |e,s| ctxref.make_span(e, s))
+    expr.map_with_span(move |e, s| ctxref.make_span(e, s))
 }
 fn parser(ctx: ParseContextRef) -> impl Parser<Token, ExprRef, Error = Simple<Token>> + Clone {
     expr_parser(ctx)

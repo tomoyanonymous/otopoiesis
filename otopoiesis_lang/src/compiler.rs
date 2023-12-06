@@ -11,7 +11,7 @@ use string_interner::StringInterner;
 
 pub struct Context {
     pub expr_storage: Arena<Expr>,
-    interner: StringInterner,
+    pub interner: StringInterner,
     object_storage: Arena<Closure>,
     pub array_storage: Arena<Vec<RawValue>>,
     pub track_storage: Arena<Track>,
