@@ -1,33 +1,10 @@
 use std::fmt;
+pub(super) use crate::expr::Op;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Comment {
     SingleLine(String),
     MultiLine(String),
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub enum Op {
-    Sum,     // +
-    Minus,   // -
-    Product, // *
-    Divide,  // /
-
-    Equal,        // ==
-    NotEqual,     // !=
-    LessThan,     // <
-    LessEqual,    // <=
-    GreaterThan,  // >
-    GreaterEqual, // >=
-
-    Modulo,   // %
-    Exponent, // ^
-
-    And, // &&
-    Or,  // ||
-
-    Pipe, // |>
-    Unknown(String),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -104,7 +81,7 @@ impl Op {
             Op::And => "and",
             Op::Or => "or",
             Op::Pipe => "pipe",
-            Op::Unknown(x) => x.as_str(),
+            Op::Unknown => "unknown",
         }
     }
 }
@@ -127,7 +104,7 @@ impl fmt::Display for Op {
             Op::And => write!(f, "&&"),
             Op::Or => write!(f, "||"),
             Op::Pipe => write!(f, "|>"),
-            Op::Unknown(x) => write!(f, "{}", x),
+            Op::Unknown => write!(f, "unknown"),
         }
     }
 }

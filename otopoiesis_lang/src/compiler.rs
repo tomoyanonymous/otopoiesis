@@ -112,7 +112,7 @@ impl Context {
         let e = self.expr_storage.get(e.0).ok_or(EvalError::InvalidId)?;
 
         match e.clone() {
-            Expr::Nop=>Err(EvalError::InvalidConversion),
+            Expr::Nop => Err(EvalError::InvalidConversion),
             Expr::Literal(l) => self.eval_literal(&l),
             Expr::Var(sym) => self
                 .env_storage
@@ -135,6 +135,13 @@ impl Context {
                     .map(|(id, a)| (*id, a));
                 let envid = self.env_storage.extend(*env, &kvs.collect::<Vec<_>>());
                 self.eval(body.clone(), envid)
+            }
+            Expr::BinOp(op, lhs, rhs) => {
+                //translate into app
+                let sym = self.interner.get_or_intern(op.get_associated_fn_name());
+                let var = self.expr_storage.alloc(Expr::Var(sym));
+                let app = ExprRef(self.expr_storage.alloc(Expr::App(ExprRef(var), vec![lhs, rhs])));
+                self.eval(app, envid)
             }
             Expr::AppExt(callee, args) => {
                 let args = self.eval_vec(&args, envid)?;
@@ -164,6 +171,9 @@ impl Context {
                 let ptr = self.project_storage.get_mut(id).unwrap() as *mut Project;
                 Ok(RawValue::from(ptr))
             }
+            Expr::Paren(e) => {
+                self.eval(e, envid)
+            },
         }
     }
 }

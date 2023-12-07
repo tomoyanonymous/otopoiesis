@@ -72,7 +72,7 @@ impl<'a> Display for Stringifier<'a> {
 
         let expr = self.ctx.get_expr(self.e.clone()).ok_or(std::fmt::Error)?;
         match expr {
-            Expr::Nop => todo!(),
+            Expr::Nop => write!(f, "nop"),
             Expr::Literal(l) => write!(f, "{}", l),
             Expr::Array(_) => todo!(),
             Expr::Var(s) => write!(f, "{}", self.get_symbol_str(s)),
@@ -86,6 +86,11 @@ impl<'a> Display for Stringifier<'a> {
                 );
                 self.write_indent(f);
                 write!(f, "{}", self.stringify(then))
+            }
+            Expr::BinOp(op, lhs, rhs) => {
+                let lhs = self.stringify(lhs);
+                let rhs = self.stringify(rhs);
+                write!(f, "{lhs} {op} {rhs}")
             }
             Expr::App(callee, args) => {
                 let callee = self.stringify(callee);
@@ -102,6 +107,10 @@ impl<'a> Display for Stringifier<'a> {
             Expr::Track(_) => todo!(),
             Expr::Region(_, _, _) => todo!(),
             Expr::Project(_, _) => todo!(),
+            Expr::Paren(e) => {
+                let e = self.stringify(e);
+                write!(f, "({e})")
+            }
         }
     }
 }

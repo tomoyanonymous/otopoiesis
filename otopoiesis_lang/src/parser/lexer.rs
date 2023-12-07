@@ -3,6 +3,8 @@ use crate::metadata::*;
 use chumsky::prelude::*;
 use chumsky::Parser;
 
+
+
 fn comment_parser() -> impl Parser<char, Comment, Error = Simple<char>> + Clone {
     // comment parser that keep its contents length, not to break line number for debugging.
     // replaces all characters except for newline.
@@ -57,7 +59,7 @@ pub fn lexer() -> impl Parser<char, Vec<(Token, Span)>, Error = Simple<char>> {
             "&&" => Token::Op(Op::And),
             "||" => Token::Op(Op::Or),
             "|>" => Token::Op(Op::Pipe),
-            _ => Token::Op(Op::Unknown(s)),
+            _ => Token::Op(Op::Unknown),
         });
     let separator = one_of(",.:;").map(|c| match c {
         ',' => Token::Comma,

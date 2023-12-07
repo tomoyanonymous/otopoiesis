@@ -70,6 +70,14 @@ impl ParseContextRef {
         let mut ctx = self.0.borrow_mut();
         ExprRef(ctx.expr_storage.alloc(Expr::App(callee, args.to_vec())))
     }
+    pub fn make_binop(&self, op: Op, lhs: ExprRef, rhs: ExprRef) -> ExprRef {
+        let mut ctx = self.0.borrow_mut();
+        ExprRef(ctx.expr_storage.alloc(Expr::BinOp(op, lhs, rhs)))
+    }
+    pub fn make_paren(&self, body: ExprRef) -> ExprRef {
+        let mut ctx = self.0.borrow_mut();
+        ExprRef(ctx.expr_storage.alloc(Expr::Paren(body)))
+    }
     // pub fn make_block(&mut self,)
 }
 fn lvar_parser(ctx: ParseContextRef) -> impl Parser<Token, Symbol, Error = Simple<Token>> + Clone {
@@ -97,11 +105,8 @@ fn literal_parser(
 }
 struct BinopParser(ParseContextRef);
 impl BinopParser {
-    pub fn exec(&self, x: ExprRef, y: ExprRef, op: Op, _opspan: Span) -> ExprRef {
-        self.0.clone().make_apply(
-            self.0.clone().make_var(op.get_associated_fn_name()),
-            &[x.clone(), y.clone()],
-        )
+    pub fn exec(&self, x: ExprRef, y: ExprRef, op: Op) -> ExprRef {
+        self.0.clone().make_binop(op, x, y)
     }
 }
 
@@ -112,9 +117,11 @@ fn expr_parser(ctx: ParseContextRef) -> impl Parser<Token, ExprRef, Error = Simp
         let lvar = lvar_parser(ctx.clone());
         let val = literal_parser(ctx.clone());
         // let expr_group = recursive(|expr_group| {
+        let ctxref = ctx.clone();
         let parenexpr = expr
             .clone()
             .delimited_by(just(Token::ParenBegin), just(Token::ParenEnd))
+            .map(move |e| ctxref.make_paren(e))
             .labelled("paren_expr");
         let ctxref = ctx.clone();
 
@@ -194,14 +201,9 @@ fn expr_parser(ctx: ParseContextRef) -> impl Parser<Token, ExprRef, Error = Simp
             .labelled("apply");
 
         let optoken = move |o: Op| {
-            just(Token::Op(o)).map_with_span(|e, s| {
-                (
-                    match e {
-                        Token::Op(o) => o,
-                        _ => Op::Unknown(String::from("invalid")),
-                    },
-                    s,
-                )
+            just(Token::Op(o)).map(|o| match o {
+                Token::Op(o) => o,
+                _ => panic!(),
             })
         };
 
@@ -210,7 +212,7 @@ fn expr_parser(ctx: ParseContextRef) -> impl Parser<Token, ExprRef, Error = Simp
         let exponent = apply
             .clone()
             .then(op.then(apply).repeated())
-            .foldl(move |x, ((op, opspan), y)| BinopParser(ctxref.clone()).exec(x, y, op, opspan))
+            .foldl(move |x, (o, y)| BinopParser(ctxref.clone()).exec(x, y, o))
             .boxed();
 
         let op = choice((
@@ -222,7 +224,7 @@ fn expr_parser(ctx: ParseContextRef) -> impl Parser<Token, ExprRef, Error = Simp
         let product = exponent
             .clone()
             .then(op.then(exponent).repeated())
-            .foldl(move |x, ((op, opspan), y)| BinopParser(ctxref.clone()).exec(x, y, op, opspan))
+            .foldl(move |x, (o, y)| BinopParser(ctxref.clone()).exec(x, y, o))
             .boxed();
         let op = optoken(Op::Sum).or(optoken(Op::Minus));
         let ctxref = ctx.clone();
@@ -230,7 +232,7 @@ fn expr_parser(ctx: ParseContextRef) -> impl Parser<Token, ExprRef, Error = Simp
         let add = product
             .clone()
             .then(op.then(product).repeated())
-            .foldl(move |x, ((op, opspan), y)| BinopParser(ctxref.clone()).exec(x, y, op, opspan))
+            .foldl(move |x, (o, y)| BinopParser(ctxref.clone()).exec(x, y, o))
             .boxed();
 
         let op = optoken(Op::Equal).or(optoken(Op::NotEqual));
@@ -239,7 +241,7 @@ fn expr_parser(ctx: ParseContextRef) -> impl Parser<Token, ExprRef, Error = Simp
         let cmp = add
             .clone()
             .then(op.then(add).repeated())
-            .foldl(move |x, ((op, opspan), y)| BinopParser(ctxref.clone()).exec(x, y, op, opspan))
+            .foldl(move |x, (o, y)| BinopParser(ctxref.clone()).exec(x, y, o))
             .boxed();
         let op = optoken(Op::And);
         let ctxref = ctx.clone();
@@ -247,7 +249,7 @@ fn expr_parser(ctx: ParseContextRef) -> impl Parser<Token, ExprRef, Error = Simp
         let cmp = cmp
             .clone()
             .then(op.then(cmp).repeated())
-            .foldl(move |x, ((op, opspan), y)| BinopParser(ctxref.clone()).exec(x, y, op, opspan))
+            .foldl(move |x, (o, y)| BinopParser(ctxref.clone()).exec(x, y, o))
             .boxed();
         let op = optoken(Op::Or);
         let ctxref = ctx.clone();
@@ -255,7 +257,7 @@ fn expr_parser(ctx: ParseContextRef) -> impl Parser<Token, ExprRef, Error = Simp
         let cmp = cmp
             .clone()
             .then(op.then(cmp).repeated())
-            .foldl(move |x, ((op, opspan), y)| BinopParser(ctxref.clone()).exec(x, y, op, opspan))
+            .foldl(move |x, (o, y)| BinopParser(ctxref.clone()).exec(x, y, o))
             .boxed();
         let op = choice((
             optoken(Op::LessThan),
@@ -267,14 +269,14 @@ fn expr_parser(ctx: ParseContextRef) -> impl Parser<Token, ExprRef, Error = Simp
         let cmp = cmp
             .clone()
             .then(op.then(cmp).repeated())
-            .foldl(move |x, ((op, opspan), y)| BinopParser(ctxref.clone()).exec(x, y, op, opspan))
+            .foldl(move |x, (o, y)| BinopParser(ctxref.clone()).exec(x, y, o))
             .boxed();
         let op = optoken(Op::Pipe);
 
         let pipe = cmp
             .clone()
             .then(op.then(cmp).repeated())
-            .foldl(move |lhs, ((_, _), rhs)| {
+            .foldl(move |lhs, (_, rhs)| {
                 // let span = lhs.1.start..rhs.1.end;
                 ctx.clone().make_apply(rhs, &[lhs])
             })
