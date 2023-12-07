@@ -1,11 +1,11 @@
 #![feature(box_patterns)]
 #![feature(iterator_try_collect)]
-pub mod error;
-pub mod parser;
 pub mod atomic;
 pub mod builtin_fn;
 pub mod compiler;
+pub mod error;
 pub mod metadata;
+pub mod parser;
 
 pub mod environment;
 pub mod expr;
@@ -20,10 +20,16 @@ use std::sync::Arc;
 
 use crate::parameter::FloatParameter;
 use id_arena::Id;
-use string_interner::DefaultSymbol;
-pub(crate) type Symbol = DefaultSymbol;
+use string_interner::{ StringInterner, backend::StringBackend};
+
+#[derive(Default, Copy, Clone, PartialEq, Debug)]
+pub struct Symbol(usize); //Symbol Trait is implemented on usize
+
+pub(crate) type Interner = StringInterner<StringBackend<usize>>;
+
 pub use {compiler::EvalError, environment::Environment, expr::Expr};
 pub type Value = value::RawValue;
+
 // mod test;
 // use serde::{Deserialize, Serialize};
 pub trait ExtFunT: std::fmt::Debug {

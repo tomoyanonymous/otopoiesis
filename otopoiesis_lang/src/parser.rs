@@ -3,7 +3,7 @@ use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::rc::Rc;
 
-use string_interner::StringInterner;
+
 use tokens::{Op, Token};
 mod error;
 mod lexer;
@@ -14,14 +14,23 @@ use crate::Symbol;
 use chumsky::prelude::*;
 use chumsky::Parser;
 
-use crate::compiler::Context;
 use crate::expr::{Expr, ExprRef, Literal};
 use id_arena::{Arena, Id};
-#[derive(Default)]
+use crate::Interner;
+
 pub struct ParseContext {
     pub expr_storage: Arena<Expr>,
     pub span_storage: BTreeMap<Id<Expr>, Span>,
-    pub interner: StringInterner,
+    pub interner: Interner
+}
+impl Default for ParseContext {
+    fn default() -> Self {
+        Self {
+            expr_storage: Default::default(),
+            span_storage: Default::default(),
+            interner: Interner::new(),
+        }
+    }
 }
 impl ParseContext {
     pub fn get_expr(&self, id: ExprRef) -> Option<&Expr> {
@@ -43,7 +52,7 @@ impl ParseContextRef {
     }
     pub fn make_lvar(&self, id: &str) -> Symbol {
         let mut ctx = self.0.borrow_mut();
-        ctx.interner.get_or_intern(id)
+        Symbol(ctx.interner.get_or_intern(id))
     }
     pub fn make_nop(&self) -> ExprRef {
         let mut ctx = self.0.borrow_mut();
@@ -55,7 +64,7 @@ impl ParseContextRef {
     }
     pub fn make_var(&self, v: &str) -> ExprRef {
         let mut ctx = self.0.borrow_mut();
-        let id = ctx.interner.get_or_intern(v);
+        let id = Symbol(ctx.interner.get_or_intern(v));
         ExprRef(ctx.expr_storage.alloc(Expr::Var(id)))
     }
     pub fn make_let(&self, ident: Symbol, body: ExprRef, then: ExprRef) -> ExprRef {

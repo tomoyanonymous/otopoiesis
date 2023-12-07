@@ -306,8 +306,97 @@ impl ExtFunT for Nop {
 //         _ => Err(EvalError::NotFound),
 //     }
 // }
+#[derive(Debug)]
+pub struct Add {}
+impl ExtFunT for Add {
+    fn exec(
+        &self,
+        _play_info: &Option<&Box<dyn PlayInfo + Send + Sync>>,
+        _ctx: &mut Context,
+        v: &[Value],
+    ) -> Result<Value, EvalError> {
+        assert!(v.len() == 2);
+        Ok(RawValue::from(v[0].get_as_float() + v[1].get_as_float()))
+    }
+
+    fn get_name(&self) -> &str {
+        "add"
+    }
+
+    fn get_params(&self) -> &[String] {
+        &[]
+    }
+}
+#[derive(Debug)]
+pub struct Sub {}
+impl ExtFunT for Sub {
+    fn exec(
+        &self,
+        _play_info: &Option<&Box<dyn PlayInfo + Send + Sync>>,
+        _ctx: &mut Context,
+        v: &[Value],
+    ) -> Result<Value, EvalError> {
+        assert!(v.len() == 2);
+        Ok(RawValue::from(v[0].get_as_float() - v[1].get_as_float()))
+    }
+
+    fn get_name(&self) -> &str {
+        "sub"
+    }
+
+    fn get_params(&self) -> &[String] {
+        &[]
+    }
+}
+#[derive(Debug)]
+pub struct Mult {}
+impl ExtFunT for Mult {
+    fn exec(
+        &self,
+        _play_info: &Option<&Box<dyn PlayInfo + Send + Sync>>,
+        _ctx: &mut Context,
+        v: &[Value],
+    ) -> Result<Value, EvalError> {
+        assert!(v.len() == 2);
+        Ok(RawValue::from(v[0].get_as_float() * v[1].get_as_float()))
+    }
+
+    fn get_name(&self) -> &str {
+        "mult"
+    }
+
+    fn get_params(&self) -> &[String] {
+        &[]
+    }
+}
+#[derive(Debug)]
+pub struct Div {}
+impl ExtFunT for Div {
+    fn exec(
+        &self,
+        _play_info: &Option<&Box<dyn PlayInfo + Send + Sync>>,
+        _ctx: &mut Context,
+        v: &[Value],
+    ) -> Result<Value, EvalError> {
+        assert!(v.len() == 2);
+        Ok(RawValue::from(v[0].get_as_float() / v[1].get_as_float()))
+    }
+
+    fn get_name(&self) -> &str {
+        "div"
+    }
+
+    fn get_params(&self) -> &[String] {
+        &[]
+    }
+}
+
 pub fn gen_default_functions() -> Vec<(String, ExtFun)> {
     vec![
+        ("add".into(), ExtFun::new(Add {})),
+        ("sub".into(), ExtFun::new(Sub {})),
+        ("mult".into(), ExtFun::new(Mult {})),
+        ("div".into(), ExtFun::new(Div {})),
         ("reverse".into(), ExtFun::new(ArrayReverse {})),
         ("sinewave".into(), ExtFun::new(SineWave {})),
         ("fadeinout".into(), ExtFun::new(FadeInOut {})),

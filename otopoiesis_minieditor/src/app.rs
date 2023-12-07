@@ -3,10 +3,12 @@ use std::rc::Rc;
 
 use otopoiesis_lang::compiler::Context;
 use otopoiesis_lang::parser::{stringifier::Stringifier, ParseContext, *};
+use otopoiesis_lang::value::RawValue;
 pub struct Model {
     source: String,
     compiler: Context,
     result: Option<String>,
+    eval_result: Option<String>,
 }
 impl Model {
     pub fn new(_cc: &eframe::CreationContext) -> Self {
@@ -14,17 +16,23 @@ impl Model {
             source: "".into(),
             compiler: Context::default(),
             result: None,
+            eval_result: None,
         }
     }
     pub fn eval(&mut self) {
         let pc = ParseContextRef::new(ParseContext::default());
         let expr = parse(&self.source.clone(), pc.clone());
         let pc = pc.0.borrow_mut();
-        self.compiler.expr_storage = pc.expr_storage.clone();
-        self.compiler.interner = pc.interner.clone();
+
         match expr {
             Ok(e) => {
-                self.result = Some(Stringifier::new(&pc, 0, e).to_string());
+                self.result = Some(Stringifier::new(&pc, 0, e.clone()).to_string());
+                let mut compiler = Context::new(pc.expr_storage.clone(), pc.interner.clone());
+                let root = compiler.root_env;
+                self.eval_result = match compiler.eval(e, root){
+                    Ok(rv) => Some(rv.get_as_float().to_string()),
+                    Err(e) => Some(format!("{:?}",e)),
+                }
             }
             Err(es) => {
                 self.result = Some(
@@ -41,7 +49,7 @@ impl eframe::App for Model {
     fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
         egui::panel::TopBottomPanel::bottom("footer").show(ctx, |ui| {
             ui.horizontal(|ui| {
-                if ui.button("eval").clicked(){
+                if ui.button("eval").clicked() {
                     self.eval();
                 }
             })
@@ -53,6 +61,7 @@ impl eframe::App for Model {
                     self.result.as_ref().map(|e| {
                         ui.label(e);
                     });
+                    self.eval_result.as_ref().map(|e| ui.label(e.to_string()))
                 })
             });
 

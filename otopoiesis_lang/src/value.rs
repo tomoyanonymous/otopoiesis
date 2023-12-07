@@ -10,11 +10,11 @@ pub struct RawValue(pub u64);
 
 impl RawValue {
     pub fn get_as_ref<T>(&self) -> &T {
-        unsafe { std::mem::transmute::<&Self, &T>(self) }
+        let ptr = self.0 as *mut T;
+        unsafe { &*ptr }
     }
-    pub fn get_as_float(&self)-> f64{
+    pub fn get_as_float(&self) -> f64 {
         unsafe { std::mem::transmute::<Self, f64>(*self) }
-
     }
 }
 
@@ -35,32 +35,32 @@ impl From<*const Arc<Mutex<String>>> for RawValue {
 }
 impl From<*mut Closure> for RawValue {
     fn from(value: *mut Closure) -> Self {
-        unsafe { std::mem::transmute::<*mut Closure, Self>(value) }
+        RawValue(value as u64)
     }
 }
 impl From<*mut ExtFun> for RawValue {
     fn from(value: *mut ExtFun) -> Self {
-        unsafe { std::mem::transmute::<*mut ExtFun, Self>(value) }
+        RawValue(value as u64)
     }
 }
 impl From<*mut Vec<RawValue>> for RawValue {
     fn from(value: *mut Vec<RawValue>) -> Self {
-        unsafe { std::mem::transmute::<*mut Vec<RawValue>, Self>(value) }
+        RawValue(value as u64)
     }
 }
 impl From<*mut Track> for RawValue {
     fn from(value: *mut Track) -> Self {
-        unsafe { std::mem::transmute::<*mut Track, Self>(value) }
+        RawValue(value as u64)
     }
 }
 impl From<*mut Region> for RawValue {
     fn from(value: *mut Region) -> Self {
-        unsafe { std::mem::transmute::<*mut Region, Self>(value) }
+        RawValue(value as u64)
     }
 }
 impl From<*mut Project> for RawValue {
     fn from(value: *mut Project) -> Self {
-        unsafe { std::mem::transmute::<*mut Project, Self>(value) }
+        RawValue(value as u64)
     }
 }
 pub struct Closure {

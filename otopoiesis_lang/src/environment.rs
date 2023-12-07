@@ -3,7 +3,6 @@ use std::ops::Range;
 use super::value::RawValue;
 use super::Symbol;
 use id_arena::{Arena, Id};
-use string_interner::StringInterner;
 pub struct Environment {
     parent: Option<Id<Self>>,
     locals: Range<usize>,
@@ -17,18 +16,17 @@ pub struct EnvironmentStorage {
 }
 
 impl EnvironmentStorage {
-
-    pub fn set_root(&mut self, svs: &[(Symbol, RawValue)]) {
-        assert!(self.data.is_empty());
+    pub fn set_root(&mut self, svs: &[(Symbol, RawValue)]) -> Id<Environment> {
+        // assert!(self.data.is_empty());
         let range = self.data.len()..(self.data.len() + svs.len());
         self.data.clear();
-        svs.iter().for_each(|v|{
+        svs.iter().for_each(|v| {
             self.data.push(*v);
         });
         self.store.alloc(Environment {
             parent: None,
             locals: range,
-        });
+        })
     }
     pub fn extend(
         &mut self,
@@ -36,7 +34,9 @@ impl EnvironmentStorage {
         svs: &[(Symbol, RawValue)],
     ) -> Id<Environment> {
         let range = self.data.len()..(self.data.len() + svs.len());
-        self.data.clone_from_slice(svs);
+        self.data
+            .resize(range.end, (Symbol::default(), RawValue(0)));
+        self.data[range.clone()].copy_from_slice(svs);
         self.store.alloc(Environment {
             parent: Some(parent),
             locals: range,

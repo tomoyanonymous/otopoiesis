@@ -18,7 +18,7 @@ impl<'a> Stringifier<'a> {
         Self { ctx, level, e }
     }
     fn get_symbol_str(&self, sym: &Symbol) -> &str {
-        self.ctx.interner.resolve(*sym).unwrap_or("")
+        self.ctx.interner.resolve(sym.0).unwrap_or("")
     }
     fn stringify(&self, e: &ExprRef) -> Self {
         Stringifier::<'a>::new(self.ctx, self.level, e.clone())
@@ -27,7 +27,7 @@ impl<'a> Stringifier<'a> {
         Stringifier::<'a>::new(self.ctx, self.level + 1, e.clone())
     }
     fn join_symbols(&self, syms: impl Iterator<Item = &'a Symbol>) -> String {
-        syms.map(|id| self.ctx.interner.resolve(*id).unwrap())
+        syms.map(|id| self.ctx.interner.resolve(id.0).unwrap())
             .fold("".to_string(), |acc, id| {
                 if acc.is_empty() {
                     id.into()

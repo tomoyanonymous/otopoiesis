@@ -19,7 +19,7 @@ serde_with = "2.1.0"
 
 atomic_float = "*"
 id-arena = "*"
-string-interner = "0.14.0"
+string-interner = {version = "0.14.0",features = ["backends"]}
 chumsky = "0.9.3"
 ariadne = "0.3.0"
 
