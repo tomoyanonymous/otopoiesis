@@ -33,7 +33,7 @@ impl ParseContext {
 pub struct ParseContextRef(pub Rc<RefCell<ParseContext>>);
 
 impl ParseContextRef {
-    pub fn new(c:ParseContext)->Self{
+    pub fn new(c: ParseContext) -> Self {
         Self(Rc::new(RefCell::new(c)))
     }
     pub fn make_span(&self, e: ExprRef, span: Span) -> ExprRef {
@@ -83,7 +83,7 @@ fn literal_parser(
     let ctxref = ctx.clone();
     select! {
         Token::Ident(v)=> ctxref.make_var(&v),
-        // Token::Int(x) => Expr::Literal(Literal::Int(x)),
+        Token::Int(x) => ctxref.make_literal(Literal::Number(x as f64)),
         Token::Float(x) =>ctxref.make_literal(Literal::Number(x.parse().unwrap())),
         Token::Str(s) => ctxref.make_literal(Literal::String(s)),
         // Token::SelfLit => Expr::Literal(Literal::SelfLit),
@@ -145,10 +145,13 @@ fn expr_parser(ctx: ParseContextRef) -> impl Parser<Token, ExprRef, Error = Simp
             )
             .then(
                 just(Token::Arrow)
-                    // .ignore_then(type_parser()).or_not())
-                    .ignore_then(expr.clone()),
+                    // .ignore_then(type_parser())
+                    .or_not(),
             )
-            .map_with_span(move |(ids, body), _span| ctxref.clone().make_lambda(&ids, body))
+            .then(expr.clone())
+            .map_with_span(move |((ids, _type), body), _span| {
+                ctxref.clone().make_lambda(&ids, body)
+            })
             .labelled("lambda");
 
         // let macro_expand = select! { Token::MacroExpand(s) => Expr::Var(s,None) }
