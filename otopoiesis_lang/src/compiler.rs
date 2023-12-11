@@ -2,7 +2,7 @@ use std::sync::{Arc, Mutex};
 
 use crate::environment::{Environment, EnvironmentRef, EnvironmentStorage};
 use crate::expr::{Expr, ExprRef, Literal};
-use crate::parameter::FloatParameter;
+use crate::parameter::{FloatParameter, Parameter, RangedNumeric};
 use crate::value::{self, Closure, Project, RawValue, Region, Track};
 use crate::Interner;
 use crate::{builtin_fn, ExtFun, Symbol};
@@ -145,10 +145,9 @@ impl Context {
                 let name = op.get_associated_fn_name();
                 //call builtin. todo:lift this before actual eval
                 if let Some((_name, fun)) = builtin_fn::gen_default_functions()
-                .iter()
-                .find(|(n, _)| n == name)
+                    .iter()
+                    .find(|(n, _)| n == name)
                 {
-                    
                     let lhs = self.eval(lhs, envid)?;
                     let rhs = self.eval(rhs, envid)?;
                     fun.0.exec(&None, self, &[lhs, rhs])
@@ -192,6 +191,30 @@ impl Context {
                 Ok(RawValue::from(ptr))
             }
             Expr::Paren(e) => self.eval(e, envid),
+            Expr::WithAttribute(attr, e) => {
+                let expr = self.expr_storage.get(e.0).unwrap();
+                match (self.interner.resolve(attr.0 .0), expr.clone()) {
+                    (Some("param"), Expr::Let(name, body, then)) => {
+                        let b = self.expr_storage.get(body.0).unwrap();
+                        let body = match b {
+                            Expr::Literal(Literal::Number(f)) => {
+                                let label = self.interner.resolve(name.0).unwrap();
+                                let lit = Arc::new(
+                                    FloatParameter::new(*f as f32, label)
+                                        .set_range(*attr.1.start() as f32..=*attr.1.end() as f32),
+                                );
+                                Expr::Literal(Literal::FloatParameter(lit))
+                            }
+                            _ => b.clone(),
+                        };
+                        let body = ExprRef(self.expr_storage.alloc(body));
+                        let newexpr =
+                            ExprRef(self.expr_storage.alloc(Expr::Let(name, body, then.clone())));
+                        self.eval(newexpr, envid)
+                    }
+                    _ => self.eval(e, envid),
+                }
+            }
         }
     }
 }

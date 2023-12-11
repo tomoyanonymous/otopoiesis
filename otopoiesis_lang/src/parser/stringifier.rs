@@ -104,6 +104,10 @@ impl<'a> Display for Stringifier<'a> {
                 let body = self.stringify(body);
                 write!(f, "|{args}| {body}")
             }
+            Expr::WithAttribute(attr, body) => {
+                attr.stringify(self.ctx, f)
+                    .and(write!(f, "\n{}", self.stringify(body)))
+            }
             Expr::Track(_) => todo!(),
             Expr::Region(_, _, _) => todo!(),
             Expr::Project(_, _) => todo!(),

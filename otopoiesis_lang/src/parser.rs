@@ -3,25 +3,25 @@ use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::rc::Rc;
 
-
 use tokens::{Op, Token};
 mod error;
 mod lexer;
 pub mod stringifier;
 use crate::error::ReportableError;
+use crate::expr::Attribute;
 use crate::metadata::*;
 use crate::Symbol;
 use chumsky::prelude::*;
 use chumsky::Parser;
 
 use crate::expr::{Expr, ExprRef, Literal};
-use id_arena::{Arena, Id};
 use crate::Interner;
+use id_arena::{Arena, Id};
 
 pub struct ParseContext {
     pub expr_storage: Arena<Expr>,
     pub span_storage: BTreeMap<Id<Expr>, Span>,
-    pub interner: Interner
+    pub interner: Interner,
 }
 impl Default for ParseContext {
     fn default() -> Self {
@@ -71,6 +71,10 @@ impl ParseContextRef {
         let mut ctx = self.0.borrow_mut();
         ExprRef(ctx.expr_storage.alloc(Expr::Let(ident, body, then)))
     }
+    pub fn make_with_attribute(&self, attr: Attribute, body: ExprRef) -> ExprRef {
+        let mut ctx = self.0.borrow_mut();
+        ExprRef(ctx.expr_storage.alloc(Expr::WithAttribute(attr, body)))
+    }
     pub fn make_lambda(&self, ident: &[Symbol], body: ExprRef) -> ExprRef {
         let mut ctx = self.0.borrow_mut();
         ExprRef(ctx.expr_storage.alloc(Expr::Lambda(ident.to_vec(), body)))
@@ -118,7 +122,28 @@ impl BinopParser {
         self.0.clone().make_binop(op, x, y)
     }
 }
-
+fn number_parser() -> impl Parser<Token, f64, Error = Simple<Token>> + Clone {
+    select! {
+        Token::Float(s)=> s.parse::<f64>().unwrap(),
+        Token::Int(i) => i as f64
+    }
+}
+fn range_parser() -> impl Parser<Token, (f64, f64), Error = Simple<Token>> + Clone {
+    number_parser()
+        .then_ignore(just(Token::DoubleDot))
+        .then(number_parser())
+}
+fn attribute_parser(
+    ctx: ParseContextRef,
+) -> impl Parser<Token, Attribute, Error = Simple<Token>> + Clone {
+    lvar_parser(ctx)
+        .then(range_parser().delimited_by(just(Token::ParenBegin), just(Token::ParenEnd)))
+        .delimited_by(
+            just(Token::SharpAngleBracketBegin),
+            just(Token::AngleBracketEnd),
+        )
+        .map(|(symbol, (start, end))| Attribute(symbol, start..=end))
+}
 fn expr_parser(ctx: ParseContextRef) -> impl Parser<Token, ExprRef, Error = Simple<Token>> + Clone {
     let ctxref = ctx.clone();
 
@@ -134,19 +159,26 @@ fn expr_parser(ctx: ParseContextRef) -> impl Parser<Token, ExprRef, Error = Simp
             .labelled("paren_expr");
         let ctxref = ctx.clone();
 
-        let let_e = just(Token::Let)
-            .ignore_then(lvar.clone())
+        let let_e = attribute_parser(ctxref.clone())
+            .or_not()
+            .then_ignore(just(Token::Let))
+            .then(lvar.clone())
             .then_ignore(just(Token::Assign))
             .then(expr.clone())
             .then_ignore(just(Token::LineBreak).or(just(Token::SemiColon)).repeated())
             .then(expr.clone().or_not())
-            .map_with_span(move |((ident, body), then), _span| {
+            .map_with_span(move |(((attr, ident), body), then), _span| {
                 let ctx = ctxref.clone();
                 let then = match then {
                     Some(then) => then,
                     None => ctx.clone().make_nop(),
                 };
-                ctx.clone().make_let(ident, body, then)
+                let res = ctx.clone().make_let(ident, body, then);
+                if let Some(a) = attr {
+                    ctx.make_with_attribute(a, res)
+                } else {
+                    res
+                }
             })
             .boxed()
             .labelled("let");

@@ -2,6 +2,7 @@ use super::tokens::*;
 use crate::metadata::*;
 use chumsky::prelude::*;
 use chumsky::Parser;
+use chumsky::text::keyword;
 
 
 
@@ -68,6 +69,7 @@ pub fn lexer() -> impl Parser<char, Vec<(Token, Span)>, Error = Simple<char>> {
         ';' => Token::SemiColon,
         _ => Token::Ident(c.to_string()),
     });
+
     // A parser for identifiers and keywords
     let ident = text::ident().map(|ident: String| match ident.as_str() {
         "fn" => Token::Function,
@@ -80,6 +82,8 @@ pub fn lexer() -> impl Parser<char, Vec<(Token, Span)>, Error = Simple<char>> {
         "if" => Token::If,
         "then" => Token::Then,
         "else" => Token::Else,
+        "#[" =>Token::SharpAngleBracketBegin,
+        ".." => Token::DoubleDot,
         // "true" => Token::Bool(true),
         // "false" => Token::Bool(false),
         // "null" => Token::Null,
@@ -98,8 +102,8 @@ pub fn lexer() -> impl Parser<char, Vec<(Token, Span)>, Error = Simple<char>> {
         ')' => Token::ParenEnd,
         '{' => Token::BlockBegin,
         '}' => Token::BlockEnd,
-        '[' => Token::ArrayBegin,
-        ']' => Token::ArrayEnd,
+        '[' => Token::AngleBracketBegin,
+        ']' => Token::AngleBracketEnd,
         _ => Token::Ident(c.to_string()),
     });
     let linebreak = text::newline()

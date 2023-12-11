@@ -1,5 +1,5 @@
-use std::fmt;
 pub(super) use crate::expr::Op;
+use std::fmt;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Comment {
@@ -28,7 +28,7 @@ pub enum Token {
 
     Comma,
     Dot,
-
+    DoubleDot,
     Colon,
     SemiColon,
 
@@ -39,12 +39,12 @@ pub enum Token {
 
     ParenBegin,
     ParenEnd,
-    ArrayBegin,
-    ArrayEnd,
+    AngleBracketBegin,
+    AngleBracketEnd,
     BlockBegin,
     BlockEnd,
     LambdaArgBeginEnd,
-
+    SharpAngleBracketBegin,
     Function, //"fn"
     Macro,    //"macro"
     Arrow,    // ->
@@ -127,6 +127,7 @@ impl fmt::Display for Token {
             Token::At => write!(f, "@"),
             Token::Comma => write!(f, ","),
             Token::Dot => write!(f, "."),
+            Token::DoubleDot =>  write!(f, ".."),
             Token::Colon => write!(f, ":"),
             Token::SemiColon => write!(f, ";"),
             Token::Let => write!(f, "let"),
@@ -134,8 +135,9 @@ impl fmt::Display for Token {
             Token::Reference => write!(f, "&"),
             Token::ParenBegin => write!(f, "("),
             Token::ParenEnd => write!(f, ")"),
-            Token::ArrayBegin => write!(f, "["),
-            Token::ArrayEnd => write!(f, "]"),
+            Token::AngleBracketBegin => write!(f, "["),
+            Token::AngleBracketEnd => write!(f, "]"),
+            Token::SharpAngleBracketBegin => write!(f, "#["),
             Token::BlockBegin => write!(f, "{{"),
             Token::BlockEnd => write!(f, "}}"),
             Token::LambdaArgBeginEnd => write!(f, "|"),
