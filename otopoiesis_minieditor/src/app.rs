@@ -29,15 +29,15 @@ impl Model {
                 self.result = Some(Stringifier::new(&pc, 0, e.clone()).to_string());
                 let mut compiler = Context::new(pc.expr_storage.clone(), pc.interner.clone());
                 let root = compiler.root_env;
-                self.eval_result = match compiler.eval(e, root){
+                self.eval_result = match compiler.eval(e, root) {
                     Ok(rv) => Some(rv.get_as_float().to_string()),
-                    Err(e) => Some(format!("{:?}",e)),
+                    Err(e) => Some(format!("{:?}", e)),
                 }
             }
             Err(es) => {
                 self.result = Some(
                     es.iter()
-                        .map(|e| e.to_string())
+                        .map(|e| e.get_message())
                         .fold("".to_string(), |acc, e| format!("{acc}\n{e}")),
                 )
             }

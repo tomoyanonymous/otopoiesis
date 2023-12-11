@@ -160,6 +160,7 @@ fn expr_parser(ctx: ParseContextRef) -> impl Parser<Token, ExprRef, Error = Simp
         let ctxref = ctx.clone();
 
         let let_e = attribute_parser(ctxref.clone())
+            .then_ignore(just(Token::LineBreak))
             .or_not()
             .then_ignore(just(Token::Let))
             .then(lvar.clone())
@@ -383,5 +384,34 @@ pub fn parse(src: &str, ctx: ParseContextRef) -> Result<ExprRef, Vec<Box<dyn Rep
         })
     } else {
         Err(errs)
+    }
+}
+
+#[cfg(test)]
+mod test {
+    #[test]
+    fn attribute_parser_test() {
+        use super::*;
+        let src = "#[param(0.0..1.0)]";
+        let len = src.chars().count();
+        let ctx = ParseContextRef(Rc::new(RefCell::new(ParseContext::default())));
+        let (tokens_opt, lex_errs) = super::lexer::lexer().parse_recovery(src);
+        lex_errs.iter().for_each(|f|{
+            println!("{}",f.to_string())
+        });
+        assert!(lex_errs.is_empty());
+        if let Some(t) = tokens_opt {
+
+            let (attribute, errs) = attribute_parser(ctx)
+                .parse_recovery(chumsky::Stream::from_iter(len..len + 1, t.into_iter()));
+            if let Some(attr) = attribute {
+                assert_eq!(attr.1, 0.0f64..=1.0f64);
+            } else {
+                errs.iter().for_each(|e| {println!("{}",e.to_string());});
+                panic!()
+            }
+        } else {
+            panic!()
+        }
     }
 }

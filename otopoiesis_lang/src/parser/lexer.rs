@@ -1,10 +1,8 @@
 use super::tokens::*;
 use crate::metadata::*;
 use chumsky::prelude::*;
-use chumsky::Parser;
 use chumsky::text::keyword;
-
-
+use chumsky::Parser;
 
 fn comment_parser() -> impl Parser<char, Comment, Error = Simple<char>> + Clone {
     // comment parser that keep its contents length, not to break line number for debugging.
@@ -82,8 +80,6 @@ pub fn lexer() -> impl Parser<char, Vec<(Token, Span)>, Error = Simple<char>> {
         "if" => Token::If,
         "then" => Token::Then,
         "else" => Token::Else,
-        "#[" =>Token::SharpAngleBracketBegin,
-        ".." => Token::DoubleDot,
         // "true" => Token::Bool(true),
         // "false" => Token::Bool(false),
         // "null" => Token::Null,
@@ -93,6 +89,13 @@ pub fn lexer() -> impl Parser<char, Vec<(Token, Span)>, Error = Simple<char>> {
         "structt" => Token::StructType,
         _ => Token::Ident(ident),
     });
+    let sharp_angle = just::<_, _, Simple<char>>('#')
+        .then(just('['))
+        .map(|_| Token::SharpAngleBracketBegin);
+    let doubledot = just::<_, _, Simple<char>>('.')
+        .then(just('.'))
+        .map(|_| Token::DoubleDot);
+
     let macro_expand = text::ident()
         .then_ignore(just('!'))
         .map(|ident: String| Token::MacroExpand(ident));
@@ -108,22 +111,23 @@ pub fn lexer() -> impl Parser<char, Vec<(Token, Span)>, Error = Simple<char>> {
     });
     let linebreak = text::newline()
         .map(|_| '\n')
-        // .or(just::<_, _, Simple<char>>(';'))
+        .or(just::<_, _, Simple<char>>(';'))
         .repeated()
         .at_least(1)
         .map(|_s| Token::LineBreak);
     // A single token can be one of the above
+
+    let literal_token = float.or(int).or(str_);
     let token = comment_parser()
         .map(|c| Token::Comment(c))
-        .or(float)
-        .or(int)
-        .or(str_)
+        .or(doubledot)
+        .or(literal_token)
         // .or(ctrl)
         .or(macro_expand)
         .or(separator)
         .or(ident)
         .or(op)
-        .or(parens)
+        .or(sharp_angle.or(parens))
         .or(linebreak)
         .recover_with(skip_then_retry_until([]));
 
@@ -151,6 +155,43 @@ mod test {
             (Token::Ident("fuga".to_string()), 14..18),
         ];
         // dbg!(res.clone());
+        if let Some(tok) = res {
+            assert_eq!(tok, ans);
+        } else {
+            println!("{:#?}", _errs);
+            panic!()
+        }
+    }
+    #[test]
+    fn sharp_angle() {
+        let src = "#[";
+        let (res, _errs) = lexer().parse_recovery(src);
+
+        let ans = [
+            (Token::SharpAngleBracketBegin, 0..2),
+            // (Token::AngleBracketEnd, 2..3),
+        ];
+        if let Some(tok) = res {
+            assert_eq!(tok, ans);
+        } else {
+            println!("{:#?}", _errs);
+            panic!()
+        }
+    }
+    #[test]
+    fn attribute() {
+        let src = "#[param(0.0..1.0)]";
+        let (res, _errs) = lexer().parse_recovery(src);
+        let ans = [
+            (Token::SharpAngleBracketBegin, 0..2),
+            (Token::Ident("param".to_string()), 2..7),
+            (Token::ParenBegin, 7..8),
+            (Token::Float("0.0".into()), 8..11),
+            (Token::DoubleDot, 11..13),
+            (Token::Float("1.0".into()), 13..16),
+            (Token::ParenEnd, 16..17),
+            (Token::AngleBracketEnd, 17..18),
+        ];
         if let Some(tok) = res {
             assert_eq!(tok, ans);
         } else {
