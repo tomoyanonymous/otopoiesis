@@ -109,5 +109,12 @@ pub fn eval_ui(
                 .and(eval_ui(dur, env.clone(), ui).inner)
                 .and(eval_ui(content, env, ui).inner)
         }),
+        Expr::Nop => todo!(),
+        Expr::BinOp(_, _, _) => todo!(),
+        Expr::AppExt(_, _) => todo!(),
+        Expr::Paren(_) => todo!(),
+        Expr::WithAttribute(_, _) => todo!(),
+        Expr::Project(_, _) => todo!(),
+        
     }
 }

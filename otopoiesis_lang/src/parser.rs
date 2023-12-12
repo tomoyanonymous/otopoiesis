@@ -98,6 +98,22 @@ fn lvar_parser(ctx: ParseContextRef) -> impl Parser<Token, Symbol, Error = Simpl
         Token::Ident(s) => ctx.make_lvar(&s)
     }
 }
+
+fn binop_parser<P, O, F>(
+    atom: P,
+    op: O,
+    folder: &F,
+) -> impl Parser<Token, ExprRef, Error = Simple<Token>> + Clone
+where
+    P: Parser<Token, ExprRef, Error = Simple<Token>> + Clone,
+    O: Parser<Token, Op, Error = Simple<Token>> + Clone,
+    F: Fn(ExprRef, (Op, ExprRef)) -> ExprRef + Clone,
+{
+    atom.clone()
+        .then(op.then(atom).repeated())
+        .foldl(folder.clone())
+}
+
 fn literal_parser(
     ctx: ParseContextRef,
 ) -> impl Parser<Token, ExprRef, Error = Simple<Token>> + Clone {
@@ -243,76 +259,55 @@ fn expr_parser(ctx: ParseContextRef) -> impl Parser<Token, ExprRef, Error = Simp
             .labelled("apply");
 
         let optoken = move |o: Op| {
-            just(Token::Op(o)).map(|o| match o {
-                Token::Op(o) => o,
-                _ => panic!(),
-            })
+            just(Token::Op(o))
+                .then_ignore(just(Token::LineBreak).repeated())
+                .map(|tk| match tk {
+                    Token::Op(o) => o,
+                    _ => panic!(),
+                })
+        };
+        let ctxref = ctx.clone();
+        let folder = move |x, (o, y)| BinopParser(ctxref.clone()).exec(x, y, o);
+        let exponent = {
+            let op = optoken(Op::Exponent);
+            binop_parser(apply, op, &folder)
+        };
+        let product = {
+            let op = choice((
+                optoken(Op::Product),
+                optoken(Op::Divide),
+                optoken(Op::Modulo),
+            ));
+            binop_parser(exponent, op, &folder)
         };
 
-        let op = optoken(Op::Exponent);
-        let ctxref = ctx.clone();
-        let exponent = apply
-            .clone()
-            .then(op.then(apply).repeated())
-            .foldl(move |x, (o, y)| BinopParser(ctxref.clone()).exec(x, y, o))
-            .boxed();
+        let add = {
+            let op = optoken(Op::Sum).or(optoken(Op::Minus));
+            binop_parser(product, op, &folder)
+        };
 
-        let op = choice((
-            optoken(Op::Product),
-            optoken(Op::Divide),
-            optoken(Op::Modulo),
-        ));
-        let ctxref = ctx.clone();
-        let product = exponent
-            .clone()
-            .then(op.then(exponent).repeated())
-            .foldl(move |x, (o, y)| BinopParser(ctxref.clone()).exec(x, y, o))
-            .boxed();
-        let op = optoken(Op::Sum).or(optoken(Op::Minus));
-        let ctxref = ctx.clone();
+        let cmp = {
+            let op = optoken(Op::Equal).or(optoken(Op::NotEqual));
+            binop_parser(add, op, &folder)
+        };
 
-        let add = product
-            .clone()
-            .then(op.then(product).repeated())
-            .foldl(move |x, (o, y)| BinopParser(ctxref.clone()).exec(x, y, o))
-            .boxed();
-
-        let op = optoken(Op::Equal).or(optoken(Op::NotEqual));
-        let ctxref = ctx.clone();
-
-        let cmp = add
-            .clone()
-            .then(op.then(add).repeated())
-            .foldl(move |x, (o, y)| BinopParser(ctxref.clone()).exec(x, y, o))
-            .boxed();
-        let op = optoken(Op::And);
-        let ctxref = ctx.clone();
-
-        let cmp = cmp
-            .clone()
-            .then(op.then(cmp).repeated())
-            .foldl(move |x, (o, y)| BinopParser(ctxref.clone()).exec(x, y, o))
-            .boxed();
-        let op = optoken(Op::Or);
-        let ctxref = ctx.clone();
-
-        let cmp = cmp
-            .clone()
-            .then(op.then(cmp).repeated())
-            .foldl(move |x, (o, y)| BinopParser(ctxref.clone()).exec(x, y, o))
-            .boxed();
-        let op = choice((
-            optoken(Op::LessThan),
-            optoken(Op::LessEqual),
-            optoken(Op::GreaterThan),
-            optoken(Op::GreaterEqual),
-        ));
-        let ctxref = ctx.clone();
-        let cmp = cmp
-            .clone()
-            .then(op.then(cmp).repeated())
-            .foldl(move |x, (o, y)| BinopParser(ctxref.clone()).exec(x, y, o))
-            .boxed();
+        let cmp = {
+            let op = optoken(Op::And);
+            binop_parser(cmp, op, &folder)
+        };
+        let cmp = {
+            let op = optoken(Op::Or);
+            binop_parser(cmp, op, &folder)
+        };
+        let cmp = {
+            let op = choice((
+                optoken(Op::LessThan),
+                optoken(Op::LessEqual),
+                optoken(Op::GreaterThan),
+                optoken(Op::GreaterEqual),
+            ));
+            binop_parser(cmp, op, &folder)
+        };
         let op = optoken(Op::Pipe);
 
         let pipe = cmp
@@ -396,18 +391,17 @@ mod test {
         let len = src.chars().count();
         let ctx = ParseContextRef(Rc::new(RefCell::new(ParseContext::default())));
         let (tokens_opt, lex_errs) = super::lexer::lexer().parse_recovery(src);
-        lex_errs.iter().for_each(|f|{
-            println!("{}",f.to_string())
-        });
+        lex_errs.iter().for_each(|f| println!("{}", f.to_string()));
         assert!(lex_errs.is_empty());
         if let Some(t) = tokens_opt {
-
             let (attribute, errs) = attribute_parser(ctx)
                 .parse_recovery(chumsky::Stream::from_iter(len..len + 1, t.into_iter()));
             if let Some(attr) = attribute {
                 assert_eq!(attr.1, 0.0f64..=1.0f64);
             } else {
-                errs.iter().for_each(|e| {println!("{}",e.to_string());});
+                errs.iter().for_each(|e| {
+                    println!("{}", e.to_string());
+                });
                 panic!()
             }
         } else {
