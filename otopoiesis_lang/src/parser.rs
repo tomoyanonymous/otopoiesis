@@ -83,6 +83,14 @@ impl ParseContextRef {
         let mut ctx = self.0.borrow_mut();
         ExprRef(ctx.expr_storage.alloc(Expr::App(callee, args.to_vec())))
     }
+    pub fn make_then(&self, e1: ExprRef, e2: ExprRef) -> ExprRef {
+        let mut ctx = self.0.borrow_mut();
+        ExprRef(ctx.expr_storage.alloc(Expr::Then(e1, e2)))
+    }
+    pub fn make_block(&self, e: ExprRef) -> ExprRef {
+        let mut ctx = self.0.borrow_mut();
+        ExprRef(ctx.expr_storage.alloc(Expr::Block(e)))
+    }
     pub fn make_binop(&self, op: Op, lhs: ExprRef, rhs: ExprRef) -> ExprRef {
         let mut ctx = self.0.borrow_mut();
         ExprRef(ctx.expr_storage.alloc(Expr::BinOp(op, lhs, rhs)))
@@ -162,30 +170,185 @@ fn attribute_parser(
 }
 fn expr_parser(ctx: ParseContextRef) -> impl Parser<Token, ExprRef, Error = Simple<Token>> + Clone {
     let ctxref = ctx.clone();
+    recursive(move |expr_group| {
+        let ctxref = ctxref.clone();
+        let egroup = expr_group.clone();
+        let expr = recursive(move |expr| {
+            let lvar = lvar_parser(ctx.clone());
+            let val = literal_parser(ctx.clone());
+            let ctxref = ctx.clone();
+            let parenexpr = expr
+                .clone()
+                .delimited_by(just(Token::ParenBegin), just(Token::ParenEnd))
+                .map(move |e| ctxref.make_paren(e))
+                .labelled("paren_expr");
 
-    let expr = recursive(|expr| {
-        let lvar = lvar_parser(ctx.clone());
-        let val = literal_parser(ctx.clone());
-        // let expr_group = recursive(|expr_group| {
-        let ctxref = ctx.clone();
-        let parenexpr = expr
-            .clone()
-            .delimited_by(just(Token::ParenBegin), just(Token::ParenEnd))
-            .map(move |e| ctxref.make_paren(e))
-            .labelled("paren_expr");
-        let ctxref = ctx.clone();
+            let ctxref = ctx.clone();
+
+            let lambda = lvar
+                .clone()
+                .separated_by(just(Token::Comma))
+                .delimited_by(
+                    just(Token::LambdaArgBeginEnd),
+                    just(Token::LambdaArgBeginEnd),
+                )
+                .then(
+                    just(Token::Arrow)
+                        // .ignore_then(type_parser())
+                        .or_not(),
+                )
+                .then(expr.clone())
+                .map_with_span(move |((ids, _type), body), _span| {
+                    ctxref.clone().make_lambda(&ids, body)
+                })
+                .labelled("lambda");
+
+            // let macro_expand = select! { Token::MacroExpand(s) => Expr::Var(s,None) }
+            //     .map_with_span(|e, s| WithMeta(e, s))
+            //     .then_ignore(just(Token::ParenBegin))
+            //     .then(expr_group.clone())
+            //     .then_ignore(just(Token::ParenEnd))
+            //     .map_with_span(|(id, then), s| {
+            //         Expr::Escape(Box::new(WithMeta(
+            //             Expr::Apply(Box::new(id), vec![then]),
+            //             s.clone(),
+            //         )))
+            //     })
+            //     .labelled("macroexpand");
+
+            let ctxref = ctx.clone();
+            let block = egroup
+                .clone()
+                .delimited_by(just(Token::BlockBegin), just(Token::BlockEnd))
+                .map(move |e| ctxref.make_block(e));
+
+            let atom = val
+                .or(lambda)
+                // .or(macro_expand)
+                .or(block)
+                // .map_with_span(move|e, s| ctxref.make_span(e, s))
+                .or(parenexpr)
+                .boxed()
+                .labelled("atoms");
+            let ctxref = ctx.clone();
+
+            let items = expr
+                .clone()
+                .separated_by(just(Token::Comma))
+                .allow_trailing()
+                .collect::<Vec<_>>();
+
+            let parenitems = items
+                .clone()
+                .delimited_by(just(Token::ParenBegin), just(Token::ParenEnd))
+                .repeated();
+            // let folder = |f, args| ctx.clone().borrow_mut().make_apply(f, args);
+            let apply = atom
+                .then(parenitems)
+                .foldl(move |f, args: Vec<ExprRef>| ctxref.clone().make_apply(f, &args))
+                .labelled("apply");
+
+            let optoken = move |o: Op| {
+                just(Token::Op(o))
+                    .then_ignore(just(Token::LineBreak).repeated())
+                    .map(|tk| match tk {
+                        Token::Op(o) => o,
+                        _ => panic!(),
+                    })
+            };
+            let ctxref = ctx.clone();
+            let folder = move |x, (o, y)| BinopParser(ctxref.clone()).exec(x, y, o);
+            let exponent = {
+                let op = optoken(Op::Exponent);
+                binop_parser(apply, op, &folder)
+            };
+            let product = {
+                let op = choice((
+                    optoken(Op::Product),
+                    optoken(Op::Divide),
+                    optoken(Op::Modulo),
+                ));
+                binop_parser(exponent, op, &folder)
+            };
+
+            let add = {
+                let op = optoken(Op::Sum).or(optoken(Op::Minus));
+                binop_parser(product, op, &folder)
+            };
+
+            let cmp = {
+                let op = optoken(Op::Equal).or(optoken(Op::NotEqual));
+                binop_parser(add, op, &folder)
+            };
+
+            let cmp = {
+                let op = optoken(Op::And);
+                binop_parser(cmp, op, &folder)
+            };
+            let cmp = {
+                let op = optoken(Op::Or);
+                binop_parser(cmp, op, &folder)
+            };
+            let cmp = {
+                let op = choice((
+                    optoken(Op::LessThan),
+                    optoken(Op::LessEqual),
+                    optoken(Op::GreaterThan),
+                    optoken(Op::GreaterEqual),
+                ));
+                binop_parser(cmp, op, &folder)
+            };
+            let op = optoken(Op::Pipe);
+            let ctx = ctx.clone();
+            let pipe = cmp
+                .clone()
+                .then(op.then(cmp).repeated())
+                .foldl(move |lhs, (_, rhs)| {
+                    // let span = lhs.1.start..rhs.1.end;
+                    ctx.clone().make_apply(rhs, &[lhs])
+                })
+                .boxed();
+
+            pipe
+        });
+        // expr_group contains let statement, assignment statement, function definiton,... they cannot be placed as an argument for apply directly.
+
+        // //todo: should be recursive(to paranthes be not needed)
+        // let if_ = just(Token::If)
+        //     .ignore_then(
+        //         expr_group
+        //             .clone()
+        //             .delimited_by(just(Token::ParenBegin), just(Token::ParenEnd)),
+        //     )
+        //     .then(expr_group.clone())
+        //     .then(
+        //         just(Token::Else)
+        //             .ignore_then(expr_group.clone().map(|e| Box::new(e)))
+        //             .or_not(),
+        //     )
+        //     .map_with_span(|((cond, then), opt_else), s| {
+        //         WithMeta(Expr::If(cond.into(), then.into(), opt_else), s)
+        //     })
+        //     .labelled("if");
+
+        // block
+        //     .map_with_span(|e, s| WithMeta(e, s))
+        //     .or(if_)
+        //     .or(expr.clone())
+        // });
+        let ctx = ctxref.clone();
 
         let let_e = attribute_parser(ctxref.clone())
             .then_ignore(just(Token::LineBreak))
             .or_not()
             .then_ignore(just(Token::Let))
-            .then(lvar.clone())
+            .then(lvar_parser(ctx.clone()).clone())
             .then_ignore(just(Token::Assign))
-            .then(expr.clone())
+            .then(expr_group.clone())
             .then_ignore(just(Token::LineBreak).or(just(Token::SemiColon)).repeated())
             .then(expr.clone().or_not())
             .map_with_span(move |(((attr, ident), body), then), _span| {
-                let ctx = ctxref.clone();
+                let ctx = ctx.clone();
                 let then = match then {
                     Some(then) => then,
                     None => ctx.clone().make_nop(),
@@ -199,161 +362,19 @@ fn expr_parser(ctx: ParseContextRef) -> impl Parser<Token, ExprRef, Error = Simp
             })
             .boxed()
             .labelled("let");
-        let ctxref = ctx.clone();
+        let ctx = ctxref.clone();
 
-        let lambda = lvar
+        let seq = expr
             .clone()
-            .separated_by(just(Token::Comma))
-            .delimited_by(
-                just(Token::LambdaArgBeginEnd),
-                just(Token::LambdaArgBeginEnd),
-            )
-            .then(
-                just(Token::Arrow)
-                    // .ignore_then(type_parser())
-                    .or_not(),
-            )
-            .then(expr.clone())
-            .map_with_span(move |((ids, _type), body), _span| {
-                ctxref.clone().make_lambda(&ids, body)
-            })
-            .labelled("lambda");
-
-        // let macro_expand = select! { Token::MacroExpand(s) => Expr::Var(s,None) }
-        //     .map_with_span(|e, s| WithMeta(e, s))
-        //     .then_ignore(just(Token::ParenBegin))
-        //     .then(expr_group.clone())
-        //     .then_ignore(just(Token::ParenEnd))
-        //     .map_with_span(|(id, then), s| {
-        //         Expr::Escape(Box::new(WithMeta(
-        //             Expr::Apply(Box::new(id), vec![then]),
-        //             s.clone(),
-        //         )))
-        //     })
-        //     .labelled("macroexpand");
-
-        let atom = val
-            .or(lambda)
-            // .or(macro_expand)
-            .or(let_e)
-            // .map_with_span(move|e, s| ctxref.make_span(e, s))
-            .or(parenexpr)
-            .boxed()
-            .labelled("atoms");
-        let ctxref = ctx.clone();
-
-        let items = expr
-            .clone()
-            .separated_by(just(Token::Comma))
-            .allow_trailing()
-            .collect::<Vec<_>>();
-
-        let parenitems = items
-            .clone()
-            .delimited_by(just(Token::ParenBegin), just(Token::ParenEnd))
-            .repeated();
-        // let folder = |f, args| ctx.clone().borrow_mut().make_apply(f, args);
-        let apply = atom
-            .then(parenitems)
-            .foldl(move |f, args: Vec<ExprRef>| ctxref.clone().make_apply(f, &args))
-            .labelled("apply");
-
-        let optoken = move |o: Op| {
-            just(Token::Op(o))
-                .then_ignore(just(Token::LineBreak).repeated())
-                .map(|tk| match tk {
-                    Token::Op(o) => o,
-                    _ => panic!(),
-                })
-        };
-        let ctxref = ctx.clone();
-        let folder = move |x, (o, y)| BinopParser(ctxref.clone()).exec(x, y, o);
-        let exponent = {
-            let op = optoken(Op::Exponent);
-            binop_parser(apply, op, &folder)
-        };
-        let product = {
-            let op = choice((
-                optoken(Op::Product),
-                optoken(Op::Divide),
-                optoken(Op::Modulo),
-            ));
-            binop_parser(exponent, op, &folder)
-        };
-
-        let add = {
-            let op = optoken(Op::Sum).or(optoken(Op::Minus));
-            binop_parser(product, op, &folder)
-        };
-
-        let cmp = {
-            let op = optoken(Op::Equal).or(optoken(Op::NotEqual));
-            binop_parser(add, op, &folder)
-        };
-
-        let cmp = {
-            let op = optoken(Op::And);
-            binop_parser(cmp, op, &folder)
-        };
-        let cmp = {
-            let op = optoken(Op::Or);
-            binop_parser(cmp, op, &folder)
-        };
-        let cmp = {
-            let op = choice((
-                optoken(Op::LessThan),
-                optoken(Op::LessEqual),
-                optoken(Op::GreaterThan),
-                optoken(Op::GreaterEqual),
-            ));
-            binop_parser(cmp, op, &folder)
-        };
-        let op = optoken(Op::Pipe);
-
-        let pipe = cmp
-            .clone()
-            .then(op.then(cmp).repeated())
-            .foldl(move |lhs, (_, rhs)| {
-                // let span = lhs.1.start..rhs.1.end;
-                ctx.clone().make_apply(rhs, &[lhs])
-            })
-            .boxed();
-
-        pipe
-    });
-    // expr_group contains let statement, assignment statement, function definiton,... they cannot be placed as an argument for apply directly.
-
-    // let block = expr_group
-    //     .clone()
-    //     .padded_by(just(Token::LineBreak).or_not())
-    //     .delimited_by(just(Token::BlockBegin), just(Token::BlockEnd))
-    //     .map(|e: WithMeta<Expr>| Expr::Block(Some(Box::new(e))));
-
-    // //todo: should be recursive(to paranthes be not needed)
-    // let if_ = just(Token::If)
-    //     .ignore_then(
-    //         expr_group
-    //             .clone()
-    //             .delimited_by(just(Token::ParenBegin), just(Token::ParenEnd)),
-    //     )
-    //     .then(expr_group.clone())
-    //     .then(
-    //         just(Token::Else)
-    //             .ignore_then(expr_group.clone().map(|e| Box::new(e)))
-    //             .or_not(),
-    //     )
-    //     .map_with_span(|((cond, then), opt_else), s| {
-    //         WithMeta(Expr::If(cond.into(), then.into(), opt_else), s)
-    //     })
-    //     .labelled("if");
-
-    // block
-    //     .map_with_span(|e, s| WithMeta(e, s))
-    //     .or(if_)
-    //     .or(expr.clone())
-    // });
-    let ctxref = ctxref.clone();
-    expr.map_with_span(move |e, s| ctxref.make_span(e, s))
+            .then_ignore(just(Token::LineBreak))
+            .then(expr_group.clone())
+            .map(move |(e1, e2)| ctx.make_then(e1, e2))
+            .labelled("sequential");
+        let ctx = ctxref.clone();
+        expr.or(let_e)
+            .or(seq)
+            .map_with_span(move |e, s| ctx.make_span(e, s))
+    })
 }
 fn parser(ctx: ParseContextRef) -> impl Parser<Token, ExprRef, Error = Simple<Token>> + Clone {
     expr_parser(ctx)

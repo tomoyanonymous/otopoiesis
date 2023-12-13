@@ -14,12 +14,12 @@ pub trait ReportableError: std::error::Error {
     }
 }
 
-pub fn report(src: &String, srcpath: path::PathBuf, errs: &Vec<Box<dyn ReportableError>>) {
+pub fn report(src: &String, srcpath: path::PathBuf, errs: &[Box<dyn ReportableError>]) {
     let path = srcpath.to_str().unwrap_or_default();
     for e in errs {
         let span = e.get_span();
         // let a_span = (src.source(), span);
-        let builder = Report::build(ReportKind::Error, "test", 4)
+        let builder = Report::build(ReportKind::Error, path, 4)
             .with_message(e.get_message().as_str())
             .with_label(Label::new((path, span.clone())).with_message(e.get_label().as_str()))
             .finish();
@@ -27,7 +27,7 @@ pub fn report(src: &String, srcpath: path::PathBuf, errs: &Vec<Box<dyn Reportabl
     }
 }
 
-pub fn dump_to_string(errs: &Vec<Box<dyn ReportableError>>) -> String {
+pub fn dump_to_string(errs: &[Box<dyn ReportableError>]) -> String {
     let mut res = String::new();
     for e in errs {
         res += e.get_message().as_str();

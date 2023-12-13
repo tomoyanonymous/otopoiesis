@@ -45,6 +45,8 @@ pub enum Token {
     BlockEnd,
     LambdaArgBeginEnd,
     SharpAngleBracketBegin,
+    BackQuote,
+    DollarSign,
     Function, //"fn"
     Macro,    //"macro"
     Arrow,    // ->
@@ -112,16 +114,16 @@ impl fmt::Display for Op {
 impl fmt::Display for Token {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Token::Ident(x) => write!(f, "{}", x),
-            Token::MacroExpand(x) => write!(f, "{}!", x),
+            Token::Ident(x) => write!(f, "{x}"),
+            Token::MacroExpand(x) => write!(f, "{x}!"),
             Token::FloatType => write!(f, "float"),
             Token::IntegerType => write!(f, "int"),
             Token::StringType => write!(f, "string"),
             Token::StructType => write!(f, "struct"),
-            Token::Int(x) => write!(f, "{}", x),
-            Token::Float(x) => write!(f, "{}", x),
-            Token::Str(x) => write!(f, "\"{}\"", x),
-            Token::Op(x) => write!(f, "{}", x),
+            Token::Int(x) => write!(f, "{x}"),
+            Token::Float(x) => write!(f, "{x}",),
+            Token::Str(x) => write!(f, "\"{x}\""),
+            Token::Op(x) => write!(f, "{x}"),
             Token::SelfLit => write!(f, "self"),
             Token::Now => write!(f, "now"),
             Token::At => write!(f, "@"),
@@ -141,6 +143,8 @@ impl fmt::Display for Token {
             Token::BlockBegin => write!(f, "{{"),
             Token::BlockEnd => write!(f, "}}"),
             Token::LambdaArgBeginEnd => write!(f, "|"),
+            Token::BackQuote => write!(f, "`"),
+            Token::DollarSign => write!(f, "$"),
 
             Token::Function => write!(f, "fn"),
             Token::Macro => write!(f, "macro"),

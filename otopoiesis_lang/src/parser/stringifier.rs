@@ -87,6 +87,14 @@ impl<'a> Display for Stringifier<'a> {
                 self.write_indent(f);
                 write!(f, "{}", self.stringify(then))
             }
+            Expr::Then(e1, e2) => {
+                let e1 = self.stringify(e1);
+                let e2 = self.stringify(e2);
+                self.write_indent(f);
+                let _ = write!(f,"{e1}\n");
+                self.write_indent(f);
+                write!(f,"{e2}")
+            },
             Expr::BinOp(op, lhs, rhs) => {
                 let lhs = self.stringify(lhs);
                 let rhs = self.stringify(rhs);
@@ -115,6 +123,11 @@ impl<'a> Display for Stringifier<'a> {
                 let e = self.stringify(e);
                 write!(f, "({e})")
             }
+            Expr::Block(e) => {
+                let e = self.stringify(e);
+                write!(f, "{{{e}}}")
+            }
+            
         }
     }
 }

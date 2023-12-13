@@ -129,7 +129,7 @@ pub fn lexer() -> impl Parser<char, Vec<(Token, Span)>, Error = Simple<char>> {
         .or(op)
         .or(sharp_angle.or(parens))
         .or(linebreak)
-        .recover_with(skip_then_retry_until([]));
+        .recover_with(skip_then_retry_until(['\n']));
 
     token
         .map_with_span(|tok, span| (tok, span))

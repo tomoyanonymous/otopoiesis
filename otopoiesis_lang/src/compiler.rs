@@ -129,6 +129,11 @@ impl Context {
                 let newenv = self.env_storage.extend(envid, &[(id, b)]);
                 self.eval(then.clone(), newenv)
             }
+            Expr::Then(e1, e2) => {
+                let _ = self.eval(e1, envid)?;
+                self.eval(e2, envid)
+            }
+
             Expr::Lambda(ids, body) => Ok(self.gen_closure(envid, &ids, &body)),
             Expr::App(callee, args) => {
                 let args = self.eval_vec(&args, envid)?;
@@ -190,7 +195,7 @@ impl Context {
                 let ptr = self.project_storage.get_mut(id).unwrap() as *mut Project;
                 Ok(RawValue::from(ptr))
             }
-            Expr::Paren(e) => self.eval(e, envid),
+            Expr::Paren(e) | Expr::Block(e) => self.eval(e, envid),
             Expr::WithAttribute(attr, e) => {
                 let expr = self.expr_storage.get(e.0).unwrap();
                 match (self.interner.resolve(attr.0 .0), expr.clone()) {

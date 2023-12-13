@@ -65,10 +65,12 @@ pub enum Expr {
     Array(Vec<ExprRef>),
     Var(Symbol),
     Let(Symbol, ExprRef, ExprRef),
+    Then(ExprRef, ExprRef),
     App(ExprRef, Vec<ExprRef>),  //currently only single argument
     BinOp(Op, ExprRef, ExprRef), //semantically identical to App
     AppExt(ExtFun, Vec<ExprRef>),
     Lambda(Vec<Symbol>, ExprRef),
+    Block(ExprRef), //semantically meaningless, just for inverse evaluation
     Paren(ExprRef), //semantically meaningless, just for inverse evaluation
     WithAttribute(Attribute, ExprRef),
     //track and region is an alias to closure
