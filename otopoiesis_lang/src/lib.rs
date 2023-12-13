@@ -12,7 +12,7 @@ pub mod expr;
 pub mod parameter;
 pub mod runtime;
 pub mod value;
-
+pub mod types;
 use compiler::Context;
 use runtime::PlayInfo;
 use serde::{Deserialize, Serialize};
@@ -99,8 +99,7 @@ impl<'d> Deserialize<'d> for ExtFun {
 // pub type Mixer = Arc<dyn MixerT>;
 pub type Time = f64;
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
-
+#[derive(Serialize, Deserialize, Debug, Clone,PartialEq)]
 pub enum Rate {
     Audio,            //
     UpSampled(u64),   //multipled by
@@ -108,22 +107,4 @@ pub enum Rate {
     Control(f64),     //event per seconds(Hz)
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub enum Type {
-    Unknown,
-    Unit,
-    Number,
-    Int,
-    String,
-    Tuple(Vec<Type>),
-    Array(Box<Type>, u64),          //type, number of element
-    Function(Box<Type>, Box<Type>), //from,to
-    Event(Box<Type>),               //type
-    Vec(Box<Type>),                 //type,
-    IVec(Box<Type>, Rate),          //type, sample_rate
-}
-impl Type {
-    pub fn midi_note() -> Self {
-        Self::Event(Self::Tuple(vec![Type::Int, Type::Int, Type::Int]).into())
-    }
-}
+
