@@ -5,7 +5,7 @@ use crate::parameter::Parameter;
 use super::expr::ExprRef;
 use super::*;
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Default)]
 pub struct RawValue(pub u64);
 
 impl RawValue {

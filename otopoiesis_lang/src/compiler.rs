@@ -18,7 +18,7 @@ pub struct Context {
     pub region_storage: Arena<Region>,
     pub project_storage: Arena<Project>,
     pub extfun_storage: Arena<ExtFun>,
-    pub env_storage: EnvironmentStorage,
+    pub env_storage: EnvironmentStorage<RawValue>,
     pub root_env: EnvironmentRef,
 }
 

@@ -8,7 +8,7 @@ use crate::{
     value::{self, RawValue, Region},
 };
 
-use super::{Environment, EvalError, Expr, ExtFun, ExtFunT, Type, Value};
+use super::{Environment, EvalError, Expr, ExtFun, ExtFunT, types::Type, Value};
 pub mod loadwav;
 use std::sync::Arc;
 

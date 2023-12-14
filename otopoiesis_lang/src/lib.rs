@@ -1,17 +1,19 @@
 #![feature(box_patterns)]
 #![feature(iterator_try_collect)]
 pub mod atomic;
-pub mod builtin_fn;
-pub mod compiler;
 pub mod error;
+pub mod builtin_fn;
 pub mod metadata;
-pub mod parser;
-
-pub mod environment;
 pub mod expr;
+pub mod environment;
+pub mod types;
 pub mod parameter;
-pub mod runtime;
 pub mod value;
+
+pub mod parser;
+pub mod compiler;
+pub mod typing;
+pub mod runtime;
 
 use compiler::Context;
 use runtime::PlayInfo;
@@ -20,7 +22,7 @@ use std::sync::Arc;
 
 use crate::parameter::FloatParameter;
 use id_arena::Id;
-use string_interner::{ StringInterner, backend::StringBackend};
+use string_interner::{backend::StringBackend, StringInterner};
 
 #[derive(Default, Copy, Clone, PartialEq, Debug)]
 pub struct Symbol(usize); //Symbol Trait is implemented on usize
@@ -99,7 +101,7 @@ impl<'d> Deserialize<'d> for ExtFun {
 // pub type Mixer = Arc<dyn MixerT>;
 pub type Time = f64;
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 
 pub enum Rate {
     Audio,            //
@@ -108,22 +110,3 @@ pub enum Rate {
     Control(f64),     //event per seconds(Hz)
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub enum Type {
-    Unknown,
-    Unit,
-    Number,
-    Int,
-    String,
-    Tuple(Vec<Type>),
-    Array(Box<Type>, u64),          //type, number of element
-    Function(Box<Type>, Box<Type>), //from,to
-    Event(Box<Type>),               //type
-    Vec(Box<Type>),                 //type,
-    IVec(Box<Type>, Rate),          //type, sample_rate
-}
-impl Type {
-    pub fn midi_note() -> Self {
-        Self::Event(Self::Tuple(vec![Type::Int, Type::Int, Type::Int]).into())
-    }
-}
