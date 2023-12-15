@@ -2,6 +2,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use otopoiesis_lang::compiler::Context;
+use otopoiesis_lang::error;
 use otopoiesis_lang::parser::{stringifier::Stringifier, ParseContext, *};
 use otopoiesis_lang::value::RawValue;
 pub struct Model {
@@ -35,11 +36,11 @@ impl Model {
                 }
             }
             Err(es) => {
-                self.result = Some(
-                    es.iter()
-                        .map(|e| e.get_message())
-                        .fold("".to_string(), |acc, e| format!("{acc}\n{e}")),
-                )
+                self.eval_result = Some(error::report_to_string(
+                    &self.source,
+                    "anonymous".into(),
+                    &es,
+                ));
             }
         }
     }

@@ -37,6 +37,16 @@ pub fn report(src: &str, srcpath: path::PathBuf, errs: &[Box<dyn ReportableError
     report_to(src, srcpath, errs, std::io::stderr())
 }
 
+pub fn report_to_string(
+    src: &str,
+    srcpath: path::PathBuf,
+    errs: &[Box<dyn ReportableError>],
+) -> String {
+    let mut buf = Vec::<u8>::new();
+    report_to(src, srcpath, errs, &mut buf);
+    String::from(String::from_utf8_lossy(buf.as_slice()))
+}
+
 pub fn dump_to_string(errs: &[Box<dyn ReportableError>]) -> String {
     let mut res = String::new();
     for e in errs {

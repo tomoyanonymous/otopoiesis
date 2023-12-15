@@ -68,7 +68,7 @@ pub enum Expr {
     Let(Symbol, ExprRef, ExprRef),
     App(ExprRef, Vec<ExprRef>),  //currently only single argument
     BinOp(Op, ExprRef, ExprRef), //semantically identical to App
-    AppExt(ExtFun, Vec<ExprRef>),
+    AppExt(*mut ExtFun, Vec<ExprRef>),
     Lambda(Vec<Symbol>, ExprRef),
     Paren(ExprRef), //semantically meaningless, just for inverse evaluation
     WithAttribute(Attribute, ExprRef),

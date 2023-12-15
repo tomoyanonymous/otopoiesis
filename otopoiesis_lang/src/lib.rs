@@ -18,7 +18,7 @@ pub mod runtime;
 use compiler::Context;
 use runtime::PlayInfo;
 use serde::{Deserialize, Serialize};
-use std::sync::Arc;
+use std::{sync::Arc, sync::Weak};
 
 use crate::parameter::FloatParameter;
 use id_arena::Id;

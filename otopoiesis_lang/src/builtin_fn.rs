@@ -8,7 +8,7 @@ use crate::{
     value::{self, RawValue, Region},
 };
 
-use super::{Environment, EvalError, Expr, ExtFun, ExtFunT, types::Type, Value};
+use super::{types::Type, Environment, EvalError, Expr, ExtFun, ExtFunT, Value};
 pub mod loadwav;
 use std::sync::Arc;
 
@@ -130,21 +130,22 @@ impl ExtFunT for FadeInOut {
         }
         match v {
             [origin, time_in, time_out] => {
-                let value::Region(envid, start, dur, content) =
-                    origin.get_as_ref::<&value::Region>();
-                let env = ctx.env_storage.extend(envid.clone(), &[]);
-                let app = ExprRef(ctx.expr_storage.alloc(Expr::AppExt(
-                    ExtFun(Arc::new(ApplyFadeInOut {
-                        time_in: *time_in,
-                        time_out: *time_out,
-                    })),
-                    vec![content.clone(), start.clone(), dur.clone()],
-                )));
-                // let content = ctx.gen_closure(env, &vec![], &ExprRef(app));
-                let region = value::Region(env, start.clone(), dur.clone(), app);
-                let region = ctx.region_storage.alloc(region);
-                let region_ref = ctx.region_storage.get_mut(region).unwrap();
-                Ok(RawValue::from(region_ref as *mut Region))
+                // let value::Region(envid, start, dur, content) =
+                //     origin.get_as_ref::<&value::Region>();
+                // let env = ctx.env_storage.extend(envid.clone(), &[]);
+                // let app = ExprRef(ctx.expr_storage.alloc(Expr::AppExt(
+                //     ExtFun(Arc::new(ApplyFadeInOut {
+                //         time_in: *time_in,
+                //         time_out: *time_out,
+                //     })),
+                //     vec![content.clone(), start.clone(), dur.clone()],
+                // )));
+                // // let content = ctx.gen_closure(env, &vec![], &ExprRef(app));
+                // let region = value::Region(env, start.clone(), dur.clone(), app);
+                // let region = ctx.region_storage.alloc(region);
+                // let region_ref = ctx.region_storage.get_mut(region).unwrap();
+                // Ok(RawValue::from(region_ref as *mut Region))
+                Ok(RawValue(0))
             }
             _ => Err(EvalError::TypeMismatch("argument type mismatch".into())),
         }
@@ -391,6 +392,30 @@ impl ExtFunT for Div {
     }
 }
 
+#[derive(Debug)]
+pub struct ParamToNumber {}
+impl ExtFunT for ParamToNumber {
+    fn exec(
+        &self,
+        play_info: &Option<&Box<dyn PlayInfo + Send + Sync>>,
+        ctx: &mut Context,
+        v: &[Value],
+    ) -> Result<Value, EvalError> {
+        assert!(v.len() == 1);
+        let param_pointer = v[0].get_as_ptr::<Arc<FloatParameter>>();
+        let param = unsafe { param_pointer.as_ref().unwrap() };
+        Ok(RawValue::from(param.get() as f64))
+    }
+
+    fn get_name(&self) -> &str {
+        todo!()
+    }
+
+    fn get_params(&self) -> &[String] {
+        todo!()
+    }
+}
+
 pub fn gen_default_functions() -> Vec<(String, ExtFun)> {
     vec![
         ("add".into(), ExtFun::new(Add {})),
@@ -400,6 +425,7 @@ pub fn gen_default_functions() -> Vec<(String, ExtFun)> {
         ("reverse".into(), ExtFun::new(ArrayReverse {})),
         ("sinewave".into(), ExtFun::new(SineWave {})),
         ("fadeinout".into(), ExtFun::new(FadeInOut {})),
+        ("param_as_number".into(), ExtFun::new(ParamToNumber {})),
     ]
 }
 // pub fn gen_global_env() -> Environment {
