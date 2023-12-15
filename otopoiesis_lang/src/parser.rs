@@ -231,13 +231,22 @@ fn expr_parser(ctx: ParseContextRef) -> impl Parser<Token, ExprRef, Error = Simp
         //         )))
         //     })
         //     .labelled("macroexpand");
-
+        let ctxref = ctx.clone();
         let atom = val
             .or(lambda)
             // .or(macro_expand)
             .or(let_e)
             // .map_with_span(move|e, s| ctxref.make_span(e, s))
             .or(parenexpr)
+            .recover_with(nested_delimiters(
+                Token::ParenBegin,
+                Token::ParenEnd,
+                [
+                    (Token::AngleBracketBegin, Token::AngleBracketEnd),
+                    (Token::BlockBegin, Token::BlockEnd),
+                ],
+                move |_| ctxref.clone().make_nop(),
+            ))
             .boxed()
             .labelled("atoms");
         let ctxref = ctx.clone();

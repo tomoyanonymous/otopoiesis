@@ -117,6 +117,7 @@ impl Context {
         let e = self.expr_storage.get(e.0).ok_or(EvalError::InvalidId)?;
 
         match e.clone() {
+            Expr::Error =>  Err(EvalError::InvalidConversion),
             Expr::Nop => Err(EvalError::InvalidConversion),
             Expr::Literal(l) => self.eval_literal(&l),
             Expr::Var(sym) => self
@@ -215,6 +216,7 @@ impl Context {
                     _ => self.eval(e, envid),
                 }
             }
+            
         }
     }
 }

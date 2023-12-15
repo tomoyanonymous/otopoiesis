@@ -61,6 +61,7 @@ pub struct Pattern {
 #[derive(Debug, Clone)]
 pub enum Expr {
     Nop,
+    Error,
     Literal(Literal),
     Array(Vec<ExprRef>),
     Var(Symbol),
@@ -75,4 +76,5 @@ pub enum Expr {
     Track(ExprRef),
     Region(ExprRef, ExprRef, ExprRef), //start,dur,content
     Project(f64, Vec<ExprRef>),
+
 }
