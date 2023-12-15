@@ -1,12 +1,13 @@
-use id_arena::Arena;
+use id_arena::{Arena, Id};
 
 use crate::{
     environment::EnvironmentStorage,
     error::ReportableError,
     expr::{ExprRef, Literal},
     metadata::Span,
+    parser::ParseContext,
     types::{Type, TypeId},
-    Environment, Expr,
+    Environment, Expr, Interner,
 };
 use std::collections::BTreeMap;
 use std::rc::Rc;
@@ -55,15 +56,24 @@ impl ReportableError for Error {
 pub struct InferContext {
     interm_idx: i64,
     subst_map: BTreeMap<i64, Type>,
+    interner: Interner,
     expr_storage: Arena<Expr>,
+    pub span_storage: BTreeMap<Id<Expr>, Span>,
     pub envstorage: EnvironmentStorage<Type>,
 }
 impl InferContext {
-    pub fn new(expr_storage: Arena<Expr>) -> Self {
+    pub fn new(parsectx: ParseContext) -> Self {
+        let ParseContext {
+            expr_storage,
+            span_storage,
+            interner,
+        } = parsectx;
         Self {
             interm_idx: 0,
             subst_map: BTreeMap::<i64, Type>::new(),
+            interner,
             expr_storage,
+            span_storage,
             envstorage: EnvironmentStorage::<Type>::default(),
         }
     }
@@ -152,7 +162,7 @@ impl InferContext {
             (Type::Code(box p1), Type::Code(box p2)) => {
                 Ok(Type::Code(Box::new(self.unify_types(p1, p2)?)))
             }
-            (_p1, _p2) => Err(ErrorKind::TypeMismatch), //todo:span
+            (_p1, _p2) => Err(ErrorKind::TypeMismatch),
         }
     }
 }
@@ -169,15 +179,19 @@ fn infer_type_literal(e: &Literal) -> Result<Type, Error> {
     Ok(pt)
 }
 
-pub fn infer_type(e: &ExprRef, ctx: &mut InferContext) -> Result<Type, Error> {
+pub fn infer_type(
+    eid: &ExprRef,
+    env: Id<Environment>,
+    ctx: &mut InferContext,
+) -> Result<Type, Error> {
     let infer_vec = |e: &Vec<ExprRef>, ctx: &mut InferContext| {
         e.iter()
-            .map(|el| Ok(infer_type(el, ctx)?))
+            .map(|el| Ok(infer_type(el, env, ctx)?))
             .collect::<Result<Vec<_>, Error>>()
     };
-    let e = ctx.expr_storage.get(e.0).unwrap();
+    let e = ctx.expr_storage.get(eid.0).unwrap().clone();
     match e {
-        Expr::Literal(l) => infer_type_literal(l),
+        Expr::Literal(l) => infer_type_literal(&l),
         // Expr::Tuple(e) => Ok(Type::Tuple(infer_vec(e, ctx)?)),
         // Expr::Proj(e, idx) => {
         //     let tup = infer_type(&e.0, ctx)?;
@@ -209,22 +223,21 @@ pub fn infer_type(e: &ExprRef, ctx: &mut InferContext) -> Result<Type, Error> {
         //     }
         // }
         Expr::Lambda(p, body) => {
-            let mut infer_params = |e: &Vec<_>, c: &mut InferContext| {
-                e.iter().map(|id| c.gen_intermediate_type()).collect()
+            let infer_params = |e: &Vec<_>, c: &mut InferContext| {
+                e.iter().map(|_id| c.gen_intermediate_type()).collect()
             };
 
-            let bty = infer_type(&body, ctx)?;
-            Ok(Type::Function(infer_params(p, ctx), Box::new(bty)))
+            let bty = infer_type(&body, env, ctx)?;
+            Ok(Type::Function(infer_params(&p, ctx), Box::new(bty)))
         }
         Expr::Let(id, body, then) => {
-            let bodyt = infer_type(body, ctx)?;
+            let bodyt = infer_type(&body, env, ctx)?;
             let idt = ctx.gen_intermediate_type();
             let bodyt_u = ctx
                 .unify_types(idt, bodyt)
-                .map_err(|kind| Error(kind, 0..0))?; //todo:span
-            ctx.env.extend();
-            ctx.env.add_bind(&mut vec![(id, bodyt_u)]);
-            infer_type(then, ctx)
+                .map_err(|kind| Error(kind, ctx.span_storage.get(&eid.0).unwrap().clone()))?;
+            ctx.envstorage.extend(env, &[(id, bodyt_u)]);
+            infer_type(&then, env, ctx)
         }
         // Expr::LetTuple(_ids, _body, _then) => {
         //     todo!("should be de-sugared before type inference")
@@ -245,17 +258,23 @@ pub fn infer_type(e: &ExprRef, ctx: &mut InferContext) -> Result<Type, Error> {
         //     c.env.to_outer();
         //     res
         // }
-        Expr::Var(name) => ctx.env.lookup(&name).map_or(
-            Err(Error(ErrorKind::VariableNotFound(name.clone()), 0..0)), //todo:Span
-            |v| Ok(v.clone()),
-        ),
+        Expr::Var(name) => {
+            let namestr = ctx.interner.resolve(name.0).unwrap();
+            ctx.envstorage.lookup(env, &name).map_or(
+                Err(Error(
+                    ErrorKind::VariableNotFound(namestr.to_string()),
+                    0..0,
+                )), //todo:Span
+                |v| Ok(v.clone()),
+            )
+        }
         Expr::App(fun, callee) => {
-            let fnl = infer_type(fun, ctx)?;
-            let callee_t = infer_vec(callee, ctx)?;
+            let fnl = infer_type(&fun, env, ctx)?;
+            let callee_t = infer_vec(&callee, ctx)?;
             let res_t = ctx.gen_intermediate_type();
             let fntype = Type::Function(callee_t, Box::new(res_t));
             ctx.unify_types(fnl, fntype)
-                .map_err(|kind| Error(kind, 0..0))
+                .map_err(|kind| Error(kind, ctx.span_storage.get(&eid.0).unwrap().clone()))
         }
         // Expr::If(cond, then, opt_else) => {
         //     let condt = infer_type(&cond.0, ctx)?;
