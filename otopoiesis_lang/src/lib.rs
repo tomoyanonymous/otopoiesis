@@ -1,26 +1,28 @@
 #![feature(box_patterns)]
 #![feature(iterator_try_collect)]
 pub mod atomic;
-pub mod builtin_fn;
-pub mod compiler;
 pub mod error;
+pub mod builtin_fn;
 pub mod metadata;
-pub mod parser;
-
-pub mod environment;
 pub mod expr;
-pub mod parameter;
-pub mod runtime;
-pub mod value;
+pub mod environment;
 pub mod types;
+pub mod parameter;
+pub mod value;
+
+pub mod parser;
+pub mod compiler;
+pub mod typing;
+pub mod runtime;
+
 use compiler::Context;
 use runtime::PlayInfo;
 use serde::{Deserialize, Serialize};
-use std::sync::Arc;
+use std::{sync::Arc, sync::Weak};
 
 use crate::parameter::FloatParameter;
 use id_arena::Id;
-use string_interner::{ StringInterner, backend::StringBackend};
+use string_interner::{backend::StringBackend, StringInterner};
 
 #[derive(Default, Copy, Clone, PartialEq, Debug)]
 pub struct Symbol(usize); //Symbol Trait is implemented on usize
@@ -99,12 +101,12 @@ impl<'d> Deserialize<'d> for ExtFun {
 // pub type Mixer = Arc<dyn MixerT>;
 pub type Time = f64;
 
-#[derive(Serialize, Deserialize, Debug, Clone,PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+
 pub enum Rate {
     Audio,            //
     UpSampled(u64),   //multipled by
     DownSampled(u64), //divided by
     Control(f64),     //event per seconds(Hz)
 }
-
 

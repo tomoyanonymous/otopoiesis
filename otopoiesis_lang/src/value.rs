@@ -5,10 +5,16 @@ use crate::parameter::Parameter;
 use super::expr::ExprRef;
 use super::*;
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Default)]
 pub struct RawValue(pub u64);
 
 impl RawValue {
+    pub fn get_as_ptr<T>(&self) -> *const T {
+        self.0 as *const T
+    }
+    pub fn get_as_mut_ptr<T>(&self) -> *mut T {
+        self.0 as *mut T
+    }
     pub fn get_as_ref<T>(&self) -> &T {
         let ptr = self.0 as *mut T;
         unsafe { &*ptr }

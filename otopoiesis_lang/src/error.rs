@@ -14,7 +14,12 @@ pub trait ReportableError: std::error::Error {
     }
 }
 
-pub fn report(src: &String, srcpath: path::PathBuf, errs: &[Box<dyn ReportableError>]) {
+pub fn report_to(
+    src: &str,
+    srcpath: path::PathBuf,
+    errs: &[Box<dyn ReportableError>],
+    mut w: impl std::io::Write,
+) {
     let path = srcpath.to_str().unwrap_or_default();
     for e in errs {
         let span = e.get_span();
@@ -23,8 +28,23 @@ pub fn report(src: &String, srcpath: path::PathBuf, errs: &[Box<dyn ReportableEr
             .with_message(e.get_message().as_str())
             .with_label(Label::new((path, span.clone())).with_message(e.get_label().as_str()))
             .finish();
-        builder.eprint((path, Source::from(src.as_str()))).unwrap();
+        let cache_key = (path, Source::from(src));
+        builder.write(cache_key, &mut w).unwrap()
     }
+}
+
+pub fn report(src: &str, srcpath: path::PathBuf, errs: &[Box<dyn ReportableError>]) {
+    report_to(src, srcpath, errs, std::io::stderr())
+}
+
+pub fn report_to_string(
+    src: &str,
+    srcpath: path::PathBuf,
+    errs: &[Box<dyn ReportableError>],
+) -> String {
+    let mut buf = Vec::<u8>::new();
+    report_to(src, srcpath, errs, &mut buf);
+    String::from(String::from_utf8_lossy(buf.as_slice()))
 }
 
 pub fn dump_to_string(errs: &[Box<dyn ReportableError>]) -> String {

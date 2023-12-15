@@ -72,6 +72,7 @@ impl<'a> Display for Stringifier<'a> {
 
         let expr = self.ctx.get_expr(self.e.clone()).ok_or(std::fmt::Error)?;
         match expr {
+            Expr::Error => write!(f, "error"),
             Expr::Nop => write!(f, "nop"),
             Expr::Literal(l) => write!(f, "{}", l),
             Expr::Array(_) => todo!(),

@@ -18,7 +18,7 @@ pub struct Context {
     pub region_storage: Arena<Region>,
     pub project_storage: Arena<Project>,
     pub extfun_storage: Arena<ExtFun>,
-    pub env_storage: EnvironmentStorage,
+    pub env_storage: EnvironmentStorage<RawValue>,
     pub root_env: EnvironmentRef,
 }
 
@@ -117,6 +117,7 @@ impl Context {
         let e = self.expr_storage.get(e.0).ok_or(EvalError::InvalidId)?;
 
         match e.clone() {
+            Expr::Error => Err(EvalError::InvalidConversion),
             Expr::Nop => Err(EvalError::InvalidConversion),
             Expr::Literal(l) => self.eval_literal(&l),
             Expr::Var(sym) => self
@@ -169,7 +170,8 @@ impl Context {
             }
             Expr::AppExt(callee, args) => {
                 let args = self.eval_vec(&args, envid)?;
-                callee.0.exec(&None, self, &args)
+                let f = unsafe { callee.as_mut() }.unwrap();
+                f.0.exec(&None, self, &args)
             }
 
             Expr::Array(es) => {
@@ -208,7 +210,15 @@ impl Context {
                                     FloatParameter::new(*f as f32, label)
                                         .set_range(*attr.1.start() as f32..=*attr.1.end() as f32),
                                 );
-                                Expr::Literal(Literal::FloatParameter(lit))
+                                let fname = self.interner.get_or_intern("param_as_number");
+                                let extfun = self
+                                    .env_storage
+                                    .lookup(envid, &Symbol(fname))
+                                    .map(|rv| rv.get_as_mut_ptr::<ExtFun>())
+                                    .unwrap();
+                                let param = Expr::Literal(Literal::FloatParameter(lit));
+                                let paramr = ExprRef(self.expr_storage.alloc(param));
+                                Expr::AppExt(extfun, vec![paramr])
                             }
                             _ => b.clone(),
                         };
