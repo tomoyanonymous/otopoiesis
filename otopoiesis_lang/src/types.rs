@@ -7,6 +7,7 @@ pub type TypeId =i64;
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub enum Type {
     Unknown,
+    Error,
     Unit,
     Number,
     Int,

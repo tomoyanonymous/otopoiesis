@@ -3,6 +3,7 @@ use std::sync::{Arc, Mutex};
 use crate::environment::{Environment, EnvironmentRef, EnvironmentStorage};
 use crate::expr::{Expr, ExprRef, Literal};
 use crate::parameter::{FloatParameter, Parameter, RangedNumeric};
+use crate::parser::ParseContext;
 use crate::value::{self, Closure, Project, RawValue, Region, Track};
 use crate::Interner;
 use crate::{builtin_fn, ExtFun, Symbol};
@@ -10,8 +11,7 @@ use id_arena::{Arena, Id};
 //unboxed
 
 pub struct Context {
-    pub expr_storage: Arena<Expr>,
-    pub interner: Interner,
+    pub parsectx: ParseContext,
     object_storage: Arena<Closure>,
     pub array_storage: Arena<Vec<RawValue>>,
     pub track_storage: Arena<Track>,
@@ -24,30 +24,17 @@ pub struct Context {
 
 impl Default for Context {
     fn default() -> Self {
-        let expr_storage = Arena::new();
-        let interner = Interner::new();
-        Self::new(expr_storage, interner)
+        Self::new(ParseContext::default())
     }
 }
 
 impl Context {
-    pub fn new(expr_storage: Arena<Expr>, mut interner: Interner) -> Self {
-        let mut extfun_storage = Arena::new();
+    pub fn new(parsectx: ParseContext) -> Self {
+        let extfun_storage = Arena::new();
         let mut env_storage = EnvironmentStorage::default();
-        let builtins = builtin_fn::gen_default_functions()
-            .iter()
-            .map(|(label, fun)| {
-                let id = Symbol(interner.get_or_intern(label));
-                let fid = extfun_storage.alloc(fun.clone());
-                let fref = extfun_storage.get_mut(fid).unwrap();
-                let f = RawValue::from(fref as *mut ExtFun);
-                (id, f)
-            })
-            .collect::<Vec<_>>();
-        let root_env = env_storage.set_root(&builtins);
-        Self {
-            expr_storage,
-            interner,
+        let root_env = env_storage.set_root(&[]);
+        let mut res = Self {
+            parsectx,
             object_storage: Default::default(),
             array_storage: Default::default(),
             track_storage: Default::default(),
@@ -56,7 +43,20 @@ impl Context {
             extfun_storage,
             env_storage,
             root_env,
-        }
+        };
+
+        let builtins = builtin_fn::gen_default_functions()
+            .iter()
+            .map(|(label, fun)| {
+                let id = Symbol(res.parsectx.interner.get_or_intern(label));
+                let fid = res.extfun_storage.alloc(fun.clone());
+                let fref = res.extfun_storage.get_mut(fid).unwrap();
+                let f = RawValue::from(fref as *mut ExtFun);
+                (id, f)
+            })
+            .collect::<Vec<_>>();
+        res.root_env = res.env_storage.set_root(&builtins);
+        res
     }
     pub fn gen_closure(
         &mut self,
@@ -79,7 +79,13 @@ impl Context {
         RawValue::from(ptr)
     }
     pub fn get_or_intern_str(&mut self, name: &str) -> Symbol {
-        Symbol(self.interner.get_or_intern(name))
+        Symbol(self.parsectx.interner.get_or_intern(name))
+    }
+    fn get_expr(&self, e: ExprRef) -> Option<&Expr> {
+        self.parsectx.expr_storage.get(e.0)
+    }
+    fn alloc_expr(&mut self, e: Expr) -> ExprRef {
+        ExprRef(self.parsectx.expr_storage.alloc(e))
     }
     fn eval_literal(&self, l: &Literal) -> Result<RawValue, EvalError> {
         match l {
@@ -114,7 +120,7 @@ impl Context {
         self.eval(body.clone(), newenv)
     }
     pub fn eval(&mut self, e: ExprRef, envid: Id<Environment>) -> Result<RawValue, EvalError> {
-        let e = self.expr_storage.get(e.0).ok_or(EvalError::InvalidId)?;
+        let e = self.get_expr(e).ok_or(EvalError::InvalidId)?;
 
         match e.clone() {
             Expr::Error => Err(EvalError::InvalidConversion),
@@ -159,12 +165,9 @@ impl Context {
                     fun.0.exec(&None, self, &[lhs, rhs])
                 } else {
                     //if unknown, translate into app
-                    let sym = Symbol(self.interner.get_or_intern(name));
-                    let var = self.expr_storage.alloc(Expr::Var(sym));
-                    let app = ExprRef(
-                        self.expr_storage
-                            .alloc(Expr::App(ExprRef(var), vec![lhs, rhs])),
-                    );
+                    let sym = self.get_or_intern_str(name);
+                    let var = self.alloc_expr(Expr::Var(sym));
+                    let app = self.alloc_expr(Expr::App(var, vec![lhs, rhs]));
                     self.eval(app, envid)
                 }
             }
@@ -199,32 +202,31 @@ impl Context {
             }
             Expr::Paren(e) | Expr::Block(e) => self.eval(e, envid),
             Expr::WithAttribute(attr, e) => {
-                let expr = self.expr_storage.get(e.0).unwrap();
-                match (self.interner.resolve(attr.0 .0), expr.clone()) {
+                let expr = self.get_expr(e.clone()).unwrap();
+                match (self.parsectx.interner.resolve(attr.0 .0), expr.clone()) {
                     (Some("param"), Expr::Let(name, body, then)) => {
-                        let b = self.expr_storage.get(body.0).unwrap();
+                        let b = self.get_expr(body).unwrap();
                         let body = match b {
                             Expr::Literal(Literal::Number(f)) => {
-                                let label = self.interner.resolve(name.0).unwrap();
+                                let label = self.parsectx.interner.resolve(name.0).unwrap();
                                 let lit = Arc::new(
                                     FloatParameter::new(*f as f32, label)
                                         .set_range(*attr.1.start() as f32..=*attr.1.end() as f32),
                                 );
-                                let fname = self.interner.get_or_intern("param_as_number");
+                                let fname = self.get_or_intern_str("param_as_number");
                                 let extfun = self
                                     .env_storage
-                                    .lookup(envid, &Symbol(fname))
+                                    .lookup(envid, &fname)
                                     .map(|rv| rv.get_as_mut_ptr::<ExtFun>())
                                     .unwrap();
                                 let param = Expr::Literal(Literal::FloatParameter(lit));
-                                let paramr = ExprRef(self.expr_storage.alloc(param));
+                                let paramr = self.alloc_expr(param);
                                 Expr::AppExt(extfun, vec![paramr])
                             }
                             _ => b.clone(),
                         };
-                        let body = ExprRef(self.expr_storage.alloc(body));
-                        let newexpr =
-                            ExprRef(self.expr_storage.alloc(Expr::Let(name, body, then.clone())));
+                        let body = self.alloc_expr(body);
+                        let newexpr = self.alloc_expr(Expr::Let(name, body, then.clone()));
                         self.eval(newexpr, envid)
                     }
                     _ => self.eval(e, envid),

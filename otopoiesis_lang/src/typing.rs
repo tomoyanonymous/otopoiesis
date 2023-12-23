@@ -166,7 +166,7 @@ impl InferContext {
         }
     }
 }
-fn infer_type_literal(e: &Literal) -> Result<Type, Error> {
+fn infer_type_literal(e: &Literal) -> Type {
     let pt = match e {
         Literal::Number(_s) => Type::Number,
         // Literal::Int(_s) => Type::Int,
@@ -176,7 +176,7 @@ fn infer_type_literal(e: &Literal) -> Result<Type, Error> {
         // Literal::Now => PType::Numeric,
         // Literal::SelfLit => panic!("\"self\" should not be shown at type inference stage"),
     };
-    Ok(pt)
+    pt
 }
 
 pub fn infer_type(
@@ -191,7 +191,7 @@ pub fn infer_type(
     };
     let e = ctx.expr_storage.get(eid.0).unwrap().clone();
     match e {
-        Expr::Literal(l) => infer_type_literal(&l),
+        Expr::Literal(l) => Ok(infer_type_literal(&l)),
         // Expr::Tuple(e) => Ok(Type::Tuple(infer_vec(e, ctx)?)),
         // Expr::Proj(e, idx) => {
         //     let tup = infer_type(&e.0, ctx)?;
@@ -292,4 +292,62 @@ pub fn infer_type(
             Ok(Type::Unknown)
         }
     }
+}
+pub fn infer_type_recovery(
+    eid: &ExprRef,
+    env: Id<Environment>,
+    ctx: &mut InferContext,
+) -> (Type, Vec<Error>) {
+    let e = ctx.expr_storage.get(eid.0).unwrap().clone();
+    let span = ctx.span_storage.get(&eid.0).unwrap().clone();
+    let mut errs = vec![];
+    let t = match e {
+        Expr::Nop => Type::Unit,
+        Expr::Error => Type::Error,
+        Expr::Literal(l) => infer_type_literal(&l),
+        Expr::Array(_) => todo!(),
+        Expr::Var(name) => {
+            let namestr = ctx.interner.resolve(name.0).unwrap();
+            ctx.envstorage.lookup(env, &name).unwrap_or_else(
+                || {
+                    errs.push(Error(
+                        ErrorKind::VariableNotFound(namestr.to_string()),
+                        span,
+                    ));
+                    Type::Error
+                }, //todo:Span
+            )
+        }
+        Expr::Let(id, body, then) => {
+            let (bodyt, mut es) = infer_type_recovery(&body, env, ctx);
+            errs.append(&mut es);
+            let idt = ctx.gen_intermediate_type();
+            let bodyt_u = ctx
+                .unify_types(idt, bodyt)
+                .map_err(|kind| Error(kind, span));
+            let bodyt_res = match bodyt_u {
+                Ok(t) => t,
+                Err(e) => {
+                    errs.push(e);
+                    Type::Error
+                }
+            };
+            ctx.envstorage.extend(env, &[(id, bodyt_res)]);
+            let (thent, mut es) = infer_type_recovery(&then, env, ctx);
+            errs.append(&mut es);
+            thent
+        }
+        Expr::Then(_, _) => todo!(),
+        Expr::App(_, _) => todo!(),
+        Expr::BinOp(_, _, _) => todo!(),
+        Expr::AppExt(_, _) => todo!(),
+        Expr::Lambda(_, _) => todo!(),
+        Expr::Block(_) => todo!(),
+        Expr::Paren(_) => todo!(),
+        Expr::WithAttribute(_, _) => todo!(),
+        Expr::Track(_) => todo!(),
+        Expr::Region(_, _, _) => todo!(),
+        Expr::Project(_, _) => todo!(),
+    };
+    (t, errs)
 }

@@ -25,7 +25,7 @@ use id_arena::Id;
 use string_interner::{backend::StringBackend, StringInterner};
 
 #[derive(Default, Copy, Clone, PartialEq, Debug)]
-pub struct Symbol(usize); //Symbol Trait is implemented on usize
+pub struct Symbol(pub usize); //Symbol Trait is implemented on usize
 
 pub(crate) type Interner = StringInterner<StringBackend<usize>>;
 

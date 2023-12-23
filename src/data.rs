@@ -7,6 +7,7 @@ use crate::script::{Environment, EvalError};
 
 use rfd;
 use script::compiler;
+use script::expr::ExprRef;
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 
@@ -82,7 +83,7 @@ pub struct AppModel {
     pub global_setting: GlobalSetting,
     pub launch_arg: LaunchArg,
     pub compile_ctx: compiler::Context,
-    pub source: Option<script::Expr>,
+    pub source: Option<script::expr::ExprRef>,
     pub project: Project,
     pub project_str: String,
     pub project_file: Option<String>,
@@ -93,7 +94,7 @@ pub struct AppModel {
 
 impl AppModel {
     pub fn new(transport: Transport, global_setting: GlobalSetting, launch_arg: LaunchArg) -> Self {
-        let compile_ctx = compiler::Context::default();
+        let mut compile_ctx = compiler::Context::default();
         let transport = Arc::new(transport);
         let file = launch_arg.file.clone();
         let project_file = file.map(|file| {
@@ -104,8 +105,8 @@ impl AppModel {
         if let Some(file) = project_file.clone() {
             let _ = filemanager::get_global_file_manager().read_to_string(file, &mut project_str);
         }
-
-        let source = Some(Expr::Project(44100., vec![]));
+        let pj = compile_ctx.parsectx.expr_storage.alloc(Expr::Project(44100., vec![]));
+        let source = Some(ExprRef(pj));
         let (action_tx, action_rx) = mpsc::channel();
         Self {
             transport,
@@ -220,7 +221,7 @@ impl AppModel {
             .any(|v| v)
     }
 
-    pub fn compile(&mut self, mut source: Expr) -> bool {
+    pub fn compile(&mut self, mut source: ExprRef) -> bool {
         log::debug!("compiling source...");
         let env = Arc::new(Environment::new());
         let res = source

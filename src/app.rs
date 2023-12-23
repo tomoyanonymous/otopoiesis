@@ -1,12 +1,14 @@
 use atomic::SimpleAtomic;
 use log::Log;
+use script::parser::stringifier::Stringifier;
+use script::parser::ParseContext;
 use std::sync::{Arc, Mutex};
 
+use crate::script::Expr;
+use crate::utils::{Logger, GLOBAL_LOGGER};
 use crate::{atomic, audio, data, gui};
 use audio::renderer::{Renderer, RendererBase};
 use data::Project;
-use crate::script::Expr;
-use crate::utils::{Logger, GLOBAL_LOGGER};
 
 pub(crate) mod filemanager;
 
@@ -209,7 +211,8 @@ impl eframe::App for Model {
                         let widget = match self.editor_mode {
                             EditorMode::Code => {
                                 txt = app.source.as_ref().map_or("".to_string(), |src| {
-                                    serde_json::to_string_pretty::<Expr>(src).unwrap()
+                                    Stringifier::new(&app.compile_ctx.parsectx, 0, src.clone())
+                                        .to_string()
                                 });
                                 app.project_str = txt.clone();
                                 egui::TextEdit::multiline(&mut txt).code_editor()
