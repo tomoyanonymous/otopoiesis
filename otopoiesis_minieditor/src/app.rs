@@ -21,14 +21,14 @@ impl Model {
         }
     }
     pub fn eval(&mut self) {
-        let pc = ParseContextRef::new(ParseContext::default());
-        let expr = parse(&self.source.clone(), pc.clone());
-        let pc = pc.0.borrow_mut();
+        let parsectx = ParseContextRef::new(ParseContext::default());
+        let expr = parse(&self.source.clone(), parsectx.clone());
+        let pc = parsectx.0.borrow_mut();
 
         match expr {
             Ok(e) => {
                 self.result = Some(Stringifier::new(&pc, 0, e.clone()).to_string());
-                let mut compiler = Context::new(pc.expr_storage.clone(), pc.interner.clone());
+                let mut compiler = Context::new(parsectx.0.take());
                 let root = compiler.root_env;
                 self.eval_result = match compiler.eval(e, root) {
                     Ok(rv) => Some(rv.get_as_float().to_string()),
