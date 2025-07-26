@@ -70,7 +70,7 @@ impl<'a> egui::Widget for Model<'a> {
     fn ui(mut self, ui: &mut egui::Ui) -> egui::Response {
         let height = gui::TRACK_HEIGHT + 30.0;
         let response = match self.track {
-            data::Track::Regions(ref region_params) => {
+            data::Track::Regions(region_params) => {
                 let w = ui.available_size().x;
                 let top = ui.available_rect_before_wrap().top();
 

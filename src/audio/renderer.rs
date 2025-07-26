@@ -4,7 +4,8 @@ use crate::data;
 
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use cpal::{self, Stream};
-use ringbuf::{HeapConsumer, HeapProducer, HeapRb};
+use ringbuf::traits::{Consumer, Producer, Split, SplitRef};
+use ringbuf::{HeapCons, HeapProd, HeapRb};
 use std::sync::{Arc, Mutex};
 
 pub trait RendererBase<E>
@@ -140,11 +141,11 @@ where
 }
 
 pub struct InputModel {
-    pub producer: HeapProducer<f32>,
+    pub producer: HeapProd<f32>,
 }
 
 pub struct OutputModel<E: Component + Sync + Send> {
-    pub consumer: HeapConsumer<f32>,
+    pub consumer: HeapCons<f32>,
     pub internal_buf: Vec<f32>,
     pub effector: E,
     pub current_time: Arc<atomic::U64>,
@@ -279,7 +280,7 @@ where
         transport: Arc<data::Transport>,
     ) -> Self {
         let latency_samples = buffer_size.unwrap_or(super::DEFAULT_BUFFER_LEN);
-        let ring_buffer = HeapRb::<f32>::new(latency_samples * 4); // Add some latency
+        let mut ring_buffer = HeapRb::<f32>::new(latency_samples * 4); // Add some latency
         let (producer, consumer) = ring_buffer.split();
         let mut res = Self {
             host: cpal::default_host(),

@@ -6,6 +6,7 @@ use crate::parameter::Parameter;
 use crate::script::{Expr, Value};
 use std::io::ErrorKind;
 
+use ringbuf::traits::{Consumer, Observer, Producer, SplitRef};
 use symphonia::core::audio::{Layout, SampleBuffer, SignalSpec};
 use symphonia::core::codecs::{Decoder, DecoderOptions, CODEC_TYPE_NULL};
 use symphonia::core::errors::Error;
@@ -175,7 +176,7 @@ impl Component for FilePlayer {
         let mut read_count = 0;
         let mut finished_loop = false;
         while !finished_loop {
-            let reached_eof = if cons.len() < output.len() {
+            let reached_eof = if cons.occupied_len() < output.len() {
                 match self.format.next_packet() {
                     Ok(packet) => {
                         // Consume any new metadata that has been read since the last packet.
@@ -220,7 +221,7 @@ impl Component for FilePlayer {
             };
             self.is_finished_playing = reached_eof.map_or(false, |res| res);
 
-            let read_len = cons.len().min(output.len());
+            let read_len = cons.occupied_len().min(output.len());
             // dbg!(read_count, cons.len(),output.len());
             let next_read = (read_count + read_len).min(output.len());
 
