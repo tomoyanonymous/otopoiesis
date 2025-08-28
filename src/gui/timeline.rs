@@ -1,8 +1,10 @@
+use egui::StrokeKind;
+
 use crate::action::{Action, AddTrack};
+use crate::atomic::{self, SimpleAtomic};
 use crate::data;
 use crate::gui;
 use crate::script::Expr;
-use crate::atomic::{self, SimpleAtomic};
 use std::sync::Arc;
 
 pub struct State {
@@ -55,6 +57,7 @@ impl<'a> Model<'a> {
             rect,
             5.0,
             egui::Stroke::new(2.0, style.visuals.extreme_bg_color), //tekitou
+            StrokeKind::Inside,
         );
     }
     fn draw_current_time(&mut self, painter: &egui::Painter, style: &egui::Style) {

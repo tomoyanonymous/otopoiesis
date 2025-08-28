@@ -3,6 +3,7 @@ use crate::{
     data::atomic,
     parameter::{FloatParameter, Parameter, RangedNumeric},
 };
+use script::atomic::SimpleAtomic;
 use serde::{Deserialize, Serialize};
 use std::ops::RangeInclusive;
 use std::sync::Arc;

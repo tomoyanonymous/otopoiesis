@@ -1,5 +1,6 @@
 use crate::{
-    parameter::{FloatParameter, Parameter, RangedNumeric}, runtime::PlayInfo,
+    parameter::{FloatParameter, Parameter, RangedNumeric},
+    runtime::PlayInfo,
 };
 
 use super::{extend_env, value::Param, Environment, EvalError, Expr, ExtFun, ExtFunT, Type, Value};
@@ -13,7 +14,7 @@ impl ExtFunT for ArrayReverse {
     fn exec(
         &self,
         _env: &Arc<Environment>,
-        _play_info: &Option<&Box<dyn PlayInfo+Send+Sync>>,
+        _play_info: &Option<&Box<dyn PlayInfo + Send + Sync>>,
         v: &[Value],
     ) -> Result<Value, EvalError> {
         if v.len() != 1 {
@@ -47,7 +48,7 @@ impl ExtFunT for Print {
     fn exec(
         &self,
         _env: &Arc<Environment>,
-        _play_info: &Option<&Box<dyn PlayInfo+Send+Sync>>,
+        _play_info: &Option<&Box<dyn PlayInfo + Send + Sync>>,
         v: &[Value],
     ) -> Result<Value, EvalError> {
         let str = v
@@ -90,7 +91,7 @@ impl ExtFunT for SineWave {
     fn exec(
         &self,
         _env: &Arc<Environment>,
-        play_info: &Option<&Box<dyn PlayInfo+Send+Sync>>,
+        play_info: &Option<&Box<dyn PlayInfo + Send + Sync>>,
         v: &[Value],
     ) -> Result<Value, EvalError> {
         match play_info {
@@ -146,7 +147,7 @@ impl ExtFunT for FadeInOut {
     fn exec(
         &self,
         env: &Arc<Environment>,
-        _play_info: &Option<&Box<dyn PlayInfo+Send+Sync>>,
+        _play_info: &Option<&Box<dyn PlayInfo + Send + Sync>>,
         v: &[Value],
     ) -> Result<Value, EvalError> {
         // ここでは実際のフェードイン、アウトはしない。
@@ -267,8 +268,12 @@ pub struct ApplyFadeInOut {
 }
 impl ApplyFadeInOut {
     pub fn new() -> Self {
-        let start = Param::Number(Arc::new(FloatParameter::new(0.01, "start")));
-        let dur = Param::Number(Arc::new(FloatParameter::new(0.01, "dur")));
+        let start = Param::Number(Arc::new(
+            FloatParameter::new(0.01, "start").set_range(0.0..=1000000.0),
+        ));
+        let dur = Param::Number(Arc::new(
+            FloatParameter::new(0.01, "dur").set_range(0.0..=1000000.0),
+        ));
         let time_in = Param::Number(Arc::new(
             FloatParameter::new(0.01, "fade_in").set_range(0.0..=10.0),
         ));
@@ -299,11 +304,11 @@ impl ExtFunT for ApplyFadeInOut {
     fn exec(
         &self,
         _env: &Arc<Environment>,
-        play_info: &Option<&Box<dyn PlayInfo+Send+Sync>>,
+        play_info: &Option<&Box<dyn PlayInfo + Send + Sync>>,
         v: &[Value],
     ) -> Result<Value, EvalError> {
         let now = play_info.unwrap().get_current_time_in_sample();
-        let sr = play_info.unwrap().get_samplerate() ;
+        let sr = play_info.unwrap().get_samplerate();
         // do nothing for now
         match v {
             [input_sample, _start, dur, time_in, time_out] => {
@@ -348,7 +353,7 @@ impl ExtFunT for Nop {
     fn exec(
         &self,
         _env: &Arc<Environment>,
-        _play_info: &Option<&Box<dyn PlayInfo+Send+Sync>>,
+        _play_info: &Option<&Box<dyn PlayInfo + Send + Sync>>,
         _v: &[Value],
     ) -> Result<Value, EvalError> {
         Ok(Value::None)

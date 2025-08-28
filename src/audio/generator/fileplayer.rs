@@ -8,7 +8,7 @@ use std::io::ErrorKind;
 
 use ringbuf::traits::{Consumer, Observer, Producer, SplitRef};
 use symphonia::core::audio::{Layout, SampleBuffer, SignalSpec};
-use symphonia::core::codecs::{Decoder, DecoderOptions, CODEC_TYPE_NULL};
+use symphonia::core::codecs::{CODEC_TYPE_NULL, Decoder, DecoderOptions};
 use symphonia::core::errors::Error;
 use symphonia::core::formats::{FormatOptions, FormatReader, SeekMode, SeekTo};
 use symphonia::core::io::{MediaSource, MediaSourceStream, MediaSourceStreamOptions};
@@ -60,10 +60,15 @@ fn get_default_decoder(path: impl ToString) -> Result<DecoderSet, Box<dyn std::e
 }
 
 impl FilePlayer {
-    pub fn new(param: FilePlayerParam) -> Self {
+    pub fn try_new(param: FilePlayerParam) -> Result<Self, Box<dyn std::error::Error>> {
         let buf_len = MediaSourceStreamOptions::default().buffer_len;
-        let path_str = param.path.try_lock().expect("failed to lock");
-        let (decoder, probed, track_id) = get_default_decoder(path_str).expect("decoder not found");
+        let (decoder, probed, track_id) = {
+            if let Ok(path_str) = param.path.try_lock() {
+                get_default_decoder(path_str)?
+            } else {
+                return Err("failed to lock path")?;
+            }
+        };
         let channels = decoder.codec_params().channels.unwrap().count() as u64;
         let max_frames = decoder.codec_params().max_frames_per_packet.unwrap();
         let audiobuffer = SampleBuffer::<f32>::new(
@@ -72,7 +77,7 @@ impl FilePlayer {
         );
 
         let ringbuf = ringbuf::HeapRb::new(buf_len);
-        Self {
+        Ok(Self {
             param,
             decoder,
             track_id,
@@ -81,7 +86,7 @@ impl FilePlayer {
             audiobuffer,
             ringbuf,
             is_finished_playing: false,
-        }
+        })
     }
     pub fn is_finished_playing(&self) -> bool {
         self.is_finished_playing
@@ -134,7 +139,7 @@ impl TryFrom<&Value> for FilePlayer {
                         start_sec,
                         duration,
                     };
-                    Ok(Self::new(param))
+                    Self::try_new(param).map_err(|e| Self::Error {})
                 } else {
                     Err(Self::Error {})
                 }
@@ -241,7 +246,7 @@ mod test {
     use super::*;
     fn read_prep() -> (FilePlayer, PlaybackInfo, usize) {
         let (param, len_samples) = data::FilePlayerParam::new_test_file();
-        let player = FilePlayer::new(param);
+        let player = FilePlayer::try_new(param).unwrap();
         let info = PlaybackInfo {
             sample_rate: 48000.,
             current_time: 0,

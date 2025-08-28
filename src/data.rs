@@ -2,14 +2,14 @@
 
 use crate::action;
 use crate::app::filemanager::{self, FileManager};
+use crate::atomic::{self, SimpleAtomic};
 use crate::script::{Environment, EvalError};
-use crate::atomic::{self,SimpleAtomic};
 
 use rfd;
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 
-use std::sync::{mpsc, Arc};
+use std::sync::{Arc, mpsc};
 use undo;
 
 pub mod generator;
@@ -59,9 +59,7 @@ impl TryFrom<&Value> for Project {
                 let tracks: Vec<Track> = tr
                     .iter()
                     .map(|t| {
-                        let res = t
-                            .eval(env.clone(), &None)
-                            .and_then(|t| Track::try_from(&t));
+                        let res = t.eval(env.clone(), &None).and_then(|t| Track::try_from(&t));
                         res
                     })
                     .try_collect()?;

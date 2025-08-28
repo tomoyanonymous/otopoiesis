@@ -1,5 +1,5 @@
 use crate::gui::PIXELS_PER_SEC_DEFAULT;
-use std::{ops::RangeInclusive, slice::Chunks};
+use std::{ops::RangeInclusive, slice::Chunks, sync::Arc};
 use crate::gui::region::BAR_WIDTH;
 
 const THUMBNAIL_REDUCTION_RATE: usize = 256;
@@ -25,7 +25,7 @@ fn gen_mesh_from_minmax<D>(
     _y: f32,
     height: f32,
     color: egui::Color32,
-) -> egui::Mesh
+) -> Arc<egui::Mesh>
 where
     D: std::iter::Iterator<Item = RangeInclusive<f32>>,
 {
@@ -50,7 +50,7 @@ where
             mesh.add_triangle(id1, *id2, id3);
             id2
         });
-    mesh
+    Arc::new(mesh)
 }
 
 impl State {

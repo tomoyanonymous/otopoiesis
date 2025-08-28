@@ -1,9 +1,9 @@
-
 use crate::data;
 use crate::gui;
 use crate::parameter::{Parameter, RangedNumeric};
 
 pub(crate) const BAR_WIDTH: f32 = 3.0;
+use egui::UiBuilder;
 use gui::script::eval_ui_val;
 
 mod region_handle;
@@ -30,7 +30,7 @@ pub struct State {
 
 impl State {
     pub fn renew_waveform(param: &data::Region) -> WaveFormState {
-        let mut model = crate::audio::region::Model::new(param.clone(),2);
+        let mut model = crate::audio::region::Model::new(param.clone(), 2);
         model.render_offline(44100.0, 2);
 
         WaveFormState::new(
@@ -109,15 +109,13 @@ impl<'a> egui::Widget for Model<'a> {
             let startui = ui.add_sized(bar_size, handle_start);
 
             let wave_ui = WaveForm::new(&mut self.state.waveform, &44100.);
-            let mut main = ui
-                .add(wave_ui)
-                .on_hover_cursor(egui::CursorIcon::Grab);
- 
+            let mut main = ui.add(wave_ui).on_hover_cursor(egui::CursorIcon::Grab);
+
             let mut handle_end =
                 UiBar::new(&mut end, &mut self.state.range_handles[1], HandleMode::End);
             handle_end.set_limit(*self.params.getrange().start()..=max_end);
             let endui = ui.add_sized(bar_size, handle_end);
-            if startui.union(endui).drag_released() {
+            if startui.union(endui).drag_stopped() {
                 self.state.waveform = State::renew_waveform(self.params);
             }
 
@@ -127,16 +125,16 @@ impl<'a> egui::Widget for Model<'a> {
                 self.interact_main(&mut main);
             }
             let menu_rect1 = main.rect.right_bottom();
-            let menu_rect2 = menu_rect1- egui::vec2(20.,20.);
-            let menu_rect = egui::Rect::from_two_pos(menu_rect1,menu_rect2);
-            ui.allocate_ui_at_rect(menu_rect, |ui|{
+            let menu_rect2 = menu_rect1 - egui::vec2(20., 20.);
+            let menu_rect = egui::Rect::from_two_pos(menu_rect1, menu_rect2);
+            ui.scope_builder(UiBuilder::new().max_rect(menu_rect), |ui| {
                 ui.push_id(ui.next_auto_id(), |ui| {
-                    egui::menu::menu_button(ui, "...", |ui| {
-                        eval_ui_val(&self.params.content, ui).response
-                    });
+                    egui::containers::menu::MenuButton::new("...")
+                        .ui(ui, |ui| eval_ui_val(&self.params.content, ui).response);
                 });
             });
             main
-        }).inner
+        })
+        .inner
     }
 }

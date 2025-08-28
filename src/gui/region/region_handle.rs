@@ -49,7 +49,7 @@ impl<'a> UiBar<'a> {
                 as f64;
             *self.pos = pos;
         }
-        if response.drag_released() {
+        if response.drag_stopped() {
             self.state.saved_state = 0.0
         }
     }

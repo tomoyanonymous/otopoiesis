@@ -1,6 +1,6 @@
 use crate::{
-    parameter::{FloatParameter, Parameter},
     atomic::SimpleAtomic,
+    parameter::{FloatParameter, Parameter},
 };
 
 pub(crate) fn slider_from_parameter(
@@ -26,16 +26,21 @@ pub(crate) fn slider_from_parameter(
             // .custom_formatter(|n, _r| format!("{:.6}", n))
             .max_decimals(5),
         );
+        // let range_end = if is_log {
+        //     range.end().load() as f64
+        // } else {
+        //     (range.end().load() as f64).min(f64::MAX)
+        // };
+        let range_end = range.end().load() as f64;
+        let bound = range.start().load() as f64..=range_end;
+
         let main = ui.add(
-            egui::Slider::from_get_set(
-                range.start().load() as f64..=range.end().load() as f64,
-                |v: Option<f64>| {
-                    if let Some(n) = v {
-                        param.set(n as f32);
-                    }
-                    param.get() as f64
-                },
-            )
+            egui::Slider::from_get_set(bound, |v: Option<f64>| {
+                if let Some(n) = v {
+                    param.set(n as f32);
+                }
+                param.get() as f64
+            })
             .show_value(false)
             .logarithmic(is_log),
         );

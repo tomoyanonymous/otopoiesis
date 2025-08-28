@@ -2,11 +2,11 @@ use atomic::SimpleAtomic;
 use log::Log;
 use std::sync::{Arc, Mutex};
 
+use crate::script::Expr;
+use crate::utils::{GLOBAL_LOGGER, Logger};
 use crate::{atomic, audio, data, gui};
 use audio::renderer::{Renderer, RendererBase};
 use data::Project;
-use crate::script::Expr;
-use crate::utils::{Logger, GLOBAL_LOGGER};
 
 pub(crate) mod filemanager;
 
@@ -79,10 +79,10 @@ impl Model {
         // .ttf and .otf files supported.
         fonts.font_data.insert(
             "my_font".to_owned(),
-            egui::FontData::from_static(include_bytes!(concat!(
+            Arc::new(egui::FontData::from_static(include_bytes!(concat!(
                 env!("CARGO_MANIFEST_DIR"),
                 "/assets/fonts/NotoSansJP-VariableFont_wght.ttf"
-            ))),
+            )))),
         );
 
         // Put my font first (highest priority) for proportional text:
@@ -137,7 +137,7 @@ impl Model {
 }
 
 impl eframe::App for Model {
-    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+    fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
         {
             let mut app = self.app.try_lock().unwrap();
             let need_update = app.consume_actions();
@@ -304,7 +304,7 @@ impl eframe::App for Model {
                                 data.iter_mut().rev().for_each(|d| {
                                     ui.add(
                                         egui::TextEdit::singleline(&mut d.0)
-                                            .desired_width(f32::INFINITY)
+                                            .desired_width(f32::MAX)
                                             .interactive(false)
                                             .text_color(Logger::get_color(d.1)),
                                     );
