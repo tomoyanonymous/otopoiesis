@@ -17,7 +17,7 @@ jobs:
       - uses: actions/checkout@v3
       - uses: ./.github/actions/cache_cargo
       - if: runner.os == 'Linux'
-        run: sudo apt-get install -y libasound2-dev libgtk-3-dev librust-atk-dev
+        run: sudo apt-get install -y libasound2-dev libgtk-3-dev
       - name: build
         run: cargo build
   test:
