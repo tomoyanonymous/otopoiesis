@@ -1,151 +1,110 @@
+use egui::Response;
+use script::parameter::Parameter;
+
 use crate::action::Action;
 use crate::data;
+use crate::data::TrackContent;
 use crate::gui;
 use crate::gui::menu;
 use std::sync::mpsc;
 
 use super::menu::add_fade_to_region;
-pub struct State {
-    regions: Vec<gui::region::State>,
-    // new_array_count: u32,
-}
-impl State {
-    pub fn new(param: &data::Track, _new_array_count: u32) -> Self {
-        let regions = get_region_from_param(param);
-
-        Self {
-            regions,
-            // new_array_count,
-        }
-    }
-}
 
 pub struct Model<'a> {
     id: usize,
     action_tx: mpsc::Sender<Action>,
     track: &'a mut data::Track,
-    state: &'a mut State,
-}
-
-fn get_region_from_param(track: &data::Track) -> Vec<gui::region::State> {
-    match track {
-        data::Track::Regions(regions) => regions
-            .iter()
-            .map(|region| gui::region::State::new(region, region.label.clone(), true))
-            .collect::<Vec<_>>(),
-        data::Track::Generator(_) => todo!(),
-        data::Track::Transformer() => todo!(),
-    }
 }
 
 impl<'a> Model<'a> {
-    pub fn new(
-        id: usize,
-        action_tx: mpsc::Sender<Action>,
-        track: &'a mut data::Track,
-        state: &'a mut State,
-    ) -> Self {
+    pub fn new(id: usize, action_tx: mpsc::Sender<Action>, track: &'a mut data::Track) -> Self {
         Self {
             id,
             action_tx,
             track,
-            state,
-        }
-    }
-    fn get_position_to_add(&self) -> f64 {
-        match &self.track {
-            data::Track::Regions(r) => r
-                .iter()
-                .fold(0.0, |acc, region| acc.max(*region.getrange().end())),
-            _ => unreachable!(),
         }
     }
 
-    fn sync_state(&mut self) {
-        self.state.regions = get_region_from_param(self.track);
-    }
+    fn sync_state(&mut self) {}
 }
 
 impl<'a> egui::Widget for Model<'a> {
-    fn ui(mut self, ui: &mut egui::Ui) -> egui::Response {
+    fn ui(self, ui: &mut egui::Ui) -> egui::Response {
         let height = gui::TRACK_HEIGHT + 30.0;
-        let response = match self.track {
-            data::Track::Regions(region_params) => {
+
+        let response = match &mut self.track.track_content {
+            TrackContent::Regions(regions) => {
                 let w = ui.available_size().x;
                 let top = ui.available_rect_before_wrap().top();
 
-                let regions_opt = if !self.state.regions.is_empty() {
-                    let regions = ui.allocate_ui(egui::vec2(w, height), |ui| {
-                        let area = ui.available_rect_before_wrap();
-                        ui.set_min_width(100.);
-                        ui.set_min_height(gui::TRACK_HEIGHT);
-                        let scale =
-                            move |sec: f64| (sec * gui::PIXELS_PER_SEC_DEFAULT as f64) as f32;
-                        ui.group(|ui| {
-                            self.state
-                                .regions
-                                .iter_mut()
-                                .zip(region_params.iter())
-                                .enumerate()
-                                .map(|(i, (region, region_param))| {
-                                    ui.push_id(i, |ui| {
-                                        let range = region_param.getrange().clone();
-                                        let x_start = area.left() + scale(*range.start());
-                                        let x_end = area.left() + scale(*range.end());
-                                        let rect = egui::Rect::from_points(&[
-                                            [x_start, top].into(),
-                                            [x_end, top + height].into(),
-                                        ]);
-                                        let res = ui.put(
-                                            rect,
-                                            super::region::Model::new(region_param, region),
-                                        );
-                                        res.context_menu(|ui| {
-                                            let _ =
-                                                add_fade_to_region(self.id, i, &self.action_tx, ui);
-                                        })
+                ui.allocate_ui(egui::vec2(w, height), |ui| {
+                    let area = ui.available_rect_before_wrap();
+                    ui.set_min_width(100.);
+                    ui.set_min_height(gui::TRACK_HEIGHT);
+                    let scale = move |sec: f64| (sec * gui::PIXELS_PER_SEC_DEFAULT as f64) as f32;
+                    ui.group(|ui| {
+                        regions
+                            .iter_mut()
+                            .enumerate()
+                            .map(|(i, region)| {
+                                ui.push_id(i, |ui| {
+                                    let start = region.start.get();
+                                    let end = start + region.dur.get();
+                                    let x_start = area.left() + scale(start as _);
+                                    let x_end = area.left() + scale(end as _);
+                                    let rect = egui::Rect::from_points(&[
+                                        [x_start, top].into(),
+                                        [x_end, top + height].into(),
+                                    ]);
+                                    let res = ui.put(rect, super::region::Model::new(region));
+                                    res.context_menu(|ui| {
+                                        let _ = add_fade_to_region(self.id, i, &self.action_tx, ui);
                                     })
-                                    .inner
                                 })
-                                .last()
-                        })
-                    });
-                    Some(regions)
-                } else {
-                    None
-                };
-                let button_w = 20.0;
-                let region_right_x = regions_opt
-                    .as_ref()
-                    .map_or(30.0, |rs| rs.response.rect.right());
-                let new_rect = egui::Rect::from_center_size(
-                    egui::pos2(region_right_x, top + gui::TRACK_HEIGHT / 2.0),
-                    egui::vec2(button_w, gui::TRACK_HEIGHT),
-                );
-
-                ui.painter().rect_filled(new_rect, 0.0, egui::Color32::BLUE);
-
-                let menu = ui.allocate_ui_at_rect(new_rect, |ui| {
-                    ui.set_min_width(40.);
-                    ui.set_height(gui::TRACK_HEIGHT);
-                    let position = self.get_position_to_add();
-                    ui.centered_and_justified(|ui| {
-                        menu::add_region_button(self.id, position, &self.action_tx, ui);
+                                .inner
+                            })
+                            .last()
                     })
-                });
+                })
+                .response
 
-                if menu.response.clicked() {
-                    self.sync_state();
-                }
-                if let Some(regions) = regions_opt {
-                    regions.response.union(menu.response)
-                } else {
-                    menu.response
-                }
+                // let new_rect = egui::Rect::from_center_size(
+                //     egui::pos2(region_right_x, top + gui::TRACK_HEIGHT / 2.0),
+                //     egui::vec2(button_w, gui::TRACK_HEIGHT),
+                // );
+
+                // ui.painter().rect_filled(new_rect, 0.0, egui::Color32::BLUE);
+
+                // let menu = ui.scope_builder(egui::UiBuilder::new().max_rect(new_rect), |ui| {
+                //     ui.set_min_width(40.);
+                //     ui.set_height(gui::TRACK_HEIGHT);
+                //     let position = self.get_position_to_add();
+                //     ui.centered_and_justified(|ui| {
+                //         menu::add_region_button(self.id, position, &self.action_tx, ui);
+                //     })
+                // });
+                // menu.response.conte
+
+                // if menu.response.clicked() {
+                //     self.sync_state();
+                // }
+                // if let Some(regions) = regions_opt {
+                //     regions.response.union(menu.response)
+                // } else {
+                //     menu.response
+                // }
             }
 
-            data::Track::Generator(_) => todo!(),
-            data::Track::Transformer() => todo!(),
+            TrackContent::SubTracks(tracks) => tracks
+                .iter_mut()
+                .enumerate()
+                .map(|(i, t)| {
+                    let model = Model::new(i, self.action_tx.clone(), t);
+                    model.ui(ui)
+                })
+                .reduce(|u1, u2| u1.union(u2))
+                .unwrap_or_else(|| ui.label("no contents")),
+            TrackContent::Generator(generator) => todo!(),
         };
 
         response

@@ -279,6 +279,7 @@ pub struct GlobalSetting;
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Project {
     pub sample_rate: atomic::U64,
+    pub current_time: atomic::U64, //in sample
     pub tracks: Vec<Track>,
     pub parameters: Vec<Arc<FloatParameter>>,
 }
@@ -286,6 +287,7 @@ impl Project {
     pub fn new(sample_rate: u64) -> Self {
         Self {
             sample_rate: atomic::U64::from(sample_rate),
+            current_time: atomic::U64::from(0),
             tracks: vec![],
             parameters: vec![],
         }

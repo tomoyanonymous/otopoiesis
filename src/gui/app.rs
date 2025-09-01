@@ -3,35 +3,35 @@ use crate::gui;
 
 use crate::atomic::SimpleAtomic;
 use std::sync::{Arc, Mutex};
-pub struct State {
-    timeline: gui::timeline::State,
+// pub struct State {
+//     timeline: gui::timeline::State,
+//     transport: gui::transport::Model,
+// }
+
+// impl State {
+//     pub fn new(param: &data::AppModel) -> Self {
+//         let sr = param.project.sample_rate.load();
+//         let transport = &param.transport;
+//         let transport = gui::transport::Model::new(Arc::clone(transport), sr);
+//         let timeline =
+//             gui::timeline::State::new(&param.project.tracks, transport.param.time.clone(), sr);
+//         Self {
+//             timeline,
+//             transport,
+//         }
+//     }
+//     pub fn sync_state(&mut self, track_p: &[data::Track]) {
+//         self.timeline.sync_state(track_p)
+//     }
+// }
+pub struct Model {
+    pub app: Arc<Mutex<data::AppModel>>,
     transport: gui::transport::Model,
 }
 
-impl State {
-    pub fn new(param: &data::AppModel) -> Self {
-        let sr = param.project.sample_rate.load();
-        let transport = &param.transport;
-        let transport = gui::transport::Model::new(Arc::clone(transport), sr);
-        let timeline =
-            gui::timeline::State::new(&param.project.tracks, transport.param.time.clone(), sr);
-        Self {
-            timeline,
-            transport,
-        }
-    }
-    pub fn sync_state(&mut self, track_p: &[data::Track]) {
-        self.timeline.sync_state(track_p)
-    }
-}
-pub struct Model<'a> {
-    pub app: Arc<Mutex<data::AppModel>>,
-    state: &'a mut State,
-}
-
-impl<'a> Model<'a> {
-    pub fn new(app: Arc<Mutex<data::AppModel>>, state: &'a mut State) -> Self {
-        Self { app, state }
+impl Model {
+    pub fn new(app: Arc<Mutex<data::AppModel>>, transport: gui::transport::Model) -> Self {
+        Self { app, transport }
     }
 
     pub fn show_ui(&mut self, ctx: &egui::Context) {
@@ -55,12 +55,13 @@ impl<'a> Model<'a> {
                                 app.save_as_file();
                             }
                         }
-                        if ui.button("Force Sync Ui State(Debug)").clicked() {
-                            #[cfg(debug_assertions)]
-                            self.state
-                                .timeline
-                                .sync_state(&self.app.try_lock().unwrap().project.tracks);
-                        }
+                        // if ui.button("Force Sync Ui State(Debug)").clicked() {
+                        //     #[cfg(debug_assertions)]
+                        //     self.app.try_lock().map(|app| {
+
+                        //         // .sync_state(&self.app.try_lock().unwrap().project.tracks);
+                        //     })
+                        // }
                     });
                     ui.menu_button("Edit", |ui| {
                         if let Ok(mut app) = self.app.try_lock() {
@@ -105,13 +106,10 @@ impl<'a> Model<'a> {
         egui::CentralPanel::default().show(ctx, |ui| {
             egui::ScrollArea::both().show(ui, |ui| {
                 if let Ok(mut app) = self.app.try_lock() {
-                    ui.add(super::timeline::Model::new(
-                        &mut app,
-                        &mut self.state.timeline,
-                    ));
+                    ui.add(super::timeline::Model::new(&mut app));
                 }
                 egui::panel::TopBottomPanel::bottom("footer")
-                    .show(ctx, |ui| ui.add(&mut self.state.transport));
+                    .show(ctx, |ui| ui.add(&mut self.transport));
             });
         });
     }
