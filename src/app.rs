@@ -142,8 +142,8 @@ impl eframe::App for Model {
             let mut app = self.app.try_lock().unwrap();
             let need_update = app.consume_actions();
             if need_update {
-                let newsrc = app.source.as_ref().unwrap().clone();
-                app.compile(newsrc);
+                let newsrc = app.project_str.clone();
+                app.compile(newsrc.as_str());
                 app.ui_to_code();
                 self.ui.sync_state(&app.project.tracks);
             }
@@ -205,21 +205,8 @@ impl eframe::App for Model {
                 egui::ScrollArea::vertical().show(ui, |ui| {
                     let should_refresh_audio = if let Ok(mut app) = self.app.try_lock() {
                         let _ = ui.label("Code Editor");
-                        let mut txt = String::new();
-                        let widget = match self.editor_mode {
-                            EditorMode::Code => {
-                                txt = app.source.as_ref().map_or("".to_string(), |src| {
-                                    serde_json::to_string_pretty::<Expr>(src).unwrap()
-                                });
-                                app.project_str = txt.clone();
-                                egui::TextEdit::multiline(&mut txt).code_editor()
-                            }
-                            EditorMode::Result => {
-                                txt =
-                                    serde_json::to_string_pretty::<Project>(&app.project).unwrap();
-                                egui::TextEdit::multiline(&mut txt).code_editor()
-                            }
-                        };
+                        let widget = egui::TextEdit::multiline(&mut app.project_str).code_editor();
+
                         let editor = ui.add_sized(ui.available_size(), widget);
                         if editor.gained_focus() {
                             app.ui_to_code();

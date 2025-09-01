@@ -3,9 +3,12 @@
 use crate::action;
 use crate::app::filemanager::{self, FileManager};
 use crate::atomic::{self, SimpleAtomic};
-use crate::script::{Environment, EvalError};
 
+use mimium_lang::Config;
+use mimium_lang::runtime::vm::Machine;
+use mimium_lang::{ExecContext, plugin};
 use rfd;
+use script::parameter::FloatParameter;
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 
@@ -51,36 +54,12 @@ impl Default for LaunchArg {
 #[derive(Debug)]
 pub struct ConversionError {}
 
-impl TryFrom<&Value> for Project {
-    type Error = EvalError;
-    fn try_from(value: &Value) -> Result<Self, Self::Error> {
-        match value {
-            Value::Project(env, sr, tr) => {
-                let tracks: Vec<Track> = tr
-                    .iter()
-                    .map(|t| {
-                        let res = t.eval(env.clone(), &None).and_then(|t| Track::try_from(&t));
-                        res
-                    })
-                    .try_collect()?;
-
-                Ok(Project {
-                    root_env: env.clone(),
-                    sample_rate: (*sr as u64).into(),
-                    tracks: tracks,
-                })
-            }
-            _ => Err(EvalError::InvalidConversion),
-        }
-    }
-}
-
 // #[derive(Serialize, Deserialize, Clone)]
 pub struct AppModel {
     pub transport: Arc<Transport>,
     pub global_setting: GlobalSetting,
     pub launch_arg: LaunchArg,
-    pub source: Option<script::Expr>,
+    pub vm: Option<ExecContext>,
     pub project: Project,
     pub project_str: String,
     pub project_file: Option<String>,
@@ -101,14 +80,12 @@ impl AppModel {
         if let Some(file) = project_file.clone() {
             let _ = filemanager::get_global_file_manager().read_to_string(file, &mut project_str);
         }
-        let root_env = Arc::new(Environment::new());
-        let source = Some(Expr::Literal(Value::Project(root_env, 44100., vec![])));
         let (action_tx, action_rx) = mpsc::channel();
         Self {
             transport,
             global_setting,
             launch_arg,
-            source,
+            vm: None,
             project: Project::new(44100),
             project_str,
             project_file,
@@ -124,14 +101,12 @@ impl AppModel {
 
     pub fn undo(&mut self) {
         let history = &mut self.history;
-        if let Some(_res) = self.source.as_mut().map(|src| {
-            if let Some(Err(e)) = history.undo(src) {
-                eprintln!("{}", e)
-            }
-        }) {
-            self.compile(self.source.as_ref().unwrap().clone());
-            self.ui_to_code();
-        }
+        if let Some(Err(e)) = history.undo(&mut self.project_str) {
+            eprintln!("{}", e)
+        };
+
+        self.compile(self.project_str.clone().as_str());
+        self.ui_to_code();
     }
     pub fn can_redo(&self) -> bool {
         let history = &self.history;
@@ -139,10 +114,12 @@ impl AppModel {
     }
     pub fn redo(&mut self) {
         let history = &mut self.history;
-        if let Some(_res) = self.source.as_mut().and_then(|src| history.redo(src)) {
-            self.compile(self.source.as_ref().unwrap().clone());
-            self.ui_to_code();
-        }
+        if let Some(Err(e)) = history.redo(&mut self.project_str) {
+            eprintln!("{}", e)
+        };
+
+        self.compile(self.project_str.clone().as_str());
+        self.ui_to_code();
     }
 
     pub fn open_file(&mut self) {
@@ -185,17 +162,18 @@ impl AppModel {
         }
     }
     pub fn ui_to_code(&mut self) {
-        let json = serde_json::to_string_pretty(&self.source);
-        let json_str = json.unwrap_or_else(|e| {
-            println!("{}", e);
-            "failed to print".to_string()
-        });
-        self.project_str = json_str;
+        // let json = serde_json::to_string_pretty(&self.source);
+        // let json_str = json.unwrap_or_else(|e| {
+        //     println!("{}", e);
+        //     "failed to print".to_string()
+        // });
+        // self.project_str = json_str;
     }
     pub fn code_to_ui(&mut self) -> Result<(), serde_json::Error> {
-        serde_json::from_str::<Expr>(&self.project_str).map(|expr| {
-            self.source = Some(expr);
-        })
+        // serde_json::from_str::<Expr>(&self.project_str).map(|expr| {
+        //     self.source = Some(expr);
+        // })
+        Ok(())
     }
     pub fn get_track_for_id_mut(&mut self, id: usize) -> Option<&mut Track> {
         self.project.tracks.get_mut(id)
@@ -207,24 +185,23 @@ impl AppModel {
         self.action_rx
             .try_iter()
             .map(|action_received| {
-                if let Some(src) = self.source.as_mut() {
-                    self.history.apply(src, action_received).is_ok()
-                } else {
-                    false
-                }
+                self.history
+                    .apply(&mut self.project_str, action_received)
+                    .is_ok()
             })
             .any(|v| v)
     }
-
-    pub fn compile(&mut self, source: Expr) -> bool {
+    fn get_default_context(&self) -> ExecContext {
+        ExecContext::new([].into_iter(), None, Config::default())
+    }
+    pub fn compile(&mut self, source: &str) -> bool {
         log::debug!("compiling source...");
-        let env = Arc::new(Environment::new());
-        let res = source
-            .eval(env, &mut None)
-            .and_then(|v| Project::try_from(&v));
+        let mut ctx = self.get_default_context();
+        ctx.prepare_compiler();
+        let res = ctx.prepare_machine(source);
         match res {
-            Ok(pj) => {
-                self.project = pj;
+            Ok(()) => {
+                self.vm = Some(ctx);
                 true
             }
             Err(e) => {
@@ -303,14 +280,14 @@ pub struct GlobalSetting;
 pub struct Project {
     pub sample_rate: atomic::U64,
     pub tracks: Vec<Track>,
-    pub root_env: Arc<Environment>,
+    pub parameters: Vec<Arc<FloatParameter>>,
 }
 impl Project {
     pub fn new(sample_rate: u64) -> Self {
         Self {
             sample_rate: atomic::U64::from(sample_rate),
             tracks: vec![],
-            root_env: Arc::new(Environment::new()),
+            parameters: vec![],
         }
     }
 }

@@ -43,15 +43,15 @@ impl<T> From<FailedToLockError<'_, Vec<T>>> for Error {
 }
 
 trait DisplayableAction:
-    undo::Action<Target = Expr, Output = (), Error = Error> + std::fmt::Display + std::fmt::Debug
+    undo::Action<Target = String, Output = (), Error = Error> + std::fmt::Display + std::fmt::Debug
 {
 }
 
-pub struct Action(Box<dyn DisplayableAction<Target = Expr, Output = (), Error = Error>>);
+pub struct Action(Box<dyn DisplayableAction<Target = String, Output = (), Error = Error>>);
 
 impl<T> From<T> for Action
 where
-    T: DisplayableAction<Target = Expr, Output = (), Error = Error> + 'static,
+    T: DisplayableAction<Target = String, Output = (), Error = Error> + 'static,
 {
     fn from(v: T) -> Self {
         Self(Box::new(v))
@@ -64,13 +64,13 @@ pub enum Target {
 }
 
 impl undo::Action for Action {
-    type Target = Expr;
+    type Target = String;
     type Output = ();
     type Error = Error;
-    fn apply(&mut self, target: &mut Expr) -> undo::Result<Self> {
+    fn apply(&mut self, target: &mut String) -> undo::Result<Self> {
         self.0.apply(target)
     }
-    fn undo(&mut self, target: &mut Expr) -> undo::Result<Self> {
+    fn undo(&mut self, target: &mut String) -> undo::Result<Self> {
         self.0.undo(target)
     }
 }
@@ -110,7 +110,7 @@ impl std::fmt::Display for AddRegion {
 }
 
 impl undo::Action for AddRegion {
-    type Target = Expr;
+    type Target = String;
 
     type Output = ();
 
@@ -169,7 +169,7 @@ impl AddTrack {
     }
 }
 impl undo::Action for AddTrack {
-    type Target = Expr;
+    type Target = String;
 
     type Output = ();
 
@@ -216,7 +216,7 @@ pub struct AddFadeInOut {
     pub time_out: f64,
 }
 impl undo::Action for AddFadeInOut {
-    type Target = Expr; //project
+    type Target = String; //project
 
     type Output = ();
 

@@ -1,62 +1,60 @@
-use crate::script::{EvalError, Value};
 use crate::{
     data::atomic,
     parameter::{FloatParameter, Parameter, RangedNumeric},
 };
-use script::atomic::SimpleAtomic;
+
 use serde::{Deserialize, Serialize};
 use std::ops::RangeInclusive;
 use std::sync::Arc;
 
-#[derive(Serialize, Deserialize, Clone, Default, Debug)]
-pub struct FadeParam {
-    pub time_in: Arc<FloatParameter>,
-    pub time_out: Arc<FloatParameter>,
-}
-impl FadeParam {
-    pub fn new() -> Self {
-        Self {
-            time_in: Arc::new(FloatParameter::new(0.0, "in_time").set_range(0.0..=1000.0)),
-            time_out: Arc::new(FloatParameter::new(0.0, "out_time").set_range(0.0..=1000.0)),
-        }
-    }
-    pub fn new_with(time_in: Arc<FloatParameter>, time_out: Arc<FloatParameter>) -> Self {
-        Self { time_in, time_out }
-    }
-}
+// #[derive(Serialize, Deserialize, Clone, Default, Debug)]
+// pub struct FadeParam {
+//     pub time_in: Arc<FloatParameter>,
+//     pub time_out: Arc<FloatParameter>,
+// }
+// impl FadeParam {
+//     pub fn new() -> Self {
+//         Self {
+//             time_in: Arc::new(FloatParameter::new(0.0, "in_time").set_range(0.0..=1000.0)),
+//             time_out: Arc::new(FloatParameter::new(0.0, "out_time").set_range(0.0..=1000.0)),
+//         }
+//     }
+//     pub fn new_with(time_in: Arc<FloatParameter>, time_out: Arc<FloatParameter>) -> Self {
+//         Self { time_in, time_out }
+//     }
+// }
 
-#[derive(Serialize, Deserialize, Clone, Default, Debug)]
-pub struct ReplicateParam {
-    pub count: atomic::U32,
-}
-impl From<u32> for ReplicateParam {
-    fn from(v: u32) -> Self {
-        Self { count: v.into() }
-    }
-}
+// #[derive(Serialize, Deserialize, Clone, Default, Debug)]
+// pub struct ReplicateParam {
+//     pub count: atomic::U32,
+// }
+// impl From<u32> for ReplicateParam {
+//     fn from(v: u32) -> Self {
+//         Self { count: v.into() }
+//     }
+// }
 
-/// Region filter transforms another region.
-/// Maybe the region after transformation has different range from the origin.
+// /// Region filter transforms another region.
+// /// Maybe the region after transformation has different range from the origin.
+// #[derive(Serialize, Deserialize, Clone, Debug)]
+// pub enum RegionFilter {
+//     Gain,
+//     FadeInOut(FadeParam),
+//     Reverse,
+//     Replicate(ReplicateParam),
+//     Script(Value),
+// }
+// impl TryFrom<&Value> for RegionFilter {
+//     type Error = EvalError;
+
+//     fn try_from(value: &Value) -> Result<Self, Self::Error> {
+//         Ok(Self::Script(value.clone()))
+//     }
+// }
+
 #[derive(Serialize, Deserialize, Clone, Debug)]
-pub enum RegionFilter {
-    Gain,
-    FadeInOut(FadeParam),
-    Reverse,
-    Replicate(ReplicateParam),
-    Script(Value),
-}
-impl TryFrom<&Value> for RegionFilter {
-    type Error = EvalError;
-
-    fn try_from(value: &Value) -> Result<Self, Self::Error> {
-        Ok(Self::Script(value.clone()))
-    }
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug)]
-pub enum Content {
-    Generator(Value),
-    Transformer(RegionFilter, Box<Region>),
+pub enum RegionContent {
+    Generator,
 }
 
 /// Data structure for region.
@@ -67,8 +65,9 @@ pub struct Region {
     /// start and dur stores a real time, not in sample.
     pub start: Arc<FloatParameter>,
     pub dur: Arc<FloatParameter>,
-    pub content: Value,
     pub label: String,
+    pub content: RegionContent,
+    pub parameters: Vec<Arc<FloatParameter>>,
 }
 
 impl Region {
@@ -77,20 +76,17 @@ impl Region {
     pub fn new(
         start: Arc<FloatParameter>,
         dur: Arc<FloatParameter>,
-        content: Value,
+        content: RegionContent,
         label: impl Into<String>,
+        parameters: Vec<Arc<FloatParameter>>,
     ) -> Self {
         Self {
             start,
             dur,
             content,
             label: label.into(),
+            parameters,
         }
-    }
-    pub fn getrange(&self) -> RangeInclusive<f64> {
-        let start = self.start.get() as f64;
-        let end = start + self.dur.get() as f64;
-        start..=end
     }
 }
 
@@ -99,8 +95,9 @@ impl std::default::Default for Region {
         Self {
             start: Arc::new(FloatParameter::default()),
             dur: Arc::new(FloatParameter::default()),
-            content: Value::None,
+            content: RegionContent::Generator,
             label: "".to_string(),
+            parameters: Vec::new(),
         }
     }
 }
@@ -108,36 +105,5 @@ impl std::default::Default for Region {
 impl std::fmt::Display for Region {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "region {}", self.label)
-    }
-}
-fn make_region_from_param(
-    start: Arc<FloatParameter>,
-    dur: Arc<FloatParameter>,
-    content: &Value,
-    label: &str,
-) -> Result<Region, EvalError> {
-    let res = Region::new(start.clone(), dur.clone(), content.clone(), label);
-    Ok(res)
-}
-
-impl TryFrom<&Value> for Region {
-    type Error = EvalError;
-
-    fn try_from(value: &Value) -> Result<Self, Self::Error> {
-        match value {
-            Value::Region(env, start, dur, content, label, _) => {
-                let start = start.eval(env.clone(), &None)?;
-                let dur = dur.eval(env.clone(), &None)?;
-
-                let content = content.eval(env.clone(), &None)?;
-                match (start, dur) {
-                    (Value::Parameter(start), Value::Parameter(dur)) => {
-                        make_region_from_param(start.clone(), dur.clone(), &content, label)
-                    }
-                    _ => Err(EvalError::InvalidConversion),
-                }
-            }
-            _ => Err(EvalError::InvalidConversion),
-        }
     }
 }

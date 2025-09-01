@@ -16,6 +16,7 @@ pub mod gui;
 pub mod utils;
 pub use script::parameter;
 pub use script::atomic;
+pub mod mimium_fns;
 
 #[cfg(not(target_arch = "wasm32"))]
 pub mod cli;
