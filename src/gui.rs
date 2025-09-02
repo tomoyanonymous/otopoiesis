@@ -8,7 +8,6 @@ pub mod region;
 pub mod timeline;
 pub mod track;
 pub mod transport;
-pub(crate) mod script;
 
 // pub(crate) const SAMPLES_PER_PIXEL_DEFAULT: f32 = 100.0;
 pub(crate) const PIXELS_PER_SEC_DEFAULT: f32 = 100.0;

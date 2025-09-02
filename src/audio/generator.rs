@@ -37,9 +37,3 @@ where
         }
     }
 }
-
-pub mod constant;
-#[cfg(not(target_arch = "wasm32"))]
-pub mod fileplayer;
-pub mod noise;
-pub mod oscillator;

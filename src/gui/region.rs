@@ -4,7 +4,6 @@ use crate::parameter::{Parameter, RangedNumeric};
 
 pub(crate) const BAR_WIDTH: f32 = 3.0;
 use egui::UiBuilder;
-use gui::script::eval_ui_val;
 
 mod region_handle;
 // pub mod regionfilter;
@@ -21,13 +20,14 @@ use region_handle::{HandleMode, UiBar, UiBarState};
 // }
 
 fn renew_waveform(param: &data::Region) -> WaveFormState {
-    let mut model = crate::audio::region::Model::new(param.clone(), 2);
-    model.render_offline(44100.0, 2);
-
-    WaveFormState::new(
-        model.content.get_sample_cache(),
-        model.content.get_output_channels() as usize,
-    )
+    let datas = match &param.content {
+        data::RegionContent::Expr(Some(arr)) => arr,
+        _ => {
+            return WaveFormState::new(&[], 1);
+        }
+    };
+    let data_f32 = datas.iter().map(|s| *s as f32).collect::<Vec<_>>();
+    WaveFormState::new(&data_f32, 1)
 }
 pub struct Model<'a> {
     pub params: &'a data::Region,
@@ -117,7 +117,11 @@ impl<'a> egui::Widget for Model<'a> {
             ui.scope_builder(UiBuilder::new().max_rect(menu_rect), |ui| {
                 ui.push_id(ui.next_auto_id(), |ui| {
                     egui::containers::menu::MenuButton::new("...")
-                        .ui(ui, |ui| &self.params.content.ui());
+                        .ui(ui, |ui| {
+                            for p in &self.params.parameters{
+                                ui.add(slider_from_parameter(p))
+                            }
+                        });
                 });
             });
             main

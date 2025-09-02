@@ -2,8 +2,8 @@
 //! Todo: fix an inconsistensy after code-app translation because serializing/deserializing refreshes Arc references.
 
 use crate::parameter::{FloatParameter, Parameter, RangedNumeric};
-use crate::script::{Expr, Value};
-use crate::{data, script::param_float};
+
+use crate::data;
 use std::sync::{Arc, MutexGuard, PoisonError};
 use undo;
 

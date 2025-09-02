@@ -4,7 +4,6 @@ use crate::action::{Action, AddTrack};
 use crate::atomic::{self, SimpleAtomic};
 use crate::data;
 use crate::gui;
-use crate::script::Expr;
 use std::sync::Arc;
 
 pub struct Model<'a> {

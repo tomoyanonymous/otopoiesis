@@ -1,6 +1,6 @@
 use egui::Response;
 use ringbuf::{HeapCons};
-use crate::parameter::FloatParameter;
+use crate::parameter::{FloatParameter, Parameter};
 
 use crate::action::Action;
 use crate::data;
