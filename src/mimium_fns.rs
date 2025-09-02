@@ -1,4 +1,7 @@
+use std::cell::RefCell;
+
 use crate::parameter::FloatParameter;
+use crate::parameter::{Parameter, RangedNumeric};
 use mimium_lang::{
     ast::{Expr, Literal},
     function,
@@ -10,31 +13,47 @@ use mimium_lang::{
     string_t,
     types::{PType, Type},
 };
-use script::parameter::{Parameter, RangedNumeric};
+enum UIData {
+    Track {
+        params: Vec<FloatParameter>,
+        content: Vec<Box<UIData>>,
+    },
+    Clip(Vec<FloatParameter>),
+    Slider(FloatParameter),
+}
+trait UIElement {
+    fn consume_stack<T: UIElement>(&mut self, elems: &[T]) {}
+}
+
 pub struct OtopoiesisPlugin {
     pub slider_storage: Vec<FloatParameter>,
 }
 
 impl OtopoiesisPlugin {
     pub fn make_slider(&mut self, v: &[(Value, TypeNodeId)]) -> Value {
-        assert_eq!(v.len(), 3);
-        let (name, min, max) = match (v[0].0.clone(), v[1].0.clone(), v[2].0.clone()) {
-            (Value::String(name), Value::Number(min), Value::Number(max)) => (name, min, max),
+        assert_eq!(v.len(), 4);
+        let (name, target, min, max) = match (
+            v[0].0.clone(),
+            v[1].0.clone(),
+            v[2].0.clone(),
+            v[3].0.clone(),
+        ) {
+            (Value::String(name), Value::Code(e), Value::Number(min), Value::Number(max)) => {
+                (name, e, min, max)
+            }
             _ => {
                 log::error!("invalid argument");
                 return Value::Number(0.0);
             }
         };
-        let param = FloatParameter::new(0.0, name.to_string()).set_range(min as f32..=max as f32);
+        let param =
+            FloatParameter::new(target, name.to_string()).set_range(min as f32..=max as f32);
         self.slider_storage.push(param);
         let idx = self.slider_storage.len() - 1;
         Value::Code(
             Expr::Apply(
                 Expr::Var("get_param".to_symbol()).into_id_without_span(),
-                vec![
-                    Expr::Literal(Literal::Float(idx.to_string().to_symbol()))
-                        .into_id_without_span(),
-                ],
+                vec![Expr::Literal(Literal::Float(RefCell::new(idx as f64))).into_id_without_span()],
             )
             .into_id_without_span(),
         )

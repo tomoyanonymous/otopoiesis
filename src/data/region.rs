@@ -3,6 +3,7 @@ use crate::{
     parameter::{FloatParameter, Parameter, RangedNumeric},
 };
 
+use mimium_lang::interner::ExprNodeId;
 use serde::{Deserialize, Serialize};
 use std::ops::RangeInclusive;
 use std::sync::Arc;
@@ -52,15 +53,16 @@ use std::sync::Arc;
 //     }
 // }
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Clone, Debug)]
 pub enum RegionContent {
-    Generator,
+    Expr(Option<Vec<f64>>),
+    // LiveExpr(ExprNodeId)
 }
 
-/// Data structure for region.
+/// `Data structure for region.
 /// The region has certain start time and end time, and one generator (including an audio file).
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Clone, Debug)]
 pub struct Region {
     /// start and dur stores a real time, not in sample.
     pub start: Arc<FloatParameter>,
@@ -68,6 +70,7 @@ pub struct Region {
     pub label: String,
     pub content: RegionContent,
     pub parameters: Vec<Arc<FloatParameter>>,
+
 }
 
 impl Region {

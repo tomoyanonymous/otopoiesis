@@ -3,8 +3,11 @@
 //!
 
 use atomic_float;
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use std::{marker::PhantomData, sync::{atomic, Arc}};
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
+use std::{
+    marker::PhantomData,
+    sync::{Arc, atomic},
+};
 
 use crate::parameter::{FloatParameter, Parameter};
 pub trait SimpleAtomicTest: Copy + PartialOrd {
@@ -110,7 +113,7 @@ impl_simple_atomic!(U64, u64, "u64", atomic::AtomicU64);
 impl_simple_atomic!(F64, f64, "f64", atomic_float::AtomicF64);
 impl_is_num!(usize, i8, u8, i16, u16, i32, u32, f32, i64, u64, f64);
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Debug, Clone)]
 pub struct AtomicRange {
     start: Arc<FloatParameter>,
     dur: Arc<FloatParameter>,
@@ -154,7 +157,6 @@ impl AtomicRange {
         self.set_end(end_bounded);
     }
 }
-
 
 #[cfg(test)]
 mod test {

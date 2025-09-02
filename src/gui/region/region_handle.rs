@@ -44,10 +44,9 @@ impl<'a> UiBar<'a> {
         if response.dragged() {
             self.state.saved_state +=
                 (response.drag_delta().x / gui::PIXELS_PER_SEC_DEFAULT) as f64;
-            let pos = (self.state.saved_state)
-                .clamp(*self.state.range.start(), *self.state.range.end())
-                as f64;
-            *self.pos = pos;
+            let (start, end) = (self.state.range.start(), self.state.range.end());
+            let pos = self.state.saved_state.clamp(*start, *end);
+            *self.pos = pos as f64;
         }
         if response.drag_stopped() {
             self.state.saved_state = 0.0
@@ -66,11 +65,10 @@ impl<'a> egui::Widget for UiBar<'a> {
         };
         let color = ui.style().visuals.strong_text_color();
         response = response.on_hover_cursor(icon);
-        painter.rect_filled(rect, 0.,egui::Color32::DARK_GRAY);
+        painter.rect_filled(rect, 0., egui::Color32::DARK_GRAY);
         if response.hovered() {
-            painter.rect_filled(rect, 0.,color);
+            painter.rect_filled(rect, 0., color);
         }
-
         if response.dragged() {
             painter.rect_filled(rect, 0., color.linear_multiply(0.8));
             ui.ctx().output_mut(|o| o.cursor_icon = icon);

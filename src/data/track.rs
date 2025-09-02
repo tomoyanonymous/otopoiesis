@@ -1,19 +1,26 @@
 use std::sync::Arc;
 
 use super::{Generator, Region};
-use script::parameter::FloatParameter;
+use crate::parameter::FloatParameter;
+use ringbuf::HeapCons;
 use serde::{Deserialize, Serialize};
+use slotmap::SlotMap;
+
+#[derive(Serialize, Deserialize, Clone, Debug, Copy, PartialEq, Eq, Hash)]
+struct ProbeId(usize);
+type ProbeMap = SlotMap<ProbeId, HeapCons<f64>>;
 
 /// Data structure for track.
 /// The track has some input/output streams.
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Clone, Debug)]
 pub struct Track {
     pub label: String,
     pub track_content: TrackContent,
     pub parameters: Vec<Arc<FloatParameter>>,
+    pub meter: ProbeId,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Clone, Debug)]
 pub enum TrackContent {
     ///Contains Multiple Regions.
     Regions(Vec<Region>),
@@ -24,13 +31,13 @@ pub enum TrackContent {
 }
 
 impl Track {
-    pub fn new(name:&str) -> Self {
-        Self {
-            label: name.to_string(),
-            track_content: TrackContent::Regions(vec![]),
-            parameters: Vec::new(),
-        }
-    }
+    // pub fn new(name: &str) -> Self {
+    //     Self {
+    //         label: name.to_string(),
+    //         track_content: TrackContent::Regions(vec![]),
+    //         parameters: Vec::new(),
+    //     }
+    // }
 }
 
 impl std::fmt::Display for Track {

@@ -4,11 +4,11 @@ use crate::action;
 use crate::app::filemanager::{self, FileManager};
 use crate::atomic::{self, SimpleAtomic};
 
+use crate::parameter::FloatParameter;
 use mimium_lang::Config;
 use mimium_lang::runtime::vm::Machine;
 use mimium_lang::{ExecContext, plugin};
 use rfd;
-use script::parameter::FloatParameter;
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 
@@ -25,8 +25,6 @@ pub use track::*;
 
 #[cfg(not(target_arch = "wasm32"))]
 use dirs;
-
-use crate::script::{self, Expr, Value};
 
 pub struct LaunchArg {
     pub file: Option<String>,
@@ -56,7 +54,7 @@ pub struct ConversionError {}
 
 // #[derive(Serialize, Deserialize, Clone)]
 pub struct AppModel {
-    pub transport: Arc<Transport>,
+    pub transport: Transport,
     pub global_setting: GlobalSetting,
     pub launch_arg: LaunchArg,
     pub vm: Option<ExecContext>,
@@ -70,7 +68,7 @@ pub struct AppModel {
 
 impl AppModel {
     pub fn new(transport: Transport, global_setting: GlobalSetting, launch_arg: LaunchArg) -> Self {
-        let transport = Arc::new(transport);
+        // let transport = Arc::new(transport);
         let file = launch_arg.file.clone();
         let project_file = file.map(|file| {
             let path = std::path::PathBuf::from(file);
@@ -276,7 +274,7 @@ impl Default for Transport {
 pub struct GlobalSetting;
 
 /// A main project data. It should be imported/exported via serde.
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Debug, Clone)]
 pub struct Project {
     pub sample_rate: atomic::U64,
     pub current_time: atomic::U64, //in sample

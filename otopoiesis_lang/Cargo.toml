@@ -18,3 +18,5 @@ serde_json = "*"
 serde_with = "2.1.0"
 
 atomic_float = "*"
+
+mimium-lang = { path = "../../mimium-rs/mimium-lang" }

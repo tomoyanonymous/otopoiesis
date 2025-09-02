@@ -1,5 +1,5 @@
 use crate::audio::{
-    get_component_for_value, GenericRangedComponent, PlaybackInfo, RangedComponent,
+    GenericRangedComponent, PlaybackInfo, RangedComponent, get_component_for_value,
 };
 
 // use crate::parameter::UIntParameter
@@ -233,7 +233,7 @@ impl Model {
     }
     pub fn render_offline(&mut self, sample_rate: f64, channels: u64) {
         self.interleaved_samples_cache.resize(
-            (self.params.dur.get() as f64 * sample_rate as f64) as usize * channels as usize,
+            (self.params.dur.get_value() * sample_rate as f64) as usize * channels as usize,
             0.0,
         );
         self.content.render_offline(sample_rate, channels);
@@ -280,7 +280,7 @@ mod test {
     use crate::{
         data::Content,
         parameter::{FloatParameter, Parameter, RangedNumeric},
-        script::{builtin_fn, Environment, Expr, ExtFun, Value},
+        script::{Environment, Expr, ExtFun, Value, builtin_fn},
     };
 
     use super::*;
@@ -382,10 +382,11 @@ mod test {
             dur.clone(),
             Value::ExtFunction(ExtFun::new(builtin_fn::SineWave::new())),
             "test_sin",
+            vec![]
         );
         let mut model = Model::new(data, channel);
         model.render_offline(sample_rate, channel);
-        let range_samps = (dur.get() as f64 * sample_rate as f64) as usize * channel as usize;
+        let range_samps = (dur.get_value() * sample_rate as f64) as usize * channel as usize;
         assert_eq!(model.interleaved_samples_cache.len(), range_samps);
 
         let mut answer = vec![0.0f32; range_samps];
@@ -435,13 +436,15 @@ mod test {
             current_time: 0,
             frame_per_buffer: 256,
             channels,
-        }.boxed();
+        }
+        .boxed();
 
         let region_res = region_with_fade.eval(env, &Some(&info)).unwrap();
         let data = data::Region::try_from(&region_res).unwrap();
         let mut model = Model::new(data, channels);
         model.render_offline(sample_rate, channels);
-        let range_samps = (dur.get() as f64 * sample_rate as f64) as usize * channels as usize;
+        let range_samps =
+            (dur.get_value() as f64 * sample_rate as f64) as usize * channels as usize;
         assert_eq!(model.interleaved_samples_cache.len(), range_samps);
 
         let mut answer = vec![1.0f32; range_samps];

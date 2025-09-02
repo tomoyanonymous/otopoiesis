@@ -4,7 +4,6 @@
 pub mod app;
 pub mod generator;
 pub mod menu;
-pub mod parameter;
 pub mod region;
 pub mod timeline;
 pub mod track;

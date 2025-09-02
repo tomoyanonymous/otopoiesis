@@ -26,12 +26,11 @@ use std::sync::{Arc, Mutex};
 // }
 pub struct Model {
     pub app: Arc<Mutex<data::AppModel>>,
-    transport: gui::transport::Model,
 }
 
 impl Model {
-    pub fn new(app: Arc<Mutex<data::AppModel>>, transport: gui::transport::Model) -> Self {
-        Self { app, transport }
+    pub fn new(app: Arc<Mutex<data::AppModel>>) -> Self {
+        Self { app }
     }
 
     pub fn show_ui(&mut self, ctx: &egui::Context) {
@@ -107,9 +106,9 @@ impl Model {
             egui::ScrollArea::both().show(ui, |ui| {
                 if let Ok(mut app) = self.app.try_lock() {
                     ui.add(super::timeline::Model::new(&mut app));
-                }
-                egui::panel::TopBottomPanel::bottom("footer")
-                    .show(ctx, |ui| ui.add(&mut self.transport));
+                    egui::panel::TopBottomPanel::bottom("footer")
+                    .show(ctx, |ui| ui.add(&mut app.transport));
+            }
             });
         });
     }

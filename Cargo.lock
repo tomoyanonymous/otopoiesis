@@ -3044,6 +3044,7 @@ dependencies = [
 name = "otopoiesis"
 version = "0.1.0"
 dependencies = [
+ "atomic_float",
  "clap",
  "console_error_panic_hook",
  "coreaudio-sys",
@@ -3054,13 +3055,13 @@ dependencies = [
  "egui_extras",
  "log",
  "mimium-lang",
- "otopoiesis_lang",
  "rand",
  "rfd",
  "ringbuf",
  "serde",
  "serde_json",
  "serde_with",
+ "slotmap",
  "symphonia",
  "undo",
  "wasm-bindgen",
@@ -3074,6 +3075,7 @@ name = "otopoiesis_lang"
 version = "0.1.0"
 dependencies = [
  "atomic_float",
+ "mimium-lang",
  "serde",
  "serde_json",
  "serde_with",

@@ -1,8 +1,6 @@
 use atomic::SimpleAtomic;
 use log::Log;
 use std::sync::{Arc, Mutex};
-
-use crate::script::Expr;
 use crate::utils::{GLOBAL_LOGGER, Logger};
 use crate::{atomic, audio, data, gui};
 use audio::renderer::{Renderer, RendererBase};
@@ -21,7 +19,7 @@ pub struct Model {
     app: Arc<Mutex<data::AppModel>>,
     audio: Renderer<audio::timeline::Model>,
     compile_err: Option<serde_json::Error>,
-    ui: gui::app::State,
+    // ui: gui::app::State,
     editor_open: bool,
     editor_mode: EditorMode,
     logger_open: bool,
@@ -44,7 +42,7 @@ impl Model {
         let mut appmodel = data::AppModel::new(data::Transport::new(), data::GlobalSetting {}, arg);
         let _ = appmodel.code_to_ui();
 
-        let ui = gui::app::State::new(&appmodel);
+        // let ui = gui::app::State::new(&appmodel);
         #[allow(clippy::arc_with_non_send_sync)]
         let app = Arc::new(Mutex::new(appmodel));
 
@@ -145,7 +143,7 @@ impl eframe::App for Model {
                 let newsrc = app.project_str.clone();
                 app.compile(newsrc.as_str());
                 app.ui_to_code();
-                self.ui.sync_state(&app.project.tracks);
+                // self.ui.sync_state(&app.project.tracks);
             }
 
             ctx.input_mut(|i| {
@@ -155,7 +153,7 @@ impl eframe::App for Model {
                 )) && app.can_undo()
                 {
                     app.undo();
-                    self.ui.sync_state(&app.project.tracks);
+                    // self.ui.sync_state(&app.project.tracks);
                 }
                 if i.consume_shortcut(&egui::KeyboardShortcut::new(
                     egui::Modifiers::COMMAND.plus(egui::Modifiers::SHIFT),
@@ -163,7 +161,7 @@ impl eframe::App for Model {
                 )) && app.can_redo()
                 {
                     app.redo();
-                    self.ui.sync_state(&app.project.tracks);
+                    // self.ui.sync_state(&app.project.tracks);
                 }
                 if i.consume_shortcut(&egui::KeyboardShortcut::new(
                     egui::Modifiers::NONE,
@@ -214,7 +212,7 @@ impl eframe::App for Model {
                         let should_refresh_audio = if editor.changed() && editor.lost_focus() {
                             match app.code_to_ui() {
                                 Ok(()) => {
-                                    self.ui.sync_state(&app.project.tracks);
+                                    // self.ui.sync_state(&app.project.tracks);
                                     true
                                 }
                                 Err(err) => {
@@ -309,8 +307,8 @@ impl eframe::App for Model {
             .show(ctx, |ui| {
                 ui.toggle_value(&mut self.logger_open, "Console Log");
             });
-        //launch main ui
-        let mut mainui = gui::app::Model::new(self.app.clone(), &mut self.ui);
+
+        let mut mainui = gui::app::Model::new(self.app.clone());
         mainui.show_ui(ctx);
         self.sync_transport();
     }

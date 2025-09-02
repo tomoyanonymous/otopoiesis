@@ -6,7 +6,6 @@
 extern crate eframe;
 extern crate egui;
 extern crate serde_json;
-extern crate otopoiesis_lang as script;
 
 pub mod action;
 pub mod app;
@@ -14,9 +13,9 @@ pub mod audio;
 pub mod data;
 pub mod gui;
 pub mod utils;
-pub use script::parameter;
-pub use script::atomic;
+pub(crate) mod atomic;
 pub mod mimium_fns;
+pub mod parameter;
 
 #[cfg(not(target_arch = "wasm32"))]
 pub mod cli;

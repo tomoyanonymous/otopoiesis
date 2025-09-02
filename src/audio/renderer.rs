@@ -189,7 +189,7 @@ where
 {
     pub host: cpal::Host,
     /// Do not mutate transport from the audio renderer side. it just subscribes states changed by GUI.
-    transport: Arc<data::Transport>,
+    transport: data::Transport,
     istream: Option<Stream>,
     ostream: Option<Stream>,
     imodel: Arc<Mutex<InputModel>>,

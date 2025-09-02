@@ -20,37 +20,6 @@ use region_handle::{HandleMode, UiBar, UiBarState};
 //     Generator(script::Value, WaveFormState),
 // }
 
-pub struct State {
-    pub label: String,
-    waveform: WaveFormState,
-    range_handles: [UiBarState; 2],
-    #[allow(dead_code)]
-    is_interactive: bool,
-}
-
-impl State {
-    pub fn renew_waveform(param: &data::Region) -> WaveFormState {
-        let mut model = crate::audio::region::Model::new(param.clone(), 2);
-        model.render_offline(44100.0, 2);
-
-        WaveFormState::new(
-            model.content.get_sample_cache(),
-            model.content.get_output_channels() as usize,
-        )
-    }
-    pub fn new(params: &data::Region, labeltext: impl ToString, is_interactive: bool) -> Self {
-        let waveform = Self::renew_waveform(&params);
-        let handle_left = UiBarState::new(0.0..=params.dur.get().into());
-        let handle_right = UiBarState::new(params.dur.get().into()..=f64::INFINITY);
-        let range_handles = [handle_left, handle_right];
-        Self {
-            label: labeltext.to_string(),
-            waveform,
-            range_handles,
-            is_interactive,
-        }
-    }
-}
 fn renew_waveform(param: &data::Region) -> WaveFormState {
     let mut model = crate::audio::region::Model::new(param.clone(), 2);
     model.render_offline(44100.0, 2);
@@ -62,7 +31,9 @@ fn renew_waveform(param: &data::Region) -> WaveFormState {
 }
 pub struct Model<'a> {
     pub params: &'a data::Region,
+    // Local Data for waveform thumbnail display
     waveform: WaveFormState,
+    // UiBarState stores local state for dragging.
     range_handles: [UiBarState; 2],
 }
 
@@ -87,7 +58,7 @@ impl<'a> Model<'a> {
     fn interact_main(&mut self, main: &mut egui::Response) {
         if main.dragged() {
             let offset = main.drag_delta().x as f64 / gui::PIXELS_PER_SEC_DEFAULT as f64;
-            let start = self.params.start.get() as f64;
+            let start = self.params.start.get_value();
             self.params.start.set((start + offset) as f32);
             *main = main.clone().on_hover_cursor(egui::CursorIcon::Grabbing)
         }
@@ -104,9 +75,9 @@ impl<'a> egui::Widget for Model<'a> {
     fn ui(mut self, ui: &mut egui::Ui) -> egui::Response {
         let height = gui::TRACK_HEIGHT + 30.0;
 
-        let start = self.params.start.get();
-        let end = start + self.params.dur.get();
-        let max_end = (end + self.params.dur.get_range().end()) as f64;
+        let start = self.params.start.get_value();
+        let end = start + self.params.dur.get_value();
+        let max_end = end + (*self.params.dur.get_range().end() as f64) as f64;
 
         //for debug
         // let rect = ui.available_rect_before_wrap();
@@ -116,8 +87,8 @@ impl<'a> egui::Widget for Model<'a> {
 
         ui.horizontal_top(|ui| {
             let bar_size = egui::vec2(BAR_WIDTH, height);
-            let mut start = self.params.start.get() as f64;
-            let mut end = self.params.dur.get() as f64 + start;
+            let mut start = self.params.start.get_value();
+            let mut end = self.params.dur.get_value() + start;
             let mut handle_start =
                 UiBar::new(&mut start, &mut self.range_handles[0], HandleMode::Start);
 
@@ -146,7 +117,7 @@ impl<'a> egui::Widget for Model<'a> {
             ui.scope_builder(UiBuilder::new().max_rect(menu_rect), |ui| {
                 ui.push_id(ui.next_auto_id(), |ui| {
                     egui::containers::menu::MenuButton::new("...")
-                        .ui(ui, |ui| &self.params.content.ui() );
+                        .ui(ui, |ui| &self.params.content.ui());
                 });
             });
             main
