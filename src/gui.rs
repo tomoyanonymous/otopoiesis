@@ -3,11 +3,12 @@
 
 pub mod app;
 pub mod generator;
-pub mod menu;
+// pub mod menu;
 pub mod region;
 pub mod timeline;
 pub mod track;
 pub mod transport;
+pub mod parameters;
 
 // pub(crate) const SAMPLES_PER_PIXEL_DEFAULT: f32 = 100.0;
 pub(crate) const PIXELS_PER_SEC_DEFAULT: f32 = 100.0;

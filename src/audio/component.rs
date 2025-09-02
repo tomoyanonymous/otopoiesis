@@ -8,7 +8,10 @@ use crate::{
 };
 
 use super::{PlaybackInfo};
-pub trait Component: std::fmt::Debug {
+
+pub mod mimium_component;
+
+pub trait Component {
     fn get_input_channels(&self) -> u64;
     fn get_output_channels(&self) -> u64;
     fn prepare_play(&mut self, info: &PlaybackInfo);
@@ -17,7 +20,7 @@ pub trait Component: std::fmt::Debug {
 
 
 /// Interface for offline rendering.
-pub trait RangedComponent: std::fmt::Debug {
+pub trait RangedComponent {
     fn get_range(&self) -> RangeInclusive<f64>;
     fn get_output_channels(&self) -> u64;
     fn get_sample_cache(&self) -> &[f32];
@@ -69,7 +72,6 @@ pub fn render_region_offline_async(
 
 //convert any generator component into region
 
-#[derive(Debug)]
 pub struct GenericRangedComponent {
     generator: Box<dyn Component + Sync + Send>,
     range: AtomicRange,

@@ -1,5 +1,6 @@
 use crate::data;
 use crate::gui;
+use crate::gui::parameters::slider_from_parameter;
 use crate::parameter::{Parameter, RangedNumeric};
 
 pub(crate) const BAR_WIDTH: f32 = 3.0;
@@ -116,12 +117,16 @@ impl<'a> egui::Widget for Model<'a> {
             let menu_rect = egui::Rect::from_two_pos(menu_rect1, menu_rect2);
             ui.scope_builder(UiBuilder::new().max_rect(menu_rect), |ui| {
                 ui.push_id(ui.next_auto_id(), |ui| {
-                    egui::containers::menu::MenuButton::new("...")
-                        .ui(ui, |ui| {
-                            for p in &self.params.parameters{
-                                ui.add(slider_from_parameter(p))
-                            }
-                        });
+                    egui::containers::menu::MenuButton::new("...").ui(ui, |ui| {
+                        let res = &self
+                            .params
+                            .parameters
+                            .iter()
+                            .map(|p| slider_from_parameter(p, false, ui))
+                            .reduce(|a, b| a.union(b))
+                            .unwrap_or_else(|| ui.label("No Parameters"));
+                        res.clone()
+                    });
                 });
             });
             main

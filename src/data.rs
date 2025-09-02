@@ -1,8 +1,8 @@
 //! The main data format like project file, track, region and etc. Can be (de)serialized to/from json with serde.
 
-use crate::action;
 use crate::app::filemanager::{self, FileManager};
 use crate::atomic::{self, SimpleAtomic};
+use crate::data;
 
 use crate::parameter::FloatParameter;
 use mimium_lang::Config;
@@ -15,11 +15,11 @@ use serde_with::serde_as;
 use std::sync::{Arc, mpsc};
 use undo;
 
-pub mod generator;
+// pub mod generator;
 pub mod region;
 pub mod track;
 
-pub use generator::*;
+// pub use generator::*;
 pub use region::*;
 pub use track::*;
 
@@ -54,20 +54,24 @@ pub struct ConversionError {}
 
 // #[derive(Serialize, Deserialize, Clone)]
 pub struct AppModel {
-    pub transport: Transport,
+    pub playop_queue: mpsc::Sender<data::PlayOp>,
     pub global_setting: GlobalSetting,
     pub launch_arg: LaunchArg,
-    pub vm: Option<ExecContext>,
+    pub mimium_ctx: Option<ExecContext>,
     pub project: Project,
     pub project_str: String,
     pub project_file: Option<String>,
-    pub history: undo::Record<action::Action>,
-    pub action_tx: mpsc::Sender<action::Action>,
-    pub action_rx: mpsc::Receiver<action::Action>,
+    // pub history: undo::Record<action::Action>,
+    // pub action_tx: mpsc::Sender<action::Action>,
+    // pub action_rx: mpsc::Receiver<action::Action>,
 }
 
 impl AppModel {
-    pub fn new(transport: Transport, global_setting: GlobalSetting, launch_arg: LaunchArg) -> Self {
+    pub fn new(
+        playop_queue: mpsc::Sender<data::PlayOp>,
+        global_setting: GlobalSetting,
+        launch_arg: LaunchArg,
+    ) -> Self {
         // let transport = Arc::new(transport);
         let file = launch_arg.file.clone();
         let project_file = file.map(|file| {
@@ -78,43 +82,45 @@ impl AppModel {
         if let Some(file) = project_file.clone() {
             let _ = filemanager::get_global_file_manager().read_to_string(file, &mut project_str);
         }
-        let (action_tx, action_rx) = mpsc::channel();
+        // let (action_tx, action_rx) = mpsc::channel();
         Self {
-            transport,
+            playop_queue,
             global_setting,
             launch_arg,
-            vm: None,
+            mimium_ctx: None,
             project: Project::new(44100),
             project_str,
             project_file,
-            history: undo::Record::new(),
-            action_tx,
-            action_rx,
+            // history: undo::Record::new(),
+            // action_tx,
+            // action_rx,
         }
     }
     pub fn can_undo(&self) -> bool {
-        let history = &self.history;
-        history.can_undo()
+        // let history = &self.history;
+        // history.can_undo()
+        false
     }
 
     pub fn undo(&mut self) {
-        let history = &mut self.history;
-        if let Some(Err(e)) = history.undo(&mut self.project_str) {
-            eprintln!("{}", e)
-        };
+        // let history = &mut self.history;
+        // if let Some(Err(e)) = history.undo(&mut self.project_str) {
+        //     eprintln!("{}", e)
+        // };
 
         self.compile(self.project_str.clone().as_str());
         self.ui_to_code();
     }
     pub fn can_redo(&self) -> bool {
-        let history = &self.history;
-        history.can_redo()
+        // let history = &self.history;
+        // history.can_redo()
+        false
     }
     pub fn redo(&mut self) {
-        let history = &mut self.history;
-        if let Some(Err(e)) = history.redo(&mut self.project_str) {
-            eprintln!("{}", e)
-        };
+        // let history = &mut self.history;
+        // if let Some(Err(e)) = history.redo(&mut self.project_str) {
+        //     eprintln!("{}", e)
+        // };
 
         self.compile(self.project_str.clone().as_str());
         self.ui_to_code();
@@ -180,14 +186,15 @@ impl AppModel {
         self.project.tracks.get(id)
     }
     pub fn consume_actions(&mut self) -> bool {
-        self.action_rx
-            .try_iter()
-            .map(|action_received| {
-                self.history
-                    .apply(&mut self.project_str, action_received)
-                    .is_ok()
-            })
-            .any(|v| v)
+        // self.action_rx
+        //     .try_iter()
+        //     .map(|action_received| {
+        //         self.history
+        //             .apply(&mut self.project_str, action_received)
+        //             .is_ok()
+        //     })
+        //     .any(|v| v)
+        false
     }
     fn get_default_context(&self) -> ExecContext {
         ExecContext::new([].into_iter(), None, Config::default())
@@ -199,7 +206,7 @@ impl AppModel {
         let res = ctx.prepare_machine(source);
         match res {
             Ok(()) => {
-                self.vm = Some(ctx);
+                self.mimium_ctx = Some(ctx);
                 true
             }
             Err(e) => {
@@ -210,65 +217,57 @@ impl AppModel {
     }
 }
 
+#[derive(Clone, Copy, PartialEq)]
 pub enum PlayOp {
-    Play = 0,
-    Pause = 1,
-    Halt = 2,
+    Play,
+    Pause,
+    Toggle,
+    Halt,
+    JumpTo(u64),
 }
 
-impl From<u8> for PlayOp {
-    fn from(p: u8) -> Self {
-        match p {
-            0 => Self::Play,
-            1 => Self::Pause,
-            2 => Self::Halt,
-            _ => panic!("invalid operation"),
-        }
-    }
-}
+// #[serde_as]
+// #[derive(Serialize, Deserialize, Debug)]
+// pub struct Transport {
+//     is_playing: atomic::U8,
+//     pub time: Arc<atomic::U64>, //in sample
+//     playing_history: atomic::U8,
+// }
 
-#[serde_as]
-#[derive(Serialize, Deserialize, Debug)]
-pub struct Transport {
-    is_playing: atomic::U8,
-    pub time: Arc<atomic::U64>, //in sample
-    playing_history: atomic::U8,
-}
+// impl Transport {
+//     pub fn new() -> Self {
+//         Self::default()
+//     }
+//     pub fn request_play(&self, p: PlayOp) {
+//         self.playing_history.store(self.is_playing.load());
+//         self.is_playing.store(p as u8);
+//     }
+//     pub fn is_playing(&self) -> bool {
+//         match PlayOp::from(self.is_playing.load()) {
+//             PlayOp::Play => true,
+//             PlayOp::Pause | PlayOp::Halt => false,
+//         }
+//     }
+//     pub fn ready_to_trigger(&self) -> Option<PlayOp> {
+//         if self.is_playing.load() != self.playing_history.load() {
+//             let res = Some(PlayOp::from(self.is_playing.load()));
+//             self.playing_history.store(self.is_playing.load());
+//             res
+//         } else {
+//             None
+//         }
+//     }
+// }
 
-impl Transport {
-    pub fn new() -> Self {
-        Self::default()
-    }
-    pub fn request_play(&self, p: PlayOp) {
-        self.playing_history.store(self.is_playing.load());
-        self.is_playing.store(p as u8);
-    }
-    pub fn is_playing(&self) -> bool {
-        match PlayOp::from(self.is_playing.load()) {
-            PlayOp::Play => true,
-            PlayOp::Pause | PlayOp::Halt => false,
-        }
-    }
-    pub fn ready_to_trigger(&self) -> Option<PlayOp> {
-        if self.is_playing.load() != self.playing_history.load() {
-            let res = Some(PlayOp::from(self.is_playing.load()));
-            self.playing_history.store(self.is_playing.load());
-            res
-        } else {
-            None
-        }
-    }
-}
-
-impl Default for Transport {
-    fn default() -> Self {
-        Self {
-            is_playing: atomic::U8::from(2),
-            time: Arc::new(atomic::U64::from(0)),
-            playing_history: atomic::U8::from(2),
-        }
-    }
-}
+// impl Default for Transport {
+//     fn default() -> Self {
+//         Self {
+//             is_playing: atomic::U8::from(2),
+//             time: Arc::new(atomic::U64::from(0)),
+//             playing_history: atomic::U8::from(2),
+//         }
+//     }
+// }
 
 #[derive(Serialize, Deserialize, Clone, Copy)]
 pub struct GlobalSetting;

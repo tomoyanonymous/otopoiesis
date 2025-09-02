@@ -1,6 +1,6 @@
 use egui::StrokeKind;
 
-use crate::action::{Action, AddTrack};
+// use crate::action::{Action, AddTrack};
 use crate::atomic::{self, SimpleAtomic};
 use crate::data;
 use crate::gui;
@@ -56,10 +56,10 @@ impl<'a> egui::Widget for Model<'a> {
         let main = egui::ScrollArea::horizontal().show(ui, |ui| {
             let res = ui
                 .vertical(|ui| {
-                    let sender = self.app.action_tx.clone();
+                    // let sender = self.app.action_tx.clone();
                     for (i, track) in self.app.project.tracks.iter_mut().enumerate() {
                         ui.push_id(i, |ui| {
-                            ui.add(gui::track::Model::new(i, sender.clone(), track));
+                            ui.add(gui::track::Model::new(i, track));
                             ui.add_space(30.0);
                         })
                         .inner

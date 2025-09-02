@@ -52,7 +52,9 @@ impl PlayInfo for PlaybackInfo {
 }
 
 pub mod component;
-pub use component::{Component, GenericRangedComponent, RangedComponent};
-pub mod generator;
+pub use component::{
+    Component, GenericRangedComponent, RangedComponent, mimium_component::MimiumComponent,
+};
+// pub mod generator;
 
 pub mod renderer;

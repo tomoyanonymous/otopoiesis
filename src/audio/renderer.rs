@@ -6,7 +6,7 @@ use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use cpal::{self, Stream};
 use ringbuf::traits::{Consumer, Producer, Split, SplitRef};
 use ringbuf::{HeapCons, HeapProd, HeapRb};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, mpsc};
 
 pub trait RendererBase<E>
 where
@@ -103,8 +103,7 @@ where
     fn prepare_play(&mut self);
     fn is_playing(&self) -> bool;
     fn get_samplerate(&self) -> u32;
-    fn play(&mut self);
-    fn pause(&mut self);
+    fn control(&mut self, op: data::PlayOp);
     fn play_audio(&mut self) {
         if let Some(is) = self.get_instream() {
             is.play().unwrap();
@@ -121,14 +120,6 @@ where
             os.pause().unwrap();
         }
     }
-    fn toggle_play(&mut self) {
-        if self.is_playing() {
-            self.pause();
-        } else {
-            self.play();
-        }
-    }
-    fn get_shared_current_time_in_sample(&self) -> Arc<atomic::U64>;
     fn get_current_time_in_sample(&self) -> u64;
     fn get_current_time(&self) -> std::time::Duration {
         let now = self.get_current_time_in_sample();
@@ -148,7 +139,7 @@ pub struct OutputModel<E: Component + Sync + Send> {
     pub consumer: HeapCons<f32>,
     pub internal_buf: Vec<f32>,
     pub effector: E,
-    pub current_time: Arc<atomic::U64>,
+    pub current_time: u64,
 }
 
 fn pass_in(model: Arc<Mutex<InputModel>>, buffer: &[f32], _info: cpal::StreamConfig) {
@@ -166,7 +157,7 @@ fn pass_out(
     if let Ok(mut model) = model.try_lock() {
         let len = buffer.len();
         let frame_per_buffer = len as u64 / info.channels as u64;
-        let t = model.current_time.load();
+        let t = model.current_time;
         // let buf = &mut model.internal_buf.as_mut_slice()[0..len];
         let mut buf = vec![0.0; len];
         let _num = model.consumer.pop_slice(&mut buf);
@@ -179,7 +170,28 @@ fn pass_out(
         };
         // todo:if  channels are different?
         model.effector.render(&buf, buffer, &info);
-        model.current_time.store(t + frame_per_buffer);
+        model.current_time = t + frame_per_buffer;
+    }
+}
+
+#[derive(Clone, Copy, PartialEq)]
+pub enum PlayState {
+    Playing,
+    Paused,
+    Stopped,
+}
+
+impl PlayState {
+    pub fn update_state_by_op(self, op: data::PlayOp) -> Self {
+        match (self, op) {
+            (PlayState::Playing, data::PlayOp::Toggle) => PlayState::Paused,
+            (_, data::PlayOp::Toggle) => PlayState::Playing,
+            (_, data::PlayOp::Halt) => PlayState::Stopped,
+            (_, data::PlayOp::Play) => PlayState::Playing,
+            (_, data::PlayOp::JumpTo(_)) => self.clone(),
+            (PlayState::Playing, data::PlayOp::Pause) => PlayState::Paused,
+            (_, data::PlayOp::Pause) => self,
+        }
     }
 }
 
@@ -189,7 +201,8 @@ where
 {
     pub host: cpal::Host,
     /// Do not mutate transport from the audio renderer side. it just subscribes states changed by GUI.
-    transport: data::Transport,
+    pub control_channel: mpsc::Receiver<data::PlayOp>,
+    playstate: PlayState,
     istream: Option<Stream>,
     ostream: Option<Stream>,
     imodel: Arc<Mutex<InputModel>>,
@@ -225,26 +238,34 @@ where
         &self.ostream
     }
     fn is_playing(&self) -> bool {
-        self.transport.is_playing()
+        self.playstate == PlayState::Playing
     }
     fn get_samplerate(&self) -> u32 {
         self.oconfig.as_ref().unwrap().sample_rate.0
     }
 
-    fn play(&mut self) {
-        self.play_audio();
-    }
-
-    fn pause(&mut self) {
-        self.pause_audio();
-    }
-
-    fn get_shared_current_time_in_sample(&self) -> Arc<atomic::U64> {
-        self.transport.time.clone()
+    fn control(&mut self, op: data::PlayOp) {
+        match op {
+            data::PlayOp::Play => {
+                self.play_audio();
+            }
+            data::PlayOp::Pause => {
+                self.pause_audio();
+            }
+            data::PlayOp::Halt => {
+                self.pause_audio();
+                self.rewind();
+            }
+            data::PlayOp::JumpTo(_) | data::PlayOp::Toggle => todo!(),
+        }
     }
 
     fn get_current_time_in_sample(&self) -> u64 {
-        self.transport.time.load()
+        if let Ok(model) = self.omodel.try_lock() {
+            model.current_time
+        } else {
+            0
+        }
     }
 
     fn prepare_play(&mut self) {
@@ -277,22 +298,24 @@ where
         effect: E,
         sample_rate: Option<u32>,
         buffer_size: Option<usize>,
-        transport: Arc<data::Transport>,
+        control_channel: mpsc::Receiver<data::PlayOp>,
+        initial_time: u64,
     ) -> Self {
         let latency_samples = buffer_size.unwrap_or(super::DEFAULT_BUFFER_LEN);
-        let mut ring_buffer = HeapRb::<f32>::new(latency_samples * 4); // Add some latency
+        let ring_buffer = HeapRb::<f32>::new(latency_samples * 4); // Add some latency
         let (producer, consumer) = ring_buffer.split();
         let mut res = Self {
             host: cpal::default_host(),
-            transport: transport.clone(),
             istream: None,
             ostream: None,
+            control_channel,
+            playstate: PlayState::Stopped,
             imodel: Arc::new(Mutex::new(InputModel { producer })),
             omodel: Arc::new(Mutex::new(OutputModel::<E> {
                 consumer,
                 internal_buf: vec![0.0; latency_samples * 2],
                 effector: effect,
-                current_time: Arc::clone(&transport.time),
+                current_time: initial_time,
             })),
             iconfig: None,
             oconfig: None,
@@ -301,7 +324,7 @@ where
         res
     }
     pub fn rewind(&mut self) {
-        self.get_shared_current_time_in_sample().store(0)
+        self.omodel.lock().unwrap().current_time = 0;
     }
 }
 
@@ -309,10 +332,17 @@ pub fn create_renderer<E>(
     effect: E,
     sample_rate: Option<u32>,
     buffer_size: Option<usize>,
-    transport: Arc<data::Transport>,
+    control_channel: mpsc::Receiver<data::PlayOp>,
+    initial_time: u64,
 ) -> Renderer<E>
 where
     E: Component + Send + Sync + 'static,
 {
-    Renderer::<E>::new(effect, sample_rate, buffer_size, transport)
+    Renderer::<E>::new(
+        effect,
+        sample_rate,
+        buffer_size,
+        control_channel,
+        initial_time,
+    )
 }

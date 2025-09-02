@@ -93,17 +93,17 @@ impl Region {
     }
 }
 
-impl std::default::Default for Region {
-    fn default() -> Self {
-        Self {
-            start: Arc::new(FloatParameter::default()),
-            dur: Arc::new(FloatParameter::default()),
-            content: RegionContent::Generator,
-            label: "".to_string(),
-            parameters: Vec::new(),
-        }
-    }
-}
+// impl std::default::Default for Region {
+//     fn default() -> Self {
+//         Self {
+//             start: Arc::new(FloatParameter::default()),
+//             dur: Arc::new(FloatParameter::default()),
+//             content: RegionContent::Generator,
+//             label: "".to_string(),
+//             parameters: Vec::new(),
+//         }
+//     }
+// }
 
 impl std::fmt::Display for Region {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

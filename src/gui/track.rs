@@ -2,26 +2,25 @@ use egui::Response;
 use ringbuf::{HeapCons};
 use crate::parameter::{FloatParameter, Parameter};
 
-use crate::action::Action;
+// use crate::action::Action;
 use crate::data;
 use crate::data::TrackContent;
 use crate::gui;
-use crate::gui::menu;
+// use crate::gui::menu;
 use std::sync::mpsc;
 
-use super::menu::add_fade_to_region;
+// use super::menu::add_fade_to_region;
 
 pub struct Model<'a> {
     id: usize,
-    action_tx: mpsc::Sender<Action>,
+    // action_tx: mpsc::Sender<Action>,
     track: &'a mut data::Track,
 }
 
 impl<'a> Model<'a> {
-    pub fn new(id: usize, action_tx: mpsc::Sender<Action>, track: &'a mut data::Track) -> Self {
+    pub fn new(id: usize, track: &'a mut data::Track) -> Self {
         Self {
             id,
-            action_tx,
             track,
         }
     }
@@ -58,9 +57,9 @@ impl<'a> egui::Widget for Model<'a> {
                                         [x_end, top + height].into(),
                                     ]);
                                     let res = ui.put(rect, super::region::Model::new(region));
-                                    res.context_menu(|ui| {
-                                        let _ = add_fade_to_region(self.id, i, &self.action_tx, ui);
-                                    })
+                                    // res.context_menu(|ui| {
+                                    //     let _ = add_fade_to_region(self.id, i, &self.action_tx, ui);
+                                    // })
                                 })
                                 .inner
                             })
@@ -100,12 +99,12 @@ impl<'a> egui::Widget for Model<'a> {
                 .iter_mut()
                 .enumerate()
                 .map(|(i, t)| {
-                    let model = Model::new(i, self.action_tx.clone(), t);
+                    let model = Model::new(i, t);
                     model.ui(ui)
                 })
                 .reduce(|u1, u2| u1.union(u2))
                 .unwrap_or_else(|| ui.label("no contents")),
-            TrackContent::Generator(generator) => todo!(),
+            // TrackContent::Generator(generator) => todo!(),
         };
 
         response

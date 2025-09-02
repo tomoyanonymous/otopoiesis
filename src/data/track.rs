@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use super::{Generator, Region};
+use super::Region;
 use crate::parameter::FloatParameter;
 use ringbuf::HeapCons;
 use serde::{Deserialize, Serialize};
@@ -26,8 +26,8 @@ pub enum TrackContent {
     Regions(Vec<Region>),
     ///Contains multiple sub-tracks.
     SubTracks(Vec<Box<Track>>),
-    ///Contains one audio generator(0 input).
-    Generator(Generator),
+    //Contains one audio generator(0 input).
+    // Generator(Generator),
 }
 
 impl Track {

@@ -1,51 +1,55 @@
+use crate::atomic::U64;
 use crate::data;
-use crate::atomic::SimpleAtomic;
-use std::sync::Arc;
+use crate::{atomic::SimpleAtomic, audio::renderer::PlayState};
+use std::sync::{Arc, mpsc};
 struct Toggle {
-    transport: Arc<data::Transport>,
+    pub controller: mpsc::Sender<data::PlayOp>,
+    pub playstate: Arc<PlayState>,
 }
 
 impl Toggle {
-    fn new(t: Arc<data::Transport>) -> Self {
-        Self { transport: t }
+    fn new(controller: mpsc::Sender<data::PlayOp>, playstate: Arc<PlayState>) -> Self {
+        Self {
+            controller,
+            playstate,
+        }
     }
 }
 impl egui::Widget for &mut Toggle {
     fn ui(self, ui: &mut egui::Ui) -> egui::Response {
-        if self.transport.is_playing() {
-            let res = ui.button("⏸");
-            if res.clicked() {
-                self.transport.request_play(data::PlayOp::Pause);
-            };
-            res
+        let res = if *self.playstate == PlayState::Playing {
+            ui.button("⏸")
         } else {
-            let res = ui.button("▶");
-            if res.clicked() {
-                self.transport.request_play(data::PlayOp::Play);
-            };
-            res
-        }
+            ui.button("▶")
+        };
+        if res.clicked() {
+            self.controller.send(data::PlayOp::Toggle).unwrap();
+        };
+        res
     }
 }
 
 pub struct Model {
-    pub param: Arc<data::Transport>,
     pub sample_rate: u64,
+    pub current_time: U64,
     playbutton: Toggle,
     // pub play_button: egui::Texture,
 }
 impl Model {
-    pub fn new(param: Arc<data::Transport>, sample_rate: u64) -> Self {
-        // egui::paint::
+    pub fn new(
+        controller: mpsc::Sender<data::PlayOp>,
+        sample_rate: u64,
+        current_time: U64,
+    ) -> Self {
+        let playbutton = Toggle::new(controller, Arc::new(PlayState::Stopped));
         Self {
-            param: param.clone(),
             sample_rate,
-            playbutton: Toggle::new(param),
-            // play_button,
+            current_time,
+            playbutton,
         }
     }
     fn get_time_in_sample(&self) -> u64 {
-        self.param.time.load()
+        self.current_time.load()
     }
     fn get_time(&self) -> f64 {
         self.get_time_in_sample() as f64 / self.sample_rate as f64
@@ -64,10 +68,15 @@ impl egui::Widget for &mut Model {
             let time = std::time::Duration::from_secs_f64(self.get_time());
 
             if ui.button("⏮").clicked() {
-                self.param.time.store(0);
+                self.playbutton
+                    .controller
+                    .send(data::PlayOp::JumpTo(0))
+                    .unwrap();
+
+                self.current_time.store(0);
             }
             if ui.button("⏹").clicked() {
-                self.param.request_play(data::PlayOp::Halt);
+                self.playbutton.controller.send(data::PlayOp::Halt).unwrap();
             }
             ui.add(&mut self.playbutton);
             let min = time.div_f64(60.0).as_secs();

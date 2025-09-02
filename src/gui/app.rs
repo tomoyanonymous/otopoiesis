@@ -1,3 +1,4 @@
+use crate::app;
 use crate::data;
 use crate::gui;
 
@@ -24,36 +25,36 @@ use std::sync::{Arc, Mutex};
 //         self.timeline.sync_state(track_p)
 //     }
 // }
-pub struct Model {
-    pub app: Arc<Mutex<data::AppModel>>,
+pub struct Model<'a> {
+    pub app: &'a mut data::AppModel,
 }
 
-impl Model {
-    pub fn new(app: Arc<Mutex<data::AppModel>>) -> Self {
+impl<'a> Model<'a> {
+    pub fn new(app: &'a mut data::AppModel) -> Self {
         Self { app }
     }
 
     pub fn show_ui(&mut self, ctx: &egui::Context) {
         let is_mac = ctx.os() == egui::os::OperatingSystem::Mac;
+        let app = &mut self.app;
 
         egui::panel::TopBottomPanel::top("header").show(ctx, |ui| {
             ui.vertical(|ui| {
                 ui.label("otopoiesis");
                 ui.horizontal(|ui| {
                     ui.menu_button("File", |ui| {
-                        if let Ok(mut app) = self.app.try_lock() {
-                            if ui.button("Open").clicked() {
-                                app.open_file();
-                            }
-                            ui.add_enabled_ui(app.project_file.is_some(), |ui| {
-                                if ui.button("Save").clicked() {
-                                    app.save_as_file();
-                                }
-                            });
-                            if ui.button("Save as").clicked() {
+                        if ui.button("Open").clicked() {
+                            app.open_file();
+                        }
+                        ui.add_enabled_ui(app.project_file.is_some(), |ui| {
+                            if ui.button("Save").clicked() {
                                 app.save_as_file();
                             }
+                        });
+                        if ui.button("Save as").clicked() {
+                            app.save_as_file();
                         }
+
                         // if ui.button("Force Sync Ui State(Debug)").clicked() {
                         //     #[cfg(debug_assertions)]
                         //     self.app.try_lock().map(|app| {
@@ -63,40 +64,38 @@ impl Model {
                         // }
                     });
                     ui.menu_button("Edit", |ui| {
-                        if let Ok(mut app) = self.app.try_lock() {
-                            let undo_sk =
-                                egui::KeyboardShortcut::new(egui::Modifiers::COMMAND, egui::Key::Z);
-                            let redo_sk = egui::KeyboardShortcut::new(
-                                egui::Modifiers::COMMAND.plus(egui::Modifiers::SHIFT),
-                                egui::Key::Z,
-                            );
-                            let str = undo_sk.format(&egui::ModifierNames::NAMES, is_mac);
-                            let undobutton = ui.add_enabled(
-                                app.can_undo(),
+                        let undo_sk =
+                            egui::KeyboardShortcut::new(egui::Modifiers::COMMAND, egui::Key::Z);
+                        let redo_sk = egui::KeyboardShortcut::new(
+                            egui::Modifiers::COMMAND.plus(egui::Modifiers::SHIFT),
+                            egui::Key::Z,
+                        );
+                        let str = undo_sk.format(&egui::ModifierNames::NAMES, is_mac);
+                        let undobutton = ui.add_enabled(
+                            app.can_undo(),
+                            egui::Button::new(format!(
+                                "Undo  | {}",
+                                // app.history.undo_text().unwrap_or_default(),
+                                str
+                            )),
+                        );
+                        // list truncated history here
+                        if undobutton.clicked() {
+                            app.undo();
+                        };
+                        let str = redo_sk.format(&egui::ModifierNames::NAMES, is_mac);
+                        if ui
+                            .add_enabled(
+                                app.can_redo(),
                                 egui::Button::new(format!(
-                                    "Undo {} | {}",
-                                    app.history.undo_text().unwrap_or_default(),
+                                    "Redo | {}",
+                                    // app.history.redo_text().unwrap_or_default(),
                                     str
                                 )),
-                            );
-                            // list truncated history here
-                            if undobutton.clicked() {
-                                app.undo();
-                            };
-                            let str = redo_sk.format(&egui::ModifierNames::NAMES, is_mac);
-                            if ui
-                                .add_enabled(
-                                    app.can_redo(),
-                                    egui::Button::new(format!(
-                                        "Redo {} | {}",
-                                        app.history.redo_text().unwrap_or_default(),
-                                        str
-                                    )),
-                                )
-                                .clicked()
-                            {
-                                app.redo();
-                            }
+                            )
+                            .clicked()
+                        {
+                            app.redo();
                         }
                     })
                 })
@@ -104,11 +103,16 @@ impl Model {
         });
         egui::CentralPanel::default().show(ctx, |ui| {
             egui::ScrollArea::both().show(ui, |ui| {
-                if let Ok(mut app) = self.app.try_lock() {
-                    ui.add(super::timeline::Model::new(&mut app));
-                    egui::panel::TopBottomPanel::bottom("footer")
-                    .show(ctx, |ui| ui.add(&mut app.transport));
-            }
+                ui.add(super::timeline::Model::new(app));
+
+                egui::panel::TopBottomPanel::bottom("footer").show(ctx, |ui| {
+                    let mut transportmodel = gui::transport::Model::new(
+                        app.playop_queue.clone(),
+                        app.project.sample_rate.load(),
+                        app.project.current_time.clone(),
+                    );
+                    ui.add(&mut transportmodel);
+                });
             });
         });
     }

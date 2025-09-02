@@ -1,10 +1,14 @@
-use atomic::SimpleAtomic;
-use log::Log;
-use std::sync::{Arc, Mutex};
+use crate::audio::component::mimium_component;
+use crate::data::PlayOp;
 use crate::utils::{GLOBAL_LOGGER, Logger};
 use crate::{atomic, audio, data, gui};
+use atomic::SimpleAtomic;
 use audio::renderer::{Renderer, RendererBase};
 use data::Project;
+use egui::accesskit::Rect;
+use log::Log;
+use mimium_lang::Config;
+use std::sync::{Arc, Mutex, mpsc};
 
 pub(crate) mod filemanager;
 
@@ -15,9 +19,10 @@ enum EditorMode {
     Result,
 }
 
+use mimium_component::MimiumComponent;
 pub struct Model {
-    app: Arc<Mutex<data::AppModel>>,
-    audio: Renderer<audio::timeline::Model>,
+    app: data::AppModel,
+    audio: Renderer<MimiumComponent>,
     compile_err: Option<serde_json::Error>,
     // ui: gui::app::State,
     editor_open: bool,
@@ -25,28 +30,34 @@ pub struct Model {
     logger_open: bool,
 }
 
-fn new_renderer(app: &data::AppModel) -> Renderer<audio::timeline::Model> {
-    let timeline = audio::timeline::Model::new(app.project.clone(), Arc::clone(&app.transport));
+fn new_renderer(
+    app: &mut data::AppModel,
+    receiver: mpsc::Receiver<data::PlayOp>,
+) -> Renderer<MimiumComponent> {
+    let vm = app.mimium_ctx.as_mut().unwrap().take_vm().unwrap();
+    let component = MimiumComponent::new(vm);
     audio::renderer::create_renderer(
-        timeline,
-        Some(44100),
+        component,
+        Some(app.project.sample_rate.load() as u32),
         Some(audio::DEFAULT_BUFFER_LEN),
-        Arc::clone(&app.transport),
+        receiver,
+        0,
     )
 }
 
 impl Model {
     pub fn new(cc: &eframe::CreationContext<'_>, arg: Option<data::LaunchArg>) -> Self {
         let arg = arg.unwrap_or_default();
+        let (sender, receriver) = mpsc::channel();
         Self::setup_custom_fonts(&cc.egui_ctx);
-        let mut appmodel = data::AppModel::new(data::Transport::new(), data::GlobalSetting {}, arg);
+        let mut appmodel = data::AppModel::new(sender, data::GlobalSetting {}, arg);
         let _ = appmodel.code_to_ui();
 
         // let ui = gui::app::State::new(&appmodel);
-        #[allow(clippy::arc_with_non_send_sync)]
-        let app = Arc::new(Mutex::new(appmodel));
+        // #[allow(clippy::arc_with_non_send_sync)]
+        // let mut app = Arc::new(Mutex::new(appmodel));
 
-        let mut renderer = new_renderer(&app.try_lock().unwrap());
+        let mut renderer = new_renderer(&mut appmodel, receriver);
 
         let _logger = GLOBAL_LOGGER.get_or_init(|| Logger::new());
         if cfg!(debug_assertions) {
@@ -57,13 +68,12 @@ impl Model {
 
         log::set_logger(GLOBAL_LOGGER.get().unwrap()).expect("failed to set logger");
         renderer.prepare_play();
-        renderer.pause();
+        renderer.control(data::PlayOp::Pause);
         log::debug!("app launched");
         Self {
             audio: renderer,
-            app: Arc::clone(&app),
+            app: appmodel,
             compile_err: None,
-            ui,
             editor_open: false,
             editor_mode: EditorMode::Code,
             logger_open: false,
@@ -105,39 +115,26 @@ impl Model {
         self.refresh_audio();
 
         self.audio.prepare_play();
-        self.audio.play();
+        self.audio.control(PlayOp::Play);
     }
     pub fn pause(&mut self) {
         log::debug!("pause");
-        self.audio.pause();
+        self.audio.control(PlayOp::Pause);
     }
     fn refresh_audio(&mut self) {
         log::debug!("refresh audio");
-        self.audio = new_renderer(&self.app.try_lock().unwrap());
+        let (sender, receiver) = mpsc::channel();
+        self.app.playop_queue = sender;
+        self.audio = new_renderer(&mut self.app, receiver);
         self.audio.prepare_play();
-        self.audio.pause();
-    }
-    fn sync_transport(&mut self) {
-        let t = self.app.try_lock().unwrap().transport.clone();
-        if let Some(b) = t.ready_to_trigger() {
-            match b {
-                data::PlayOp::Play => self.play(),
-                data::PlayOp::Pause => self.pause(),
-                data::PlayOp::Halt => {
-                    self.pause();
-                    self.audio.rewind();
-                }
-            }
-        } else {
-            //do nothing
-        }
+        self.audio.control(PlayOp::Pause);
     }
 }
 
 impl eframe::App for Model {
     fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
         {
-            let mut app = self.app.try_lock().unwrap();
+            let app = &mut self.app;
             let need_update = app.consume_actions();
             if need_update {
                 let newsrc = app.project_str.clone();
@@ -167,18 +164,13 @@ impl eframe::App for Model {
                     egui::Modifiers::NONE,
                     egui::Key::Space,
                 )) {
-                    let op = if app.transport.is_playing() {
-                        data::PlayOp::Pause
-                    } else {
-                        data::PlayOp::Play
-                    };
-                    app.transport.request_play(op);
+                    app.playop_queue.send(data::PlayOp::Toggle).unwrap();
                 }
                 if i.consume_shortcut(&egui::KeyboardShortcut::new(
                     egui::Modifiers::NONE,
                     egui::Key::ArrowLeft,
                 )) {
-                    app.transport.time.store(0);
+                    app.playop_queue.send(data::PlayOp::JumpTo(0)).unwrap();
                     self.audio.prepare_play();
                 }
             });
@@ -201,7 +193,8 @@ impl eframe::App for Model {
             .resizable(true)
             .show_animated(ctx, self.editor_open, |ui| {
                 egui::ScrollArea::vertical().show(ui, |ui| {
-                    let should_refresh_audio = if let Ok(mut app) = self.app.try_lock() {
+                    let should_refresh_audio = {
+                        let app = &mut self.app;
                         let _ = ui.label("Code Editor");
                         let widget = egui::TextEdit::multiline(&mut app.project_str).code_editor();
 
@@ -249,8 +242,6 @@ impl eframe::App for Model {
                             }
                         });
                         should_refresh_audio
-                    } else {
-                        false
                     };
                     if should_refresh_audio {
                         self.refresh_audio();
@@ -262,14 +253,13 @@ impl eframe::App for Model {
             .resizable(false)
             .show(ctx, |ui| {
                 ui.horizontal_centered(|ui| {
-                    if let Ok(mut app) = self.app.try_lock() {
-                        let text = if self.editor_open { "📕" } else { "📖" };
-                        let button = ui.button(text);
-                        if button.clicked() {
-                            self.editor_open = !self.editor_open;
-                            if self.editor_open {
-                                app.ui_to_code();
-                            }
+                    let app = &mut self.app;
+                    let text = if self.editor_open { "📕" } else { "📖" };
+                    let button = ui.button(text);
+                    if button.clicked() {
+                        self.editor_open = !self.editor_open;
+                        if self.editor_open {
+                            app.ui_to_code();
                         }
                     }
                 });
@@ -308,8 +298,7 @@ impl eframe::App for Model {
                 ui.toggle_value(&mut self.logger_open, "Console Log");
             });
 
-        let mut mainui = gui::app::Model::new(self.app.clone());
+        let mut mainui = gui::app::Model::new(&mut self.app);
         mainui.show_ui(ctx);
-        self.sync_transport();
     }
 }
