@@ -210,6 +210,7 @@ impl AppModel {
                 true
             }
             Err(e) => {
+                eprintln!("compile error: {:?}", e);
                 log::error!("{:?}", e);
                 false
             }

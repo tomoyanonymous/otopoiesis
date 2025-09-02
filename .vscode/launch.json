@@ -20,7 +20,7 @@
                 }
             },
             "args": [
-                "test/project/test_project.json"
+                "test/project/empty.mmm"
             ],
             "cwd": "${workspaceFolder}"
         },

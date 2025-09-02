@@ -52,7 +52,8 @@ impl Model {
         Self::setup_custom_fonts(&cc.egui_ctx);
         let mut appmodel = data::AppModel::new(sender, data::GlobalSetting {}, arg);
         let _ = appmodel.code_to_ui();
-
+        let initsrc = &appmodel.project_str.clone();
+        appmodel.compile(&initsrc);
         // let ui = gui::app::State::new(&appmodel);
         // #[allow(clippy::arc_with_non_send_sync)]
         // let mut app = Arc::new(Mutex::new(appmodel));
