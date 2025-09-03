@@ -1,4 +1,5 @@
 use crate::audio::component::mimium_component;
+use crate::audio::renderer::PlayState;
 use crate::data::PlayOp;
 use crate::utils::{GLOBAL_LOGGER, Logger};
 use crate::{atomic, audio, data, gui};
@@ -7,7 +8,7 @@ use audio::renderer::{Renderer, RendererBase};
 use data::Project;
 use egui::accesskit::Rect;
 use log::Log;
-use mimium_lang::Config;
+use mimium_lang::{Config, ExecContext};
 use std::sync::{Arc, Mutex, mpsc};
 
 pub(crate) mod filemanager;
@@ -22,6 +23,7 @@ enum EditorMode {
 use mimium_component::MimiumComponent;
 pub struct Model {
     app: data::AppModel,
+    playop_queue: mpsc::Receiver<data::PlayOp>,
     audio: Renderer<MimiumComponent>,
     compile_err: Option<serde_json::Error>,
     // ui: gui::app::State,
@@ -30,18 +32,23 @@ pub struct Model {
     logger_open: bool,
 }
 
-fn new_renderer(
-    app: &mut data::AppModel,
-    receiver: mpsc::Receiver<data::PlayOp>,
-) -> Renderer<MimiumComponent> {
-    let vm = app.mimium_ctx.as_mut().unwrap().take_vm().unwrap();
+fn new_renderer(app: &mut data::AppModel) -> Renderer<MimiumComponent> {
+    let vm = app
+        .mimium_ctx
+        .as_mut()
+        .unwrap()
+        .take_vm()
+        .unwrap_or_else(|| {
+            let mut dummy_ctx = ExecContext::new([].into_iter(), None, Config::default());
+            dummy_ctx.prepare_machine("`{let dsp = | | 0.0}").unwrap();
+            dummy_ctx.take_vm().unwrap()
+        });
     let component = MimiumComponent::new(vm);
     audio::renderer::create_renderer(
         component,
         Some(app.project.sample_rate.load() as u32),
         Some(audio::DEFAULT_BUFFER_LEN),
-        receiver,
-        0,
+        app.project.current_time.clone(),
     )
 }
 
@@ -50,7 +57,8 @@ impl Model {
         let arg = arg.unwrap_or_default();
         let (sender, receriver) = mpsc::channel();
         Self::setup_custom_fonts(&cc.egui_ctx);
-        let mut appmodel = data::AppModel::new(sender, data::GlobalSetting {}, arg);
+        let mut appmodel =
+            data::AppModel::new(sender, PlayState::Stopped, data::GlobalSetting, arg);
         let _ = appmodel.code_to_ui();
         let initsrc = &appmodel.project_str.clone();
         appmodel.compile(&initsrc);
@@ -58,7 +66,7 @@ impl Model {
         // #[allow(clippy::arc_with_non_send_sync)]
         // let mut app = Arc::new(Mutex::new(appmodel));
 
-        let mut renderer = new_renderer(&mut appmodel, receriver);
+        let mut renderer = new_renderer(&mut appmodel);
 
         let _logger = GLOBAL_LOGGER.get_or_init(|| Logger::new());
         if cfg!(debug_assertions) {
@@ -74,6 +82,7 @@ impl Model {
         Self {
             audio: renderer,
             app: appmodel,
+            playop_queue: receriver,
             compile_err: None,
             editor_open: false,
             editor_mode: EditorMode::Code,
@@ -122,11 +131,15 @@ impl Model {
         log::debug!("pause");
         self.audio.control(PlayOp::Pause);
     }
+    pub fn halt(&mut self) {
+        log::debug!("halt");
+        self.audio.control(PlayOp::Halt);
+    }
     fn refresh_audio(&mut self) {
         log::debug!("refresh audio");
         let (sender, receiver) = mpsc::channel();
         self.app.playop_queue = sender;
-        self.audio = new_renderer(&mut self.app, receiver);
+        self.audio = new_renderer(&mut self.app);
         self.audio.prepare_play();
         self.audio.control(PlayOp::Pause);
     }
@@ -134,48 +147,57 @@ impl Model {
 
 impl eframe::App for Model {
     fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
-        {
-            let app = &mut self.app;
-            let need_update = app.consume_actions();
-            if need_update {
-                let newsrc = app.project_str.clone();
-                app.compile(newsrc.as_str());
-                app.ui_to_code();
+        let need_update = self.app.consume_actions();
+        if need_update {
+            let newsrc = self.app.project_str.clone();
+            self.app.compile(newsrc.as_str());
+            self.app.ui_to_code();
+            // self.ui.sync_state(&app.project.tracks);
+        }
+        match self.app.playstate {
+            PlayState::Playing if !self.audio.is_playing() => {
+                self.play();
+            }
+            PlayState::Paused if self.audio.is_playing() => {
+                self.pause();
+            }
+            PlayState::Stopped if self.audio.is_playing() => {
+                self.halt();
+            }
+            _ => {}
+        };
+
+        ctx.input_mut(|i| {
+            if i.consume_shortcut(&egui::KeyboardShortcut::new(
+                egui::Modifiers::COMMAND,
+                egui::Key::Z,
+            )) && self.app.can_undo()
+            {
+                self.app.undo();
                 // self.ui.sync_state(&app.project.tracks);
             }
-
-            ctx.input_mut(|i| {
-                if i.consume_shortcut(&egui::KeyboardShortcut::new(
-                    egui::Modifiers::COMMAND,
-                    egui::Key::Z,
-                )) && app.can_undo()
-                {
-                    app.undo();
-                    // self.ui.sync_state(&app.project.tracks);
-                }
-                if i.consume_shortcut(&egui::KeyboardShortcut::new(
-                    egui::Modifiers::COMMAND.plus(egui::Modifiers::SHIFT),
-                    egui::Key::Z,
-                )) && app.can_redo()
-                {
-                    app.redo();
-                    // self.ui.sync_state(&app.project.tracks);
-                }
-                if i.consume_shortcut(&egui::KeyboardShortcut::new(
-                    egui::Modifiers::NONE,
-                    egui::Key::Space,
-                )) {
-                    app.playop_queue.send(data::PlayOp::Toggle).unwrap();
-                }
-                if i.consume_shortcut(&egui::KeyboardShortcut::new(
-                    egui::Modifiers::NONE,
-                    egui::Key::ArrowLeft,
-                )) {
-                    app.playop_queue.send(data::PlayOp::JumpTo(0)).unwrap();
-                    self.audio.prepare_play();
-                }
-            });
-        }
+            if i.consume_shortcut(&egui::KeyboardShortcut::new(
+                egui::Modifiers::COMMAND.plus(egui::Modifiers::SHIFT),
+                egui::Key::Z,
+            )) && self.app.can_redo()
+            {
+                self.app.redo();
+                // self.ui.sync_state(&app.project.tracks);
+            }
+            if i.consume_shortcut(&egui::KeyboardShortcut::new(
+                egui::Modifiers::NONE,
+                egui::Key::Space,
+            )) {
+                self.app.playop_queue.send(data::PlayOp::Toggle);
+            }
+            if i.consume_shortcut(&egui::KeyboardShortcut::new(
+                egui::Modifiers::NONE,
+                egui::Key::ArrowLeft,
+            )) {
+                self.app.playop_queue.send(data::PlayOp::JumpTo(0));
+                self.audio.prepare_play();
+            }
+        });
 
         let style = egui::Style {
             animation_time: 0.2,

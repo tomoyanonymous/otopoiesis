@@ -4,6 +4,7 @@ use crate::data;
 
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use cpal::{self, Stream};
+use ringbuf::rb::shared;
 use ringbuf::traits::{Consumer, Producer, Split, SplitRef};
 use ringbuf::{HeapCons, HeapProd, HeapRb};
 use std::sync::{Arc, Mutex, mpsc};
@@ -139,7 +140,7 @@ pub struct OutputModel<E: Component + Sync + Send> {
     pub consumer: HeapCons<f32>,
     pub internal_buf: Vec<f32>,
     pub effector: E,
-    pub current_time: u64,
+    pub current_time: Arc<atomic::U64>,
 }
 
 fn pass_in(model: Arc<Mutex<InputModel>>, buffer: &[f32], _info: cpal::StreamConfig) {
@@ -157,7 +158,7 @@ fn pass_out(
     if let Ok(mut model) = model.try_lock() {
         let len = buffer.len();
         let frame_per_buffer = len as u64 / info.channels as u64;
-        let t = model.current_time;
+        let t = model.current_time.load();
         // let buf = &mut model.internal_buf.as_mut_slice()[0..len];
         let mut buf = vec![0.0; len];
         let _num = model.consumer.pop_slice(&mut buf);
@@ -170,7 +171,7 @@ fn pass_out(
         };
         // todo:if  channels are different?
         model.effector.render(&buf, buffer, &info);
-        model.current_time = t + frame_per_buffer;
+        model.current_time.store(t + frame_per_buffer);
     }
 }
 
@@ -201,7 +202,7 @@ where
 {
     pub host: cpal::Host,
     /// Do not mutate transport from the audio renderer side. it just subscribes states changed by GUI.
-    pub control_channel: mpsc::Receiver<data::PlayOp>,
+
     playstate: PlayState,
     istream: Option<Stream>,
     ostream: Option<Stream>,
@@ -262,7 +263,7 @@ where
 
     fn get_current_time_in_sample(&self) -> u64 {
         if let Ok(model) = self.omodel.try_lock() {
-            model.current_time
+            model.current_time.load()
         } else {
             0
         }
@@ -298,8 +299,7 @@ where
         effect: E,
         sample_rate: Option<u32>,
         buffer_size: Option<usize>,
-        control_channel: mpsc::Receiver<data::PlayOp>,
-        initial_time: u64,
+        shared_time: Arc<atomic::U64>,
     ) -> Self {
         let latency_samples = buffer_size.unwrap_or(super::DEFAULT_BUFFER_LEN);
         let ring_buffer = HeapRb::<f32>::new(latency_samples * 4); // Add some latency
@@ -308,14 +308,13 @@ where
             host: cpal::default_host(),
             istream: None,
             ostream: None,
-            control_channel,
             playstate: PlayState::Stopped,
             imodel: Arc::new(Mutex::new(InputModel { producer })),
             omodel: Arc::new(Mutex::new(OutputModel::<E> {
                 consumer,
                 internal_buf: vec![0.0; latency_samples * 2],
                 effector: effect,
-                current_time: initial_time,
+                current_time: shared_time,
             })),
             iconfig: None,
             oconfig: None,
@@ -324,7 +323,7 @@ where
         res
     }
     pub fn rewind(&mut self) {
-        self.omodel.lock().unwrap().current_time = 0;
+        self.omodel.lock().unwrap().current_time.store(0);
     }
 }
 
@@ -332,8 +331,7 @@ pub fn create_renderer<E>(
     effect: E,
     sample_rate: Option<u32>,
     buffer_size: Option<usize>,
-    control_channel: mpsc::Receiver<data::PlayOp>,
-    initial_time: u64,
+    shared_time: Arc<atomic::U64>,
 ) -> Renderer<E>
 where
     E: Component + Send + Sync + 'static,
@@ -342,7 +340,6 @@ where
         effect,
         sample_rate,
         buffer_size,
-        control_channel,
-        initial_time,
+        shared_time,
     )
 }

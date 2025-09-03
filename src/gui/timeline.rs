@@ -4,6 +4,7 @@ use egui::StrokeKind;
 use crate::atomic::{self, SimpleAtomic};
 use crate::data;
 use crate::gui;
+use crate::gui::parameters::slider_from_parameter;
 use std::sync::Arc;
 
 pub struct Model<'a> {
@@ -67,6 +68,15 @@ impl<'a> egui::Widget for Model<'a> {
                 })
                 .response;
             let add_track_button = ui.button("+").on_hover_text("Add new Track");
+            ui.vertical(|ui| {
+                self.app.project.parameters.iter_mut().for_each(|param| {
+                    let mut sliders = self.app.slider_map.borrow_mut();
+                    ui.horizontal(|ui| {
+                        let slider = sliders.get_mut(*param).unwrap();
+                        slider_from_parameter(slider, false, ui);
+                    });
+                });
+            });
             if add_track_button.clicked() {
                 self.add_track();
             }

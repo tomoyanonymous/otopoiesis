@@ -1,14 +1,7 @@
 use std::sync::Arc;
 
 use super::Region;
-use crate::parameter::FloatParameter;
-use ringbuf::HeapCons;
-use serde::{Deserialize, Serialize};
-use slotmap::SlotMap;
-
-#[derive(Serialize, Deserialize, Clone, Debug, Copy, PartialEq, Eq, Hash)]
-struct ProbeId(usize);
-type ProbeMap = SlotMap<ProbeId, HeapCons<f64>>;
+use crate::{data::ProbeId, parameter::FloatParameter};
 
 /// Data structure for track.
 /// The track has some input/output streams.

@@ -2,16 +2,24 @@
 
 use crate::app::filemanager::{self, FileManager};
 use crate::atomic::{self, SimpleAtomic};
-use crate::data;
+use crate::audio::renderer::PlayState;
+use crate::{data, mimium_fns};
 
 use crate::parameter::FloatParameter;
+use coreaudio_sys::erfcf;
 use mimium_lang::Config;
+use mimium_lang::interner::ToSymbol;
 use mimium_lang::runtime::vm::Machine;
 use mimium_lang::{ExecContext, plugin};
 use rfd;
+use ringbuf::HeapCons;
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
+use slotmap::{SlotMap, new_key_type};
 
+use std::cell::{OnceCell, RefCell};
+use std::io::BufWriter;
+use std::rc::Rc;
 use std::sync::{Arc, mpsc};
 use undo;
 
@@ -25,6 +33,15 @@ pub use track::*;
 
 #[cfg(not(target_arch = "wasm32"))]
 use dirs;
+
+// #[derive(Serialize, Deserialize, Clone, Debug, Copy, PartialEq, Eq, Hash)]
+// pub struct ProbeId(usize);
+new_key_type! {
+    pub struct ProbeId;
+    pub struct SliderId;
+}
+pub type ProbeMap = SlotMap<ProbeId, HeapCons<f64>>;
+pub type SliderMap = SlotMap<SliderId, FloatParameter>;
 
 pub struct LaunchArg {
     pub file: Option<String>,
@@ -55,12 +72,17 @@ pub struct ConversionError {}
 // #[derive(Serialize, Deserialize, Clone)]
 pub struct AppModel {
     pub playop_queue: mpsc::Sender<data::PlayOp>,
+    pub playstate: PlayState,
     pub global_setting: GlobalSetting,
     pub launch_arg: LaunchArg,
     pub mimium_ctx: Option<ExecContext>,
+    project_tx: mpsc::Sender<data::Project>,
+    project_rx: mpsc::Receiver<data::Project>,
     pub project: Project,
     pub project_str: String,
     pub project_file: Option<String>,
+    pub probe_map: Rc<RefCell<ProbeMap>>,
+    pub slider_map: Rc<RefCell<SliderMap>>,
     // pub history: undo::Record<action::Action>,
     // pub action_tx: mpsc::Sender<action::Action>,
     // pub action_rx: mpsc::Receiver<action::Action>,
@@ -69,6 +91,7 @@ pub struct AppModel {
 impl AppModel {
     pub fn new(
         playop_queue: mpsc::Sender<data::PlayOp>,
+        playstate: PlayState,
         global_setting: GlobalSetting,
         launch_arg: LaunchArg,
     ) -> Self {
@@ -82,15 +105,20 @@ impl AppModel {
         if let Some(file) = project_file.clone() {
             let _ = filemanager::get_global_file_manager().read_to_string(file, &mut project_str);
         }
-        // let (action_tx, action_rx) = mpsc::channel();
+        let (project_tx, project_rx) = mpsc::channel();
         Self {
             playop_queue,
             global_setting,
+            playstate,
             launch_arg,
             mimium_ctx: None,
-            project: Project::new(44100),
+            project_tx,
+            project_rx,
+            project: Project::new(String::new(), 44100),
             project_str,
             project_file,
+            probe_map: Default::default(),
+            slider_map: Default::default(),
             // history: undo::Record::new(),
             // action_tx,
             // action_rx,
@@ -196,22 +224,37 @@ impl AppModel {
         //     .any(|v| v)
         false
     }
-    fn get_default_context(&self) -> ExecContext {
-        ExecContext::new([].into_iter(), None, Config::default())
+    fn get_default_context(&mut self) -> ExecContext {
+        let plugin = mimium_fns::OtopoiesisPlugin::new(
+            self.probe_map.clone(),
+            self.slider_map.clone(),
+            self.project_tx.clone(),
+        );
+        let mut ctx = ExecContext::new([].into_iter(), None, Config::default());
+        ctx.add_system_plugin(plugin);
+        ctx
     }
     pub fn compile(&mut self, source: &str) -> bool {
         log::debug!("compiling source...");
         let mut ctx = self.get_default_context();
         ctx.prepare_compiler();
         let res = ctx.prepare_machine(source);
-        match res {
-            Ok(()) => {
+
+        match (res, self.project_rx.try_recv()) {
+            (Ok(()), Ok(project)) => {
                 self.mimium_ctx = Some(ctx);
+                self.project = project;
                 true
             }
-            Err(e) => {
-                eprintln!("compile error: {:?}", e);
-                log::error!("{:?}", e);
+            (Err(errs), _) => {
+                mimium_lang::utils::error::report(&self.project_str, "".to_symbol(), &errs);
+                errs.iter().for_each(|e| {
+                    log::error!("{}", e.get_message());
+                });
+                false
+            }
+            (Ok(_), Err(e)) => {
+                log::error!("project is not built:{}", e);
                 false
             }
         }
@@ -273,19 +316,21 @@ pub enum PlayOp {
 #[derive(Serialize, Deserialize, Clone, Copy)]
 pub struct GlobalSetting;
 
-/// A main project data. It should be imported/exported via serde.
+/// A main project data.
 #[derive(Debug, Clone)]
 pub struct Project {
+    pub label: String,
     pub sample_rate: atomic::U64,
-    pub current_time: atomic::U64, //in sample
+    pub current_time: Arc<atomic::U64>, //in sample
     pub tracks: Vec<Track>,
-    pub parameters: Vec<Arc<FloatParameter>>,
+    pub parameters: Vec<SliderId>,
 }
 impl Project {
-    pub fn new(sample_rate: u64) -> Self {
+    pub fn new(label: String, sample_rate: u64) -> Self {
         Self {
+            label,
             sample_rate: atomic::U64::from(sample_rate),
-            current_time: atomic::U64::from(0),
+            current_time: Arc::new(atomic::U64::from(0)),
             tracks: vec![],
             parameters: vec![],
         }

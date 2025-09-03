@@ -1,9 +1,10 @@
-use crate::app;
+use std::sync::Arc;
+
 use crate::data;
 use crate::gui;
 
 use crate::atomic::SimpleAtomic;
-use std::sync::{Arc, Mutex};
+
 // pub struct State {
 //     timeline: gui::timeline::State,
 //     transport: gui::transport::Model,
@@ -36,6 +37,7 @@ impl<'a> Model<'a> {
 
     pub fn show_ui(&mut self, ctx: &egui::Context) {
         let is_mac = ctx.os() == egui::os::OperatingSystem::Mac;
+
         let app = &mut self.app;
 
         egui::panel::TopBottomPanel::top("header").show(ctx, |ui| {
@@ -107,11 +109,11 @@ impl<'a> Model<'a> {
 
                 egui::panel::TopBottomPanel::bottom("footer").show(ctx, |ui| {
                     let mut transportmodel = gui::transport::Model::new(
-                        app.playop_queue.clone(),
+                        &mut app.playstate,
                         app.project.sample_rate.load(),
                         app.project.current_time.clone(),
                     );
-                    ui.add(&mut transportmodel);
+                    ui.add(transportmodel);
                 });
             });
         });

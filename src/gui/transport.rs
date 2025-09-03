@@ -1,21 +1,17 @@
-use crate::atomic::U64;
+use crate::atomic;
 use crate::data;
 use crate::{atomic::SimpleAtomic, audio::renderer::PlayState};
 use std::sync::{Arc, mpsc};
-struct Toggle {
-    pub controller: mpsc::Sender<data::PlayOp>,
-    pub playstate: Arc<PlayState>,
+struct Toggle<'a> {
+    pub playstate: &'a mut PlayState,
 }
 
-impl Toggle {
-    fn new(controller: mpsc::Sender<data::PlayOp>, playstate: Arc<PlayState>) -> Self {
-        Self {
-            controller,
-            playstate,
-        }
+impl<'a> Toggle<'a> {
+    fn new(playstate: &'a mut PlayState) -> Self {
+        Self { playstate }
     }
 }
-impl egui::Widget for &mut Toggle {
+impl<'a> egui::Widget for Toggle<'a> {
     fn ui(self, ui: &mut egui::Ui) -> egui::Response {
         let res = if *self.playstate == PlayState::Playing {
             ui.button("⏸")
@@ -23,25 +19,25 @@ impl egui::Widget for &mut Toggle {
             ui.button("▶")
         };
         if res.clicked() {
-            self.controller.send(data::PlayOp::Toggle).unwrap();
+            *self.playstate = self.playstate.update_state_by_op(data::PlayOp::Toggle);
         };
         res
     }
 }
 
-pub struct Model {
+pub struct Model<'a> {
     pub sample_rate: u64,
-    pub current_time: U64,
-    playbutton: Toggle,
+    pub current_time: Arc<atomic::U64>,
+    playbutton: Toggle<'a>,
     // pub play_button: egui::Texture,
 }
-impl Model {
+impl<'a> Model<'a> {
     pub fn new(
-        controller: mpsc::Sender<data::PlayOp>,
+        playstate: &'a mut PlayState,
         sample_rate: u64,
-        current_time: U64,
+        current_time: Arc<atomic::U64>,
     ) -> Self {
-        let playbutton = Toggle::new(controller, Arc::new(PlayState::Stopped));
+        let playbutton = Toggle::new(playstate);
         Self {
             sample_rate,
             current_time,
@@ -59,7 +55,7 @@ impl Model {
     // }
 }
 
-impl egui::Widget for &mut Model {
+impl<'a> egui::Widget for Model<'a> {
     fn ui(self, ui: &mut egui::Ui) -> egui::Response {
         for (_text_style, font_id) in ui.style_mut().text_styles.iter_mut() {
             font_id.size = 24.0 // whatever size you want here
@@ -68,17 +64,15 @@ impl egui::Widget for &mut Model {
             let time = std::time::Duration::from_secs_f64(self.get_time());
 
             if ui.button("⏮").clicked() {
-                self.playbutton
-                    .controller
-                    .send(data::PlayOp::JumpTo(0))
-                    .unwrap();
-
                 self.current_time.store(0);
             }
             if ui.button("⏹").clicked() {
-                self.playbutton.controller.send(data::PlayOp::Halt).unwrap();
+                *self.playbutton.playstate = self
+                    .playbutton
+                    .playstate
+                    .update_state_by_op(data::PlayOp::Halt);
             }
-            ui.add(&mut self.playbutton);
+            ui.add(self.playbutton);   
             let min = time.div_f64(60.0).as_secs();
             let secs = time.as_secs() % 60;
             ui.label(format!(
