@@ -249,13 +249,16 @@ where
         match op {
             data::PlayOp::Play => {
                 self.play_audio();
+                self.playstate = PlayState::Playing;
             }
             data::PlayOp::Pause => {
                 self.pause_audio();
+                self.playstate = PlayState::Paused; 
             }
             data::PlayOp::Halt => {
                 self.pause_audio();
                 self.rewind();
+                self.playstate = PlayState::Stopped;
             }
             data::PlayOp::JumpTo(_) | data::PlayOp::Toggle => todo!(),
         }

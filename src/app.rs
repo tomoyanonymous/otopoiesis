@@ -5,8 +5,6 @@ use crate::utils::{GLOBAL_LOGGER, Logger};
 use crate::{atomic, audio, data, gui};
 use atomic::SimpleAtomic;
 use audio::renderer::{Renderer, RendererBase};
-use data::Project;
-use egui::accesskit::Rect;
 use log::Log;
 use mimium_lang::{Config, ExecContext};
 use std::sync::{Arc, Mutex, mpsc};
@@ -23,7 +21,6 @@ enum EditorMode {
 use mimium_component::MimiumComponent;
 pub struct Model {
     app: data::AppModel,
-    playop_queue: mpsc::Receiver<data::PlayOp>,
     audio: Renderer<MimiumComponent>,
     compile_err: Option<serde_json::Error>,
     // ui: gui::app::State,
@@ -33,16 +30,13 @@ pub struct Model {
 }
 
 fn new_renderer(app: &mut data::AppModel) -> Renderer<MimiumComponent> {
-    let vm = app
-        .mimium_ctx
-        .as_mut()
-        .unwrap()
-        .take_vm()
-        .unwrap_or_else(|| {
-            let mut dummy_ctx = ExecContext::new([].into_iter(), None, Config::default());
-            dummy_ctx.prepare_machine("`{let dsp = | | 0.0}").unwrap();
-            dummy_ctx.take_vm().unwrap()
-        });
+    if app.mimium_ctx.as_mut().unwrap().get_vm().is_none() {
+        let src = app.project_str.clone();
+        app.compile(&src);
+    }
+    let ctx = app.mimium_ctx.as_mut().unwrap();
+
+    let vm = ctx.take_vm().unwrap();
     let component = MimiumComponent::new(vm);
     audio::renderer::create_renderer(
         component,
@@ -76,13 +70,10 @@ impl Model {
         }
 
         log::set_logger(GLOBAL_LOGGER.get().unwrap()).expect("failed to set logger");
-        renderer.prepare_play();
-        renderer.control(data::PlayOp::Pause);
         log::debug!("app launched");
         Self {
             audio: renderer,
             app: appmodel,
-            playop_queue: receriver,
             compile_err: None,
             editor_open: false,
             editor_mode: EditorMode::Code,
@@ -188,14 +179,19 @@ impl eframe::App for Model {
                 egui::Modifiers::NONE,
                 egui::Key::Space,
             )) {
-                self.app.playop_queue.send(data::PlayOp::Toggle);
+                if self.audio.is_playing() {
+                    self.app.playstate = PlayState::Paused;
+                    self.pause();
+                } else {
+                    self.app.playstate = PlayState::Playing;
+                    self.play();
+                }
             }
             if i.consume_shortcut(&egui::KeyboardShortcut::new(
                 egui::Modifiers::NONE,
                 egui::Key::ArrowLeft,
             )) {
-                self.app.playop_queue.send(data::PlayOp::JumpTo(0));
-                self.audio.prepare_play();
+                self.halt();
             }
         });
 

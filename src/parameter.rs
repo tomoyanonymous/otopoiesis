@@ -5,7 +5,7 @@ use mimium_lang::{
     interner::{ExprNodeId, ToSymbol},
 };
 use serde::{Deserialize, Serialize};
-use std::{cell::RefCell, ops::RangeInclusive};
+use std::{cell::RefCell, ops::RangeInclusive, sync::Arc};
 
 use crate::atomic::{self, SimpleAtomic};
 pub trait Parameter: Clone + std::fmt::Debug {
@@ -57,31 +57,24 @@ pub trait NumericParameter: Parameter + RangedNumeric {}
 
 #[derive(Clone, Debug)]
 pub struct FloatParameter {
-    value: ExprNodeId,
+    //because the expression storage is thread-local, we can not share Expr refcell between audio thread and GUI.
+    value: Arc<RefCell<f64>>,
     pub range: RangeInclusive<atomic::F32>,
     label: String,
 }
 
 impl FloatParameter {
     pub fn get_value(&self) -> f64 {
-        match self.value.to_expr() {
-            Expr::Literal(Literal::Float(n)) => *n.borrow(),
-            _ => 0.0,
-        }
+        *self.value.borrow()
     }
     pub fn set_value(&self, v: f64) {
-        match self.value.to_expr_ref() {
-            Expr::Literal(Literal::Float(n)) => {
-                *n.borrow_mut() = v;
-            }
-            _ => {}
-        }
+        *self.value.borrow_mut() = v;
     }
 }
 
 impl Parameter for FloatParameter {
     type Element = f32;
-    type Content = ExprNodeId;
+    type Content = Arc<RefCell<f64>>;
     fn new(init: Self::Content, label: impl Into<String>) -> Self {
         Self {
             value: init,
@@ -171,14 +164,6 @@ macro_rules! param_float {
 // }
 // impl NumericParameter for UIntParameter {}
 
-impl Default for FloatParameter {
-    fn default() -> Self {
-        Self::new(
-            Expr::Literal(Literal::Float(RefCell::new(0.0))).into_id_without_span(),
-            "",
-        )
-    }
-}
 // pub struct UIntPairParameter {
 //     value: (AtomicU64,AtomicInt),
 //     range: RangeInclusive<u64,u64>,

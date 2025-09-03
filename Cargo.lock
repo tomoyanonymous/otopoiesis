@@ -2476,6 +2476,27 @@ name = "mimium-lang"
 version = "2.3.1"
 dependencies = [
  "ariadne",
+ "atomic_float",
+ "chumsky",
+ "colog",
+ "half",
+ "homedir",
+ "intx",
+ "itertools",
+ "log",
+ "mimalloc",
+ "slotmap",
+ "string-interner",
+ "wasm-bindgen",
+]
+
+[[package]]
+name = "mimium-lang"
+version = "2.3.1"
+source = "git+https://github.com/mimium-org/mimium-rs.git?rev=f97323db947b64bbc22bc22b772e5c7d34dce1a3#f97323db947b64bbc22bc22b772e5c7d34dce1a3"
+dependencies = [
+ "ariadne",
+ "atomic_float",
  "chumsky",
  "colog",
  "half",
@@ -3054,7 +3075,7 @@ dependencies = [
  "egui",
  "egui_extras",
  "log",
- "mimium-lang",
+ "mimium-lang 2.3.1 (git+https://github.com/mimium-org/mimium-rs.git?rev=f97323db947b64bbc22bc22b772e5c7d34dce1a3)",
  "rand",
  "rfd",
  "ringbuf",
@@ -3075,7 +3096,7 @@ name = "otopoiesis_lang"
 version = "0.1.0"
 dependencies = [
  "atomic_float",
- "mimium-lang",
+ "mimium-lang 2.3.1",
  "serde",
  "serde_json",
  "serde_with",

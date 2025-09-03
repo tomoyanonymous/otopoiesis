@@ -19,6 +19,7 @@ use mimium_lang::{
     string_t,
     types::{PType, Type},
 };
+use slotmap::Key;
 pub type ProjectChannel = mpsc::Sender<data::Project>;
 pub struct OtopoiesisPlugin {
     pub param_stack: Vec<SliderId>,
@@ -32,16 +33,15 @@ pub struct OtopoiesisPlugin {
 
 impl OtopoiesisPlugin {
     pub fn new(
-        probe_map: Rc<RefCell<ProbeMap>>,
-        slider_map: Rc<RefCell<SliderMap>>,
+
         project_sender: ProjectChannel,
     ) -> Self {
         Self {
             param_stack: vec![],
             track_stack: vec![],
             region_stack: vec![],
-            probe_map,
-            slider_map,
+            probe_map: Default::default(),
+            slider_map: Default::default(),
             project_channel: project_sender,
             shared_time: Arc::new(atomic::U64::from(0)), //lazily initialized
         }
@@ -73,16 +73,23 @@ impl OtopoiesisPlugin {
                 return Value::Number(0.0);
             }
         };
+        let cell = match target.to_expr_ref() {
+            Expr::Literal(Literal::Float(n)) => n,
+            _ => {
+                log::error!("invalid target for slider");
+                return Value::Number(0.0);
+            }
+        };
         let param =
-            FloatParameter::new(target, name.to_string()).set_range(min as f32..=max as f32);
-        let sliderid = self.slider_map.borrow_mut().insert(param);
+            FloatParameter::new(cell.clone(), name.to_string()).set_range(min as f32..=max as f32);
+        self.slider_map.borrow_mut().push(param);
+        let sliderid = self.slider_map.borrow().len() - 1;
         self.param_stack.push(sliderid);
-        let rawid = unsafe { std::mem::transmute::<SliderId, u64>(sliderid) };
         Value::Code(
             Expr::Apply(
                 Expr::Var("get_param".to_symbol()).into_id_without_span(),
                 vec![
-                    Expr::Literal(Literal::Float(RefCell::new(rawid as f64)))
+                    Expr::Literal(Literal::Float(Arc::new(RefCell::new(sliderid as f64))))
                         .into_id_without_span(),
                 ],
             )
@@ -92,15 +99,19 @@ impl OtopoiesisPlugin {
     pub fn get_slider(&mut self, vm: &mut Machine) -> ReturnCode {
         let slider_idx = Machine::get_as::<f64>(vm.get_stack(0)) as u64;
         let slider_idx = unsafe { std::mem::transmute::<u64, SliderId>(slider_idx) };
-        match self.slider_map.borrow().get(slider_idx) {
-            Some(s) => {
-                vm.set_stack(0, Machine::to_value(s.get()));
-            }
-            None => {
-                log::error!("invalid slider index");
-                return 0;
-            }
-        };
+        if let Ok(s) = self.slider_map.try_borrow() {
+            let sid = s.get(slider_idx);
+            match sid {
+                Some(s) => {
+                    let v = s.get() as f64;
+                    vm.set_stack(0, Machine::to_value(v));
+                }
+                None => {
+                    log::error!("invalid slider index");
+                    return 0;
+                }
+            };
+        }
         1
     }
     pub fn make_project(&mut self, v: &[(Value, TypeNodeId)]) -> Value {
@@ -117,6 +128,7 @@ impl OtopoiesisPlugin {
         for slider in self.param_stack.drain(..) {
             project.parameters.push(slider);
         }
+        project.slider_map = self.slider_map.clone();
         self.shared_time = project.current_time.clone();
         self.project_channel
             .send(project)

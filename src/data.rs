@@ -38,10 +38,11 @@ use dirs;
 // pub struct ProbeId(usize);
 new_key_type! {
     pub struct ProbeId;
-    pub struct SliderId;
+    
 }
+pub type SliderId = usize;
 pub type ProbeMap = SlotMap<ProbeId, HeapCons<f64>>;
-pub type SliderMap = SlotMap<SliderId, FloatParameter>;
+pub type SliderMap = Vec<FloatParameter>;
 
 pub struct LaunchArg {
     pub file: Option<String>,
@@ -81,8 +82,7 @@ pub struct AppModel {
     pub project: Project,
     pub project_str: String,
     pub project_file: Option<String>,
-    pub probe_map: Rc<RefCell<ProbeMap>>,
-    pub slider_map: Rc<RefCell<SliderMap>>,
+
     // pub history: undo::Record<action::Action>,
     // pub action_tx: mpsc::Sender<action::Action>,
     // pub action_rx: mpsc::Receiver<action::Action>,
@@ -117,8 +117,6 @@ impl AppModel {
             project: Project::new(String::new(), 44100),
             project_str,
             project_file,
-            probe_map: Default::default(),
-            slider_map: Default::default(),
             // history: undo::Record::new(),
             // action_tx,
             // action_rx,
@@ -226,8 +224,7 @@ impl AppModel {
     }
     fn get_default_context(&mut self) -> ExecContext {
         let plugin = mimium_fns::OtopoiesisPlugin::new(
-            self.probe_map.clone(),
-            self.slider_map.clone(),
+
             self.project_tx.clone(),
         );
         let mut ctx = ExecContext::new([].into_iter(), None, Config::default());
@@ -324,6 +321,7 @@ pub struct Project {
     pub current_time: Arc<atomic::U64>, //in sample
     pub tracks: Vec<Track>,
     pub parameters: Vec<SliderId>,
+    pub slider_map:Rc<RefCell<SliderMap>>
 }
 impl Project {
     pub fn new(label: String, sample_rate: u64) -> Self {
@@ -333,6 +331,7 @@ impl Project {
             current_time: Arc::new(atomic::U64::from(0)),
             tracks: vec![],
             parameters: vec![],
+            slider_map: Default::default()
         }
     }
 }

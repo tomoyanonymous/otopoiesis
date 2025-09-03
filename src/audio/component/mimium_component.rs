@@ -28,12 +28,15 @@ impl Component for MimiumComponent {
 
     fn prepare_play(&mut self, info: &crate::audio::PlaybackInfo) {
         self.vm.clear_stack();
+        self.vm.clear_states();
         self.vm.execute_main();
     }
 
     fn render(&mut self, input: &[f32], output: &mut [f32], info: &crate::audio::PlaybackInfo) {
         for o in output.iter_mut() {
-            *o = self.vm.execute_entry(&self.dsp_idx) as f32;
+            let _ = self.vm.execute_entry(&self.dsp_idx);
+            let res = Machine::get_as::<f64>(self.vm.get_stack(0));
+            *o = res as f32;
         }
     }
 }

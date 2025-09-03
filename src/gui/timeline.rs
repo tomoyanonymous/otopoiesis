@@ -70,11 +70,13 @@ impl<'a> egui::Widget for Model<'a> {
             let add_track_button = ui.button("+").on_hover_text("Add new Track");
             ui.vertical(|ui| {
                 self.app.project.parameters.iter_mut().for_each(|param| {
-                    let mut sliders = self.app.slider_map.borrow_mut();
-                    ui.horizontal(|ui| {
-                        let slider = sliders.get_mut(*param).unwrap();
-                        slider_from_parameter(slider, false, ui);
-                    });
+                    if let Ok(sliders) = self.app.project.slider_map.try_borrow_mut() {
+                        if let Some(slider) = sliders.get(*param) {
+                            ui.horizontal(|ui| {
+                                slider_from_parameter(slider, false, ui);
+                            });
+                        }
+                    }
                 });
             });
             if add_track_button.clicked() {
