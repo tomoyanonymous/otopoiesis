@@ -17,8 +17,8 @@ description = "a constructive audio programming environment with timeline-based 
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-# mimium-lang = { path = "../mimium-rs/mimium-lang" }
-mimium-lang = { git = "https://github.com/mimium-org/mimium-rs.git", rev = "f97323db947b64bbc22bc22b772e5c7d34dce1a3" }
+mimium-lang = { path = "../mimium-rs/mimium-lang" }
+# mimium-lang = { git = "https://github.com/mimium-org/mimium-rs.git", rev = "f97323db947b64bbc22bc22b772e5c7d34dce1a3" }
 ringbuf = "*"
 serde = { version = "*", features = ["rc"] }
 serde_json = "*"

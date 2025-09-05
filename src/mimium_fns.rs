@@ -26,16 +26,13 @@ pub struct OtopoiesisPlugin {
     track_stack: Vec<Track>,
     region_stack: Vec<Region>,
     probe_map: Rc<RefCell<ProbeMap>>,
-    slider_map: Rc<RefCell<SliderMap>>,
+    slider_map: Vec<Arc<FloatParameter>>,
     project_channel: ProjectChannel,
     shared_time: Arc<atomic::U64>,
 }
 
 impl OtopoiesisPlugin {
-    pub fn new(
-
-        project_sender: ProjectChannel,
-    ) -> Self {
+    pub fn new(project_sender: ProjectChannel) -> Self {
         Self {
             param_stack: vec![],
             track_stack: vec![],
@@ -82,14 +79,14 @@ impl OtopoiesisPlugin {
         };
         let param =
             FloatParameter::new(cell.clone(), name.to_string()).set_range(min as f32..=max as f32);
-        self.slider_map.borrow_mut().push(param);
-        let sliderid = self.slider_map.borrow().len() - 1;
+        self.slider_map.push(Arc::new(param));
+        let sliderid = self.slider_map.len() - 1;
         self.param_stack.push(sliderid);
         Value::Code(
             Expr::Apply(
                 Expr::Var("get_param".to_symbol()).into_id_without_span(),
                 vec![
-                    Expr::Literal(Literal::Float(Arc::new(RefCell::new(sliderid as f64))))
+                    Expr::Literal(Literal::Float(Arc::new(atomic::F64::new(sliderid as f64))))
                         .into_id_without_span(),
                 ],
             )
@@ -98,20 +95,17 @@ impl OtopoiesisPlugin {
     }
     pub fn get_slider(&mut self, vm: &mut Machine) -> ReturnCode {
         let slider_idx = Machine::get_as::<f64>(vm.get_stack(0)) as u64;
-        let slider_idx = unsafe { std::mem::transmute::<u64, SliderId>(slider_idx) };
-        if let Ok(s) = self.slider_map.try_borrow() {
-            let sid = s.get(slider_idx);
-            match sid {
-                Some(s) => {
-                    let v = s.get() as f64;
-                    vm.set_stack(0, Machine::to_value(v));
-                }
-                None => {
-                    log::error!("invalid slider index");
-                    return 0;
-                }
-            };
-        }
+        let s = self.slider_map.get(slider_idx as usize);
+        match s {
+            Some(s) => {
+                // let v = s.get();
+                vm.set_stack(0, Machine::to_value(1.0f64));
+            }
+            None => {
+                log::error!("invalid slider index");
+                return 0;
+            }
+        };
         1
     }
     pub fn make_project(&mut self, v: &[(Value, TypeNodeId)]) -> Value {

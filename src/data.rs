@@ -42,7 +42,7 @@ new_key_type! {
 }
 pub type SliderId = usize;
 pub type ProbeMap = SlotMap<ProbeId, HeapCons<f64>>;
-pub type SliderMap = Vec<FloatParameter>;
+pub type SliderMap = Vec<Arc<FloatParameter>>;
 
 pub struct LaunchArg {
     pub file: Option<String>,
@@ -321,7 +321,7 @@ pub struct Project {
     pub current_time: Arc<atomic::U64>, //in sample
     pub tracks: Vec<Track>,
     pub parameters: Vec<SliderId>,
-    pub slider_map:Rc<RefCell<SliderMap>>
+    pub slider_map: SliderMap
 }
 impl Project {
     pub fn new(label: String, sample_rate: u64) -> Self {

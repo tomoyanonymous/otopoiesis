@@ -2491,26 +2491,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "mimium-lang"
-version = "2.3.1"
-source = "git+https://github.com/mimium-org/mimium-rs.git?rev=f97323db947b64bbc22bc22b772e5c7d34dce1a3#f97323db947b64bbc22bc22b772e5c7d34dce1a3"
-dependencies = [
- "ariadne",
- "atomic_float",
- "chumsky",
- "colog",
- "half",
- "homedir",
- "intx",
- "itertools",
- "log",
- "mimalloc",
- "slotmap",
- "string-interner",
- "wasm-bindgen",
-]
-
-[[package]]
 name = "minicov"
 version = "0.3.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3075,7 +3055,7 @@ dependencies = [
  "egui",
  "egui_extras",
  "log",
- "mimium-lang 2.3.1 (git+https://github.com/mimium-org/mimium-rs.git?rev=f97323db947b64bbc22bc22b772e5c7d34dce1a3)",
+ "mimium-lang",
  "rand",
  "rfd",
  "ringbuf",
@@ -3096,7 +3076,7 @@ name = "otopoiesis_lang"
 version = "0.1.0"
 dependencies = [
  "atomic_float",
- "mimium-lang 2.3.1",
+ "mimium-lang",
  "serde",
  "serde_json",
  "serde_with",

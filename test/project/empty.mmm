@@ -2,8 +2,9 @@
 `{
 let phasor = | |{(self+1.0)% 44100}
 let dsp:()->float = Project!("test project ",`| | {
-        let gain = Slider!("gain",`0.5,0.0,1.0)
-        sin(440*3.1415 * 2*phasor() /44100) *gain
+        // let gain = Slider!("gain",`1.0,0.0,1.0)
+        let gain = 1.0
+        sin(440*3.1415 * 2*phasor() /44100)*1.0
         // gain
     })
 }
