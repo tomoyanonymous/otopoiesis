@@ -25,51 +25,23 @@ enum EditorMode {
 use mimium_component::MimiumComponent;
 pub struct Model {
     app: data::AppModel,
-    audio: Renderer<MimiumComponent>,
-    compile_err: Option<serde_json::Error>,
     // ui: gui::app::State,
     editor_open: bool,
     editor_mode: EditorMode,
     logger_open: bool,
 }
 
-fn new_renderer(app: &mut data::AppModel) -> Renderer<MimiumComponent> {
-    if app.mimium_ctx.as_mut().unwrap().get_vm().is_none() {
-        let src = app.project_str.clone();
-        app.compile(&src);
-    }
-    let ctx = app.mimium_ctx.as_mut().unwrap();
-
-    let vm = ctx.take_vm().unwrap_or_else(|| {
-        log::error!("failed to compile code, use dummy dsp");
-        let dummy_src = "let dsp = | | 0.0 ";
-        app.compile(&dummy_src);
-        app.mimium_ctx.as_mut().unwrap().take_vm().unwrap()
-    });
-    let component = MimiumComponent::new(vm);
-    audio::renderer::create_renderer(
-        component,
-        Some(app.project.sample_rate.load() as u32),
-        Some(audio::DEFAULT_BUFFER_LEN),
-        app.project.current_time.clone(),
-    )
-}
-
 impl Model {
     pub fn new(cc: &eframe::CreationContext<'_>, arg: Option<data::LaunchArg>) -> Self {
         let arg = arg.unwrap_or_default();
-        let (sender, receriver) = mpsc::channel();
         Self::setup_custom_fonts(&cc.egui_ctx);
-        let mut appmodel =
-            data::AppModel::new(sender, PlayState::Stopped, data::GlobalSetting, arg);
+        let mut appmodel = data::AppModel::new(PlayState::Stopped, data::GlobalSetting, arg);
         let _ = appmodel.code_to_ui();
         let initsrc = &appmodel.project_str.clone();
         appmodel.compile(&initsrc);
         // let ui = gui::app::State::new(&appmodel);
         // #[allow(clippy::arc_with_non_send_sync)]
         // let mut app = Arc::new(Mutex::new(appmodel));
-
-        let mut renderer = new_renderer(&mut appmodel);
 
         let _logger = GLOBAL_LOGGER.get_or_init(|| Logger::new());
         if cfg!(debug_assertions) {
@@ -81,9 +53,7 @@ impl Model {
         log::set_logger(GLOBAL_LOGGER.get().unwrap()).expect("failed to set logger");
         log::debug!("app launched");
         Self {
-            audio: renderer,
             app: appmodel,
-            compile_err: None,
             editor_open: false,
             editor_mode: EditorMode::Code,
             logger_open: false,
@@ -120,29 +90,6 @@ impl Model {
         // Tell egui to use these fonts:
         ctx.set_fonts(fonts);
     }
-    pub fn play(&mut self) {
-        log::debug!("play");
-        self.refresh_audio();
-
-        self.audio.prepare_play();
-        self.audio.control(PlayOp::Play);
-    }
-    pub fn pause(&mut self) {
-        log::debug!("pause");
-        self.audio.control(PlayOp::Pause);
-    }
-    pub fn halt(&mut self) {
-        log::debug!("halt");
-        self.audio.control(PlayOp::Halt);
-    }
-    fn refresh_audio(&mut self) {
-        log::debug!("refresh audio");
-        let (sender, receiver) = mpsc::channel();
-        self.app.playop_queue = sender;
-        self.audio = new_renderer(&mut self.app);
-        self.audio.prepare_play();
-        self.audio.control(PlayOp::Pause);
-    }
 }
 
 impl eframe::App for Model {
@@ -154,68 +101,12 @@ impl eframe::App for Model {
             self.app.ui_to_code();
             // self.ui.sync_state(&app.project.tracks);
         }
-        match self.app.playstate {
-            PlayState::Playing if !self.audio.is_playing() => {
-                self.play();
-            }
-            PlayState::Paused if self.audio.is_playing() => {
-                self.pause();
-            }
-            PlayState::Stopped if self.audio.is_playing() => {
-                self.halt();
-            }
-            _ => {}
-        };
-
-        ctx.input_mut(|i| {
-            if i.consume_shortcut(&egui::KeyboardShortcut::new(
-                egui::Modifiers::COMMAND,
-                egui::Key::Z,
-            )) && self.app.can_undo()
-            {
-                self.app.undo();
-                // self.ui.sync_state(&app.project.tracks);
-            }
-            if i.consume_shortcut(&egui::KeyboardShortcut::new(
-                egui::Modifiers::COMMAND.plus(egui::Modifiers::SHIFT),
-                egui::Key::Z,
-            )) && self.app.can_redo()
-            {
-                self.app.redo();
-                // self.ui.sync_state(&app.project.tracks);
-            }
-            if i.consume_shortcut(&egui::KeyboardShortcut::new(
-                egui::Modifiers::NONE,
-                egui::Key::Space,
-            )) && !self.editor_open
-            //do not play/pause when editor is focused to prevent from misediting
-            {
-                if self.audio.is_playing() {
-                    self.app.playstate = PlayState::Paused;
-                    self.pause();
-                } else {
-                    self.app.playstate = PlayState::Playing;
-                    self.play();
-                }
-            }
-            if i.consume_shortcut(&egui::KeyboardShortcut::new(
-                egui::Modifiers::NONE,
-                egui::Key::ArrowLeft,
-            )) {
-                self.halt();
-            }
-        });
 
         let style = egui::Style {
             animation_time: 0.2,
             ..Default::default()
         };
         ctx.set_style(style);
-
-        if self.audio.is_playing() {
-            //needs constant update while playing
-            ctx.request_repaint();
-        }
 
         let _panel = egui::panel::SidePanel::right("Code Viewer")
             .default_width(400.)
@@ -224,85 +115,65 @@ impl eframe::App for Model {
             .show_animated(ctx, self.editor_open, |ui| {
                 egui::ScrollArea::vertical().show(ui, |ui| {
                     let _ = ui.label("Code Editor");
-                    let should_refresh_audio = {
-                        ui.horizontal(|ui| {
-                            let button = ui.menu_button("Code Menu", |ui| {
-                                ui.selectable_value(
-                                    &mut self.editor_mode,
-                                    EditorMode::Code,
-                                    "Code",
-                                );
-                                ui.selectable_value(
-                                    &mut self.editor_mode,
-                                    EditorMode::Result,
-                                    "Result",
-                                );
-                                ui.selectable_value(&mut self.editor_mode, EditorMode::Mir, "Mir");
-                                ui.selectable_value(
-                                    &mut self.editor_mode,
-                                    EditorMode::ByteCode,
-                                    "ByteCode",
-                                );
-                            });
-                            if ui.button("Open").clicked() {
-                                self.app.open_file();
+                    ui.horizontal(|ui| {
+                        let _ = ui.menu_button("Code Menu", |ui| {
+                            ui.selectable_value(&mut self.editor_mode, EditorMode::Code, "Code");
+                            ui.selectable_value(
+                                &mut self.editor_mode,
+                                EditorMode::Result,
+                                "Result",
+                            );
+                            ui.selectable_value(&mut self.editor_mode, EditorMode::Mir, "Mir");
+                            ui.selectable_value(
+                                &mut self.editor_mode,
+                                EditorMode::ByteCode,
+                                "ByteCode",
+                            );
+                        });
+                        if ui.button("Open").clicked() {
+                            if let Some(new_file_path) = self.app.open_file() {
+                                ctx.send_viewport_cmd(egui::ViewportCommand::Title(format!(
+                                    "otopoiesis - {}",
+                                    new_file_path
+                                )));
                             }
-                            ui.add_enabled_ui(self.app.project_file.is_some(), |ui| {
-                                if ui.button("Save").clicked() {
-                                    self.app.save_file();
-                                }
-                            });
-                            if ui.button("Save as").clicked() {
-                                self.app.save_as_file();
+                        }
+                        ui.add_enabled_ui(self.app.project_file.is_some(), |ui| {
+                            if ui.button("Save").clicked() {
+                                self.app.save_file();
                             }
                         });
-                        let widget = match self.editor_mode {
-                            EditorMode::Code | EditorMode::Result => {
-                                egui::TextEdit::multiline(&mut self.app.project_str)
-                                    .font(egui::TextStyle::Monospace) // for cursor height
-                                    .code_editor()
-                                    .lock_focus(false)
-                            }
-                            EditorMode::Mir => {
-                                egui::TextEdit::multiline(&mut self.app.project_mir_str)
-                                    .font(egui::TextStyle::Monospace) // for cursor height
-                                    .interactive(false)
-                            }
-                            EditorMode::ByteCode => {
-                                egui::TextEdit::multiline(&mut self.app.bytecode_str)
-                                    .font(egui::TextStyle::Monospace) // for cursor height
-                                    .interactive(false)
-                            }
-                        };
-                        let editor = ui.add_sized(ui.available_size(), widget);
-                        if editor.gained_focus() {
-                            self.app.ui_to_code();
+                        if ui.button("Save as").clicked() {
+                            self.app.save_as_file();
                         }
-                        let should_refresh_audio = if editor.changed() && editor.lost_focus() {
-                            match self.app.code_to_ui() {
-                                Ok(()) => {
-                                    // self.ui.sync_state(&app.project.tracks);
-                                    true
-                                }
-                                Err(err) => {
-                                    self.compile_err = Some(err);
-                                    false
-                                }
-                            }
-                        } else {
-                            false
-                        };
-                        if let Some(err) = &self.compile_err {
-                            ui.colored_label(
-                                egui::Color32::RED,
-                                format!("failed to evaluate json:{}", err),
-                            );
+                    });
+                    let widget = match self.editor_mode {
+                        EditorMode::Code | EditorMode::Result => {
+                            egui::TextEdit::multiline(&mut self.app.project_str)
+                                .font(egui::TextStyle::Monospace) // for cursor height
+                                .code_editor()
+                                .lock_focus(false)
                         }
-
-                        should_refresh_audio
+                        EditorMode::Mir => {
+                            egui::TextEdit::multiline(&mut self.app.project_mir_str)
+                                .font(egui::TextStyle::Monospace) // for cursor height
+                                .interactive(false)
+                        }
+                        EditorMode::ByteCode => {
+                            egui::TextEdit::multiline(&mut self.app.bytecode_str)
+                                .font(egui::TextStyle::Monospace) // for cursor height
+                                .interactive(false)
+                        }
                     };
-                    if should_refresh_audio {
-                        self.refresh_audio();
+                    let editor = ui.add_sized(ui.available_size(), widget);
+                    if editor.gained_focus() {
+                        self.app.ui_to_code();
+                    }
+                    if editor.changed() && editor.lost_focus() {
+                        self.app.code_to_ui()
+                    }
+                    for err in self.app.err_msgs.iter() {
+                        ui.colored_label(egui::Color32::RED, err);
                     }
                 });
             });

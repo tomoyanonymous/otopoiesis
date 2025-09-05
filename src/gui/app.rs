@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use crate::audio::renderer::PlayState;
 use crate::data;
 use crate::gui;
 
@@ -34,11 +35,49 @@ impl<'a> Model<'a> {
     pub fn new(app: &'a mut data::AppModel) -> Self {
         Self { app }
     }
-
+    fn consume_shortcuts(&mut self, ctx: &egui::Context) {
+        ctx.input_mut(|i| {
+            if i.consume_shortcut(&egui::KeyboardShortcut::new(
+                egui::Modifiers::COMMAND,
+                egui::Key::Z,
+            )) && self.app.can_undo()
+            {
+                self.app.undo();
+                // self.ui.sync_state(&app.project.tracks);
+            }
+            if i.consume_shortcut(&egui::KeyboardShortcut::new(
+                egui::Modifiers::COMMAND.plus(egui::Modifiers::SHIFT),
+                egui::Key::Z,
+            )) && self.app.can_redo()
+            {
+                self.app.redo();
+                // self.ui.sync_state(&app.project.tracks);
+            }
+            if i.consume_shortcut(&egui::KeyboardShortcut::new(
+                egui::Modifiers::NONE,
+                egui::Key::Space,
+            ))
+            //do not play/pause when editor is focused to prevent from misediting
+            {
+                if self.app.is_playing() {
+                    self.app.playstate = PlayState::Paused;
+                    self.app.pause();
+                } else {
+                    self.app.playstate = PlayState::Playing;
+                    self.app.code_to_ui();
+                    self.app.play();
+                }
+            }
+            if i.consume_shortcut(&egui::KeyboardShortcut::new(
+                egui::Modifiers::NONE,
+                egui::Key::ArrowLeft,
+            )) {
+                self.app.halt();
+            }
+        });
+    }
     pub fn show_ui(&mut self, ctx: &egui::Context) {
         let is_mac = ctx.os() == egui::os::OperatingSystem::Mac;
-
-        let app = &mut self.app;
 
         egui::panel::TopBottomPanel::top("header").show(ctx, |ui| {
             ui.vertical(|ui| {
@@ -46,15 +85,15 @@ impl<'a> Model<'a> {
                 ui.horizontal(|ui| {
                     ui.menu_button("File", |ui| {
                         if ui.button("Open").clicked() {
-                            app.open_file();
+                            self.app.open_file();
                         }
-                        ui.add_enabled_ui(app.project_file.is_some(), |ui| {
+                        ui.add_enabled_ui(self.app.project_file.is_some(), |ui| {
                             if ui.button("Save").clicked() {
-                                app.save_as_file();
+                                self.app.save_as_file();
                             }
                         });
                         if ui.button("Save as").clicked() {
-                            app.save_as_file();
+                            self.app.save_as_file();
                         }
 
                         // if ui.button("Force Sync Ui State(Debug)").clicked() {
@@ -74,7 +113,7 @@ impl<'a> Model<'a> {
                         );
                         let str = undo_sk.format(&egui::ModifierNames::NAMES, is_mac);
                         let undobutton = ui.add_enabled(
-                            app.can_undo(),
+                            self.app.can_undo(),
                             egui::Button::new(format!(
                                 "Undo  | {}",
                                 // app.history.undo_text().unwrap_or_default(),
@@ -83,12 +122,12 @@ impl<'a> Model<'a> {
                         );
                         // list truncated history here
                         if undobutton.clicked() {
-                            app.undo();
+                            self.app.undo();
                         };
                         let str = redo_sk.format(&egui::ModifierNames::NAMES, is_mac);
                         if ui
                             .add_enabled(
-                                app.can_redo(),
+                                self.app.can_redo(),
                                 egui::Button::new(format!(
                                     "Redo | {}",
                                     // app.history.redo_text().unwrap_or_default(),
@@ -97,21 +136,26 @@ impl<'a> Model<'a> {
                             )
                             .clicked()
                         {
-                            app.redo();
+                            self.app.redo();
                         }
                     })
                 })
             });
         });
         egui::CentralPanel::default().show(ctx, |ui| {
+            self.consume_shortcuts(ctx);
+            if self.app.is_playing() {
+                //needs constant update while playing
+                ctx.request_repaint();
+            }
             egui::ScrollArea::both().show(ui, |ui| {
-                ui.add(super::timeline::Model::new(app));
+                ui.add(super::timeline::Model::new(self.app));
 
                 egui::panel::TopBottomPanel::bottom("footer").show(ctx, |ui| {
-                    let mut transportmodel = gui::transport::Model::new(
-                        &mut app.playstate,
-                        app.project.sample_rate.load(),
-                        app.project.current_time.clone(),
+                    let transportmodel = gui::transport::Model::new(
+                        &mut self.app.playstate,
+                        self.app.project.sample_rate.load(),
+                        self.app.project.current_time.clone(),
                     );
                     ui.add(transportmodel);
                 });

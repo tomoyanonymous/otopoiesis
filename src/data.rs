@@ -2,14 +2,15 @@
 
 use crate::app::filemanager::{self, FileManager};
 use crate::atomic::{self, SimpleAtomic};
-use crate::audio::renderer::PlayState;
+use crate::audio::renderer::{PlayState, Renderer, RendererBase};
+use crate::audio::{self, MimiumComponent};
 use crate::{data, mimium_fns};
 
 use crate::parameter::FloatParameter;
 use coreaudio_sys::erfcf;
-use mimium_lang::Config;
 use mimium_lang::interner::ToSymbol;
 use mimium_lang::runtime::vm::Machine;
+use mimium_lang::{Config, ast};
 use mimium_lang::{ExecContext, plugin};
 use rfd;
 use ringbuf::HeapCons;
@@ -72,15 +73,16 @@ pub struct ConversionError {}
 
 // #[derive(Serialize, Deserialize, Clone)]
 pub struct AppModel {
-    pub playop_queue: mpsc::Sender<data::PlayOp>,
+    pub audio: Option<Renderer<MimiumComponent>>,
     pub playstate: PlayState,
     pub global_setting: GlobalSetting,
     pub launch_arg: LaunchArg,
-    pub mimium_ctx: Option<ExecContext>,
     project_tx: mpsc::Sender<data::Project>,
     project_rx: mpsc::Receiver<data::Project>,
     pub project: Project,
+    pub err_msgs: Vec<String>,
     pub project_str: String,
+    pub project_ast: Option<ast::program::Program>,
     pub project_mir_str: String,
     pub bytecode_str: String,
     pub project_file: Option<String>,
@@ -90,12 +92,44 @@ pub struct AppModel {
 }
 
 impl AppModel {
-    pub fn new(
-        playop_queue: mpsc::Sender<data::PlayOp>,
-        playstate: PlayState,
-        global_setting: GlobalSetting,
-        launch_arg: LaunchArg,
-    ) -> Self {
+    pub fn play(&mut self) {
+        // need to compile before play to update instance
+        log::debug!("play");
+        if let Some(audio) = &mut self.audio {
+            audio.control(PlayOp::Play);
+        }
+    }
+    pub fn pause(&mut self) {
+        log::debug!("pause");
+        if let Some(audio) = &mut self.audio {
+            audio.control(PlayOp::Pause);
+        }
+    }
+    pub fn halt(&mut self) {
+        log::debug!("halt");
+        if let Some(audio) = &mut self.audio {
+            audio.control(PlayOp::Halt);
+        }
+    }
+    pub fn is_playing(&self) -> bool {
+        if let Some(audio) = &self.audio {
+            audio.is_playing()
+        } else {
+            false
+        }
+    }
+    fn new_renderer(&self, mut ctx: ExecContext) -> Option<Renderer<MimiumComponent>> {
+        ctx.take_vm().map(|vm| {
+            let component = MimiumComponent::new(vm);
+            audio::renderer::create_renderer(
+                component,
+                Some(self.project.sample_rate.load() as u32),
+                Some(audio::DEFAULT_BUFFER_LEN),
+                self.project.current_time.clone(),
+            )
+        })
+    }
+    pub fn new(playstate: PlayState, global_setting: GlobalSetting, launch_arg: LaunchArg) -> Self {
         // let transport = Arc::new(transport);
         let file = launch_arg.file.clone();
         let project_file = file.map(|file| {
@@ -108,18 +142,19 @@ impl AppModel {
         }
         let (project_tx, project_rx) = mpsc::channel();
         Self {
-            playop_queue,
+            audio: None,
             global_setting,
             playstate,
             launch_arg,
-            mimium_ctx: None,
             project_tx,
             project_rx,
             project: Project::new(String::new(), 44100),
             project_str,
+            err_msgs: vec![],
             project_mir_str: String::new(),
             bytecode_str: String::new(),
             project_file,
+            project_ast: None,
             // history: undo::Record::new(),
             // action_tx,
             // action_rx,
@@ -155,19 +190,26 @@ impl AppModel {
         self.ui_to_code();
     }
 
-    pub fn open_file(&mut self) {
+    pub fn open_file(&mut self) -> Option<String> {
         #[cfg(not(target_arch = "wasm32"))]
         {
             let dir = self.project_file.clone().unwrap_or("~/".to_string());
-            let file = rfd::FileDialog::new()
+            if let Some(file) = rfd::FileDialog::new()
                 .add_filter("json", &["json"])
                 .set_directory(dir)
-                .pick_file();
-            let path_str = String::from(file.unwrap().to_string_lossy());
+                .pick_file()
+            {
+                let path_str = String::from(file.to_string_lossy());
 
-            let _ =
-                filemanager::GLOBAL_FILE_MANAGER.read_to_string(path_str, &mut self.project_str);
+                let _ = filemanager::GLOBAL_FILE_MANAGER
+                    .read_to_string(path_str, &mut self.project_str);
+                Some(file.to_string_lossy().to_string())
+            } else {
+                None
+            }
         }
+        #[cfg(target_arch = "wasm32")]
+        None
     }
     pub fn save_file(&mut self) {
         match &self.project_file {
@@ -195,18 +237,18 @@ impl AppModel {
         }
     }
     pub fn ui_to_code(&mut self) {
-        // let json = serde_json::to_string_pretty(&self.source);
-        // let json_str = json.unwrap_or_else(|e| {
-        //     println!("{}", e);
-        //     "failed to print".to_string()
-        // });
+        if let Some(formatted_src) = self
+            .project_ast
+            .as_ref()
+            .map(|ast| mimium_fmt::format_ast(ast.clone(), 40))
+            .flatten()
+        {
+            self.project_str = formatted_src.clone();
+        }
         // self.project_str = json_str;
     }
-    pub fn code_to_ui(&mut self) -> Result<(), serde_json::Error> {
-        // serde_json::from_str::<Expr>(&self.project_str).map(|expr| {
-        //     self.source = Some(expr);
-        // })
-        Ok(())
+    pub fn code_to_ui(&mut self) {
+        self.compile(self.project_str.clone().as_str());
     }
     pub fn get_track_for_id_mut(&mut self, id: usize) -> Option<&mut Track> {
         self.project.tracks.get_mut(id)
@@ -234,47 +276,40 @@ impl AppModel {
     pub fn compile(&mut self, source: &str) -> bool {
         log::debug!("compiling source...{}", source);
         // compile mir for display
-        {
-            let mut ctx = self.get_default_context();
-            ctx.prepare_compiler();
-            let mir = ctx.get_compiler_mut().unwrap().emit_mir(source);
-            if let Ok(mir) = mir {
-                self.project_mir_str = mir.to_string();
-            };
-        }
-        //compile bytecode for display
 
         let mut ctx = self.get_default_context();
         ctx.prepare_compiler();
-        let bytecode = ctx.get_compiler_mut().unwrap().emit_bytecode(source);
-        if let Ok(bytecode) = bytecode {
-            self.bytecode_str = bytecode.to_string();
-        };
+        let res = ctx.get_compiler_mut().unwrap().emit_mir(source).map(|mir| {
+            self.project_mir_str = mir.to_string();
 
-        let mut ctx = self.get_default_context();
-        let res = ctx.prepare_machine(source);
+            //compile bytecode for display
+            let bytecode =
+                mimium_lang::compiler::bytecodegen::gen_bytecode(mir, Default::default());
+
+            self.bytecode_str = bytecode.to_string();
+            ctx.prepare_machine_with_bytecode(bytecode);
+        });
+
         let project = self.project_rx.try_iter().last();
         match (res, project) {
             (Ok(()), Some(project)) => {
-                self.mimium_ctx = Some(ctx);
-                project.slider_map.iter().for_each(|slider| {
-                    log::debug!("slider ptr(app) = {:#?}", Arc::as_ptr(slider));
-                });
-
+                self.audio = self.new_renderer(ctx);
                 self.project = project;
-
+                self.err_msgs.clear();
                 true
             }
             (Err(errs), _) => {
+                //todo: use ariadne with report_to_string
                 mimium_lang::utils::error::report(&self.project_str, "".to_symbol(), &errs);
                 errs.iter().for_each(|e| {
-                    log::error!("{}", e.get_message());
+                    self.err_msgs.push(e.get_message());
                 });
                 false
             }
             (Ok(_), None) => {
-                log::error!("project is not built");
-                self.mimium_ctx = Some(ctx);
+                self.err_msgs.clear();
+                self.err_msgs.push("project is not built".to_string());
+                self.audio = self.new_renderer(ctx);
                 self.project = Project::new(String::new(), 44100);
                 true
             }

@@ -2,6 +2,7 @@ use egui::StrokeKind;
 
 // use crate::action::{Action, AddTrack};
 use crate::atomic::{self, SimpleAtomic};
+use crate::audio::renderer::PlayState;
 use crate::data;
 use crate::gui;
 use crate::gui::parameters::slider_from_parameter;
@@ -54,6 +55,19 @@ impl<'a> Model<'a> {
 
 impl<'a> egui::Widget for Model<'a> {
     fn ui(mut self, ui: &mut egui::Ui) -> egui::Response {
+        match self.app.playstate {
+            PlayState::Playing if !self.app.is_playing() => {
+                self.app.code_to_ui();
+                self.app.play();
+            }
+            PlayState::Paused if self.app.is_playing() => {
+                self.app.pause();
+            }
+            PlayState::Stopped if self.app.is_playing() => {
+                self.app.halt();
+            }
+            _ => {}
+        };
         let main = egui::ScrollArea::horizontal().show(ui, |ui| {
             let res = ui
                 .vertical(|ui| {
