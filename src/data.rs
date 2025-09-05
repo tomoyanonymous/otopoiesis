@@ -38,7 +38,7 @@ use dirs;
 // pub struct ProbeId(usize);
 new_key_type! {
     pub struct ProbeId;
-    
+
 }
 pub type SliderId = usize;
 pub type ProbeMap = SlotMap<ProbeId, HeapCons<f64>>;
@@ -81,8 +81,9 @@ pub struct AppModel {
     project_rx: mpsc::Receiver<data::Project>,
     pub project: Project,
     pub project_str: String,
+    pub project_mir_str: String,
+    pub bytecode_str: String,
     pub project_file: Option<String>,
-
     // pub history: undo::Record<action::Action>,
     // pub action_tx: mpsc::Sender<action::Action>,
     // pub action_rx: mpsc::Receiver<action::Action>,
@@ -116,6 +117,8 @@ impl AppModel {
             project_rx,
             project: Project::new(String::new(), 44100),
             project_str,
+            project_mir_str: String::new(),
+            bytecode_str: String::new(),
             project_file,
             // history: undo::Record::new(),
             // action_tx,
@@ -222,25 +225,44 @@ impl AppModel {
         //     .any(|v| v)
         false
     }
-    fn get_default_context(&mut self) -> ExecContext {
-        let plugin = mimium_fns::OtopoiesisPlugin::new(
-
-            self.project_tx.clone(),
-        );
+    fn get_default_context(&self) -> ExecContext {
+        let plugin = mimium_fns::OtopoiesisPlugin::new(self.project_tx.clone());
         let mut ctx = ExecContext::new([].into_iter(), None, Config::default());
         ctx.add_system_plugin(plugin);
         ctx
     }
     pub fn compile(&mut self, source: &str) -> bool {
-        log::debug!("compiling source...");
+        log::debug!("compiling source...{}", source);
+        // compile mir for display
+        {
+            let mut ctx = self.get_default_context();
+            ctx.prepare_compiler();
+            let mir = ctx.get_compiler_mut().unwrap().emit_mir(source);
+            if let Ok(mir) = mir {
+                self.project_mir_str = mir.to_string();
+            };
+        }
+        //compile bytecode for display
+
         let mut ctx = self.get_default_context();
         ctx.prepare_compiler();
-        let res = ctx.prepare_machine(source);
+        let bytecode = ctx.get_compiler_mut().unwrap().emit_bytecode(source);
+        if let Ok(bytecode) = bytecode {
+            self.bytecode_str = bytecode.to_string();
+        };
 
-        match (res, self.project_rx.try_recv()) {
-            (Ok(()), Ok(project)) => {
+        let mut ctx = self.get_default_context();
+        let res = ctx.prepare_machine(source);
+        let project = self.project_rx.try_iter().last();
+        match (res, project) {
+            (Ok(()), Some(project)) => {
                 self.mimium_ctx = Some(ctx);
+                project.slider_map.iter().for_each(|slider| {
+                    log::debug!("slider ptr(app) = {:#?}", Arc::as_ptr(slider));
+                });
+
                 self.project = project;
+
                 true
             }
             (Err(errs), _) => {
@@ -250,9 +272,11 @@ impl AppModel {
                 });
                 false
             }
-            (Ok(_), Err(e)) => {
-                log::error!("project is not built:{}", e);
-                false
+            (Ok(_), None) => {
+                log::error!("project is not built");
+                self.mimium_ctx = Some(ctx);
+                self.project = Project::new(String::new(), 44100);
+                true
             }
         }
     }
@@ -321,7 +345,7 @@ pub struct Project {
     pub current_time: Arc<atomic::U64>, //in sample
     pub tracks: Vec<Track>,
     pub parameters: Vec<SliderId>,
-    pub slider_map: SliderMap
+    pub slider_map: Arc<SliderMap>,
 }
 impl Project {
     pub fn new(label: String, sample_rate: u64) -> Self {
@@ -331,7 +355,7 @@ impl Project {
             current_time: Arc::new(atomic::U64::from(0)),
             tracks: vec![],
             parameters: vec![],
-            slider_map: Default::default()
+            slider_map: Default::default(),
         }
     }
 }

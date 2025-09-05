@@ -13,9 +13,13 @@ pub(crate) mod filemanager;
 
 extern crate eframe;
 extern crate serde_json;
+
+#[derive(PartialEq, Clone, Copy, Debug)]
 enum EditorMode {
     Code,
     Result,
+    Mir,
+    ByteCode,
 }
 
 use mimium_component::MimiumComponent;
@@ -36,7 +40,12 @@ fn new_renderer(app: &mut data::AppModel) -> Renderer<MimiumComponent> {
     }
     let ctx = app.mimium_ctx.as_mut().unwrap();
 
-    let vm = ctx.take_vm().unwrap();
+    let vm = ctx.take_vm().unwrap_or_else(|| {
+        log::error!("failed to compile code, use dummy dsp");
+        let dummy_src = "let dsp = | | 0.0 ";
+        app.compile(&dummy_src);
+        app.mimium_ctx.as_mut().unwrap().take_vm().unwrap()
+    });
     let component = MimiumComponent::new(vm);
     audio::renderer::create_renderer(
         component,
@@ -178,7 +187,9 @@ impl eframe::App for Model {
             if i.consume_shortcut(&egui::KeyboardShortcut::new(
                 egui::Modifiers::NONE,
                 egui::Key::Space,
-            )) {
+            )) && !self.editor_open
+            //do not play/pause when editor is focused to prevent from misediting
+            {
                 if self.audio.is_playing() {
                     self.app.playstate = PlayState::Paused;
                     self.pause();
@@ -212,17 +223,63 @@ impl eframe::App for Model {
             .resizable(true)
             .show_animated(ctx, self.editor_open, |ui| {
                 egui::ScrollArea::vertical().show(ui, |ui| {
+                    let _ = ui.label("Code Editor");
                     let should_refresh_audio = {
-                        let app = &mut self.app;
-                        let _ = ui.label("Code Editor");
-                        let widget = egui::TextEdit::multiline(&mut app.project_str).code_editor();
-
+                        ui.horizontal(|ui| {
+                            let button = ui.menu_button("Code Menu", |ui| {
+                                ui.selectable_value(
+                                    &mut self.editor_mode,
+                                    EditorMode::Code,
+                                    "Code",
+                                );
+                                ui.selectable_value(
+                                    &mut self.editor_mode,
+                                    EditorMode::Result,
+                                    "Result",
+                                );
+                                ui.selectable_value(&mut self.editor_mode, EditorMode::Mir, "Mir");
+                                ui.selectable_value(
+                                    &mut self.editor_mode,
+                                    EditorMode::ByteCode,
+                                    "ByteCode",
+                                );
+                            });
+                            if ui.button("Open").clicked() {
+                                self.app.open_file();
+                            }
+                            ui.add_enabled_ui(self.app.project_file.is_some(), |ui| {
+                                if ui.button("Save").clicked() {
+                                    self.app.save_file();
+                                }
+                            });
+                            if ui.button("Save as").clicked() {
+                                self.app.save_as_file();
+                            }
+                        });
+                        let widget = match self.editor_mode {
+                            EditorMode::Code | EditorMode::Result => {
+                                egui::TextEdit::multiline(&mut self.app.project_str)
+                                    .font(egui::TextStyle::Monospace) // for cursor height
+                                    .code_editor()
+                                    .lock_focus(false)
+                            }
+                            EditorMode::Mir => {
+                                egui::TextEdit::multiline(&mut self.app.project_mir_str)
+                                    .font(egui::TextStyle::Monospace) // for cursor height
+                                    .interactive(false)
+                            }
+                            EditorMode::ByteCode => {
+                                egui::TextEdit::multiline(&mut self.app.bytecode_str)
+                                    .font(egui::TextStyle::Monospace) // for cursor height
+                                    .interactive(false)
+                            }
+                        };
                         let editor = ui.add_sized(ui.available_size(), widget);
                         if editor.gained_focus() {
-                            app.ui_to_code();
+                            self.app.ui_to_code();
                         }
                         let should_refresh_audio = if editor.changed() && editor.lost_focus() {
-                            match app.code_to_ui() {
+                            match self.app.code_to_ui() {
                                 Ok(()) => {
                                     // self.ui.sync_state(&app.project.tracks);
                                     true
@@ -241,25 +298,7 @@ impl eframe::App for Model {
                                 format!("failed to evaluate json:{}", err),
                             );
                         }
-                        ui.horizontal(|ui| {
-                            if ui.button("Code⇆Result").clicked() {
-                                self.editor_mode = match self.editor_mode {
-                                    EditorMode::Code => EditorMode::Result,
-                                    EditorMode::Result => EditorMode::Code,
-                                }
-                            }
-                            if ui.button("Open").clicked() {
-                                app.open_file();
-                            }
-                            ui.add_enabled_ui(app.project_file.is_some(), |ui| {
-                                if ui.button("Save").clicked() {
-                                    app.save_file();
-                                }
-                            });
-                            if ui.button("Save as").clicked() {
-                                app.save_as_file();
-                            }
-                        });
+
                         should_refresh_audio
                     };
                     if should_refresh_audio {

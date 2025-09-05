@@ -35,7 +35,7 @@ impl Component for MimiumComponent {
     fn render(&mut self, input: &[f32], output: &mut [f32], info: &crate::audio::PlaybackInfo) {
         for o in output.iter_mut() {
             let _ = self.vm.execute_entry(&self.dsp_idx);
-            let res = Machine::get_as::<f64>(self.vm.get_stack(0));
+            let res = Machine::get_as::<f64>(self.vm.get_top_n(1)[0]);
             *o = res as f32;
         }
     }

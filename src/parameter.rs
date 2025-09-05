@@ -58,7 +58,7 @@ pub trait NumericParameter: Parameter + RangedNumeric {}
 #[derive(Clone, Debug)]
 pub struct FloatParameter {
     //because the expression storage is thread-local, we can not share Expr refcell between audio thread and GUI.
-    value: Arc<atomic::F64>,
+    value: atomic::F64,
     pub range: RangeInclusive<atomic::F32>,
     label: String,
 }
@@ -74,7 +74,7 @@ impl FloatParameter {
 
 impl Parameter for FloatParameter {
     type Element = f32;
-    type Content = Arc<atomic::F64>;
+    type Content = atomic::F64;
     fn new(init: Self::Content, label: impl Into<String>) -> Self {
         Self {
             value: init,

@@ -26,7 +26,7 @@ pub struct OtopoiesisPlugin {
     track_stack: Vec<Track>,
     region_stack: Vec<Region>,
     probe_map: Rc<RefCell<ProbeMap>>,
-    slider_map: Vec<Arc<FloatParameter>>,
+    slider_map: Arc<SliderMap>,
     project_channel: ProjectChannel,
     shared_time: Arc<atomic::U64>,
 }
@@ -56,30 +56,30 @@ impl OtopoiesisPlugin {
     }
     fn make_slider(&mut self, v: &[(Value, TypeNodeId)]) -> Value {
         assert_eq!(v.len(), 4);
-        let (name, target, min, max) = match (
+        let (name, init, min, max) = match (
             v[0].0.clone(),
             v[1].0.clone(),
             v[2].0.clone(),
             v[3].0.clone(),
         ) {
-            (Value::String(name), Value::Code(e), Value::Number(min), Value::Number(max)) => {
-                (name, e, min, max)
+            (Value::String(name), Value::Number(init), Value::Number(min), Value::Number(max)) => {
+                (name, init, min, max)
             }
             _ => {
                 log::error!("invalid argument");
                 return Value::Number(0.0);
             }
         };
-        let cell = match target.to_expr_ref() {
-            Expr::Literal(Literal::Float(n)) => n,
-            _ => {
-                log::error!("invalid target for slider");
-                return Value::Number(0.0);
-            }
-        };
-        let param =
-            FloatParameter::new(cell.clone(), name.to_string()).set_range(min as f32..=max as f32);
-        self.slider_map.push(Arc::new(param));
+        // let cell = match target.to_expr_ref() {
+        //     Expr::Literal(Literal::Float(n)) => n,
+        //     _ => {
+        //         log::error!("invalid target for slider");
+        //         return Value::Number(0.0);
+        //     }
+        // };
+        let param = FloatParameter::new(atomic::F64::from(init) , name.to_string())
+            .set_range(min as f32..=max as f32);
+        Arc::make_mut(&mut self.slider_map).push(Arc::new(param));
         let sliderid = self.slider_map.len() - 1;
         self.param_stack.push(sliderid);
         Value::Code(
@@ -98,8 +98,8 @@ impl OtopoiesisPlugin {
         let s = self.slider_map.get(slider_idx as usize);
         match s {
             Some(s) => {
-                // let v = s.get();
-                vm.set_stack(0, Machine::to_value(1.0f64));
+                let v = s.get() as f64;
+                vm.set_stack(0, Machine::to_value(v));
             }
             None => {
                 log::error!("invalid slider index");
@@ -119,10 +119,17 @@ impl OtopoiesisPlugin {
         };
 
         let mut project = data::Project::new(name.to_string(), 44100);
-        for slider in self.param_stack.drain(..) {
-            project.parameters.push(slider);
+        for sliderid in self.param_stack.drain(..) {
+            project.parameters.push(sliderid);
         }
-        project.slider_map = self.slider_map.clone();
+        project.slider_map = Arc::clone(&self.slider_map);
+        // self.slider_map.iter().for_each(|slider| {
+        //     project.slider_map.push(slider.clone());
+        //     log::debug!("slider ptr(plugin1) = {:#?}", Arc::as_ptr(slider));
+        // });
+        project.slider_map.iter().for_each(|slider| {
+            log::debug!("slider ptr(plugin2) = {:#?}", Arc::as_ptr(slider));
+        });
         self.shared_time = project.current_time.clone();
         self.project_channel
             .send(project)
